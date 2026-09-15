@@ -566,14 +566,13 @@ class ZUsageApplet extends Applet.Applet {
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {
-            const [x] = actor.get_transformed_position();
             const [width] = actor.get_transformed_size();
             if (width <= 0) continue;
-            // Absolute recomputation from the untranslated layout position:
-            // a cumulative += drifts when the anchor is remeasured after
-            // footer or scroll allocations.
-            const layoutX = x - actor.translation_x;
-            actor.translation_x = Math.round(right - (layoutX + width - 1));
+            // Per-ring absolute alignment: the painted right edge (the glow
+            // ends one pixel inside) goes to the anchor, so repeated syncs
+            // converge instead of drifting.
+            const current = actor.get_transformed_position()[0] + width - 1;
+            actor.translation_x += right - Math.round(current);
         }
         const arrows = this._submenuTriangles || [];
         for (const actor of arrows) {
@@ -1340,6 +1339,7 @@ class ZUsageApplet extends Applet.Applet {
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
                 this._clampPopupHeight();
+                this._syncContentRightEdges();
                 if (open && rows.length > 0 && typeof Mainloop !== "undefined" &&
                     !this._suppressSectionAutoScroll && this.menu && this.menu.isOpen) {
                     Mainloop.idle_add(() => {
@@ -3660,7 +3660,15 @@ class ZUsageApplet extends Applet.Applet {
         // rest. The frame height is locked once per open - later section
         // toggles only change the scrollbar range, never the popup frame, so
         // nothing drifts, jumps or gets cut while the popup is open.
-        const maxMenu = Math.max(240, monitor.height - 16);
+        // Reserve for the top panel: the popup must start below it.
+        let topReserve = 16;
+        try {
+            for (const panel of Main.panelManager.panels) {
+                if (!panel || !panel.actor || panel.panelPosition !== 1) continue;
+                topReserve = Math.max(topReserve, panel.actor.get_height() + 16);
+            }
+        } catch (error) {}
+        const maxMenu = Math.max(240, monitor.height - topReserve);
         if (!this._popupFrameHeight) {
             const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
             this._popupViewport = viewport;
