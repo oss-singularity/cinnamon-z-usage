@@ -564,8 +564,12 @@ class ZUsageApplet extends Applet.Applet {
             const [width] = actor.get_transformed_size();
             if (width <= 0) continue;
             // The circular glow ends one pixel inside its drawing allocation.
-            const shift = Math.round(right - (x + width - 1));
-            if (shift) actor.translation_x += shift;
+            // Absolute recomputation from the untranslated layout position:
+            // a cumulative += drifts when the anchor is remeasured after
+            // footer or scroll allocations.
+            const base = actor._usageBaseTX || 0;
+            const layoutX = x - actor.translation_x;
+            actor.translation_x = base + Math.round(right - (layoutX + width - 1));
         }
         const arrows = (this._submenuTriangles || []).concat(
             (this._limitSections || []).map(section => section.heading.arrow)
@@ -576,8 +580,8 @@ class ZUsageApplet extends Applet.Applet {
             // The transformed origin is not the bounding-box left edge after
             // Cinnamon rotates the disclosure. Measure the actual vertices.
             const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
-            const shift = Math.round(right - edge);
-            if (shift) actor.translation_x += shift;
+            const layoutEdge = edge - actor.translation_x;
+            actor.translation_x = Math.round(right - layoutEdge);
         }
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
@@ -1117,6 +1121,7 @@ class ZUsageApplet extends Applet.Applet {
             rings.translation_x = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
+            rings._usageBaseTX = rings.translation_x;
             for (const summary of summaries) {
                 rings.add_child(
                     this._createQuotaRing(
@@ -1371,6 +1376,7 @@ class ZUsageApplet extends Applet.Applet {
             track_hover: true
         });
         actor.translation_x = -POPUP_RESET_RING_LEFT_SHIFT;
+        actor._usageBaseTX = actor.translation_x;
         const area = new St.DrawingArea({ width: size, height: size });
         const label = new St.Label({
             x_align: Clutter.ActorAlign.CENTER,
@@ -3588,6 +3594,7 @@ class ZUsageApplet extends Applet.Applet {
         this.menu.box.clip_to_allocation = true;
         this._forceActorWidth(this.menu._scroll, width);
         this._forceActorWidth(this.menu._content.actor, width);
+        this.menu._content.actor.clip_to_allocation = false;
         if (this.menu._footer) {
             this._forceActorWidth(this.menu._footer, width);
         }
@@ -3633,26 +3640,6 @@ class ZUsageApplet extends Applet.Applet {
         // The scroll view allocates an unfixed content at the viewport height,
         // which clips the bottom action rows out of existence. Pin the content
         // to its natural height so scrolling reaches every row.
-        const [, contentNatural] = this.menu._content.actor.get_preferred_height(width);
-        this.menu._content.actor.set_height(Math.max(200, contentNatural));
-        // The preferred measurement can exceed the laid-out rows (padding and
-        // separators report inflated naturals). Once the allocation pass has
-        // run, repin the content to the real extent of its children so a fully
-        // scrolled popup ends flush above the footer.
-        if (typeof Mainloop !== "undefined") {
-            Mainloop.timeout_add(60, () => {
-                if (this._destroyed || !this.menu || !this.menu._content) return GLib.SOURCE_REMOVE;
-                let bottom = 0;
-                for (const child of this.menu._content.actor.get_children()) {
-                    bottom = Math.max(bottom, child.y + child.get_height());
-                }
-                const current = this.menu._content.actor.get_height();
-                if (bottom > 0 && Math.abs(current - bottom) > 1) {
-                    this.menu._content.actor.set_height(Math.ceil(bottom));
-                }
-                return GLib.SOURCE_REMOVE;
-            });
-        }
     }
 
     _ensureActorVisible(actor) {

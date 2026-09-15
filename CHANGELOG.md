@@ -7,6 +7,10 @@
   view, so the buttons stay visible and clickable while the quota and history
   content scrolls behind them. The former empty reserve at the popup bottom is
   gone — the footer occupies it.
+- Remove the content height pin entirely: the forced height disabled the
+  scroll view's own adjustment (upper stayed 0), so nothing below the fold
+  ever rendered. The scroll view now works on the content's natural height
+  with clipping disabled on the content actor.
 - Flush scroll bottom: after the allocation pass the pinned content height is
   corrected to the real extent of its rows, so a fully scrolled popup ends
   directly above the footer instead of carrying an empty reserve.
