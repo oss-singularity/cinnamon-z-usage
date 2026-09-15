@@ -79,7 +79,10 @@ for (const scale of [1, 1.25, 2]) {
             }));
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
-                actor: { get_transformed_position() { return [menuX + 48, 0]; } },
+                actor: {
+                    allocation: { x1: menuX + 48 },
+                    get_transformed_position() { return [menuX + 48, 0]; }
+                },
                 isOpen: true
             };
             applet._popupWidth = () => 419;

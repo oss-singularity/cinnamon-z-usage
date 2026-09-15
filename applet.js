@@ -555,8 +555,11 @@ class ZUsageApplet extends Applet.Applet {
         // Stable geometric anchor: the popup's content right edge. The pinned
         // footer action grid no longer shares an edge line with the scrolled
         // content, so its (allocation-dependent) geometry is not used here.
-        const [menuX] = this.menu.actor.get_transformed_position();
-        const right = Math.round(menuX + this._popupWidth() - POPUP_RIGHT_INSET);
+        // The menu actor's own translation (right-panel popup positioning)
+        // pollutes the transformed position; the allocation box is the clean
+        // layout position on screen.
+        const menuX = Math.round(this.menu.actor.allocation.x1);
+        const right = menuX + this._popupWidth() - POPUP_RIGHT_INSET;
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {
