@@ -557,15 +557,39 @@ class ZUsageApplet extends Applet.Applet {
         // The menu actor's own translation (right-panel popup positioning)
         // pollutes the transformed position; the allocation box is the clean
         // layout position on screen.
-        // Countdown rings and disclosure arrows keep the positions their row
-        // layout gives them: re-anchoring them from transformed coordinates
-        // races the popup positioning pass and pushed them off the edge. Only
-        // the chart widths follow the content's real right edge.
         const contentActor = this.menu._content.actor;
         if (!contentActor.get_transformed_position || !contentActor.get_transformed_size) return;
         const [contentX] = contentActor.get_transformed_position();
         const [contentW] = contentActor.get_transformed_size();
-        const right = Math.round(contentX + contentW - POPUP_RIGHT_INSET);
+        // Anchor: the content's real right edge minus the row inset and the
+        // original ring shift - this is where the countdown rings sat in the
+        // original design.
+        const right = Math.round(contentX + contentW - POPUP_RIGHT_INSET -
+            POPUP_RESET_RING_LEFT_SHIFT);
+        const rings = (this._countdownWidgets || []).map(entry => entry.actor);
+        if (this._headerRings) rings.push(this._headerRings);
+        for (const actor of rings) {
+            const [x] = actor.get_transformed_position();
+            const [width] = actor.get_transformed_size();
+            if (width <= 0) continue;
+            // Absolute recomputation from the untranslated layout position:
+            // a cumulative += drifts when the anchor is remeasured after
+            // footer or scroll allocations.
+            const layoutX = x - actor.translation_x;
+            actor.translation_x = Math.round(right - (layoutX + width - 1));
+        }
+        const arrows = (this._submenuTriangles || []).concat(
+            (this._limitSections || []).map(section => section.heading.arrow)
+        );
+        for (const actor of arrows) {
+            const [width] = actor.get_transformed_size();
+            if (width <= 0) continue;
+            // The transformed origin is not the bounding-box left edge after
+            // Cinnamon rotates the disclosure. Measure the actual vertices.
+            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
+            const layoutEdge = edge - actor.translation_x;
+            actor.translation_x = Math.round(right - layoutEdge);
+        }
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);

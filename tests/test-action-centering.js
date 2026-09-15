@@ -86,7 +86,7 @@ for (const scale of [1, 1.25, 2]) {
                     get_transformed_size() { return [395, 0]; }
                 } }
             };
-            const right = menuX + 60 + 395 - 17;
+            const right = menuX + 60 + 395 - 17 - 14;
             Object.assign(applet, {
                 _countdownWidgets: [{ actor: ring }],
                 _limitSections: [{ heading: { arrow: arrows[0] } }],
@@ -95,16 +95,18 @@ for (const scale of [1, 1.25, 2]) {
             });
             for (let rebuild = 0; rebuild < 3; rebuild++) {
                 applet._syncContentRightEdges();
-                if (ring.translation_x !== -14 || chart.width !== right - 110 + 39) {
+                const ringRight = ring.get_transformed_position()[0] + 51;
+                if (ringRight !== right || chart.width !== right - 110 + 39) {
                     throw new Error(
                         `Content edge drift after model/layout change: scale=${scale}, ` +
-                        `menuX=${menuX}, shift=${naturalShift}, ringTX=${ring.translation_x}, ` +
-                        `chartWidth=${chart.width}`
+                        `menuX=${menuX}, shift=${naturalShift}, ringRight=${ringRight}, ` +
+                        `expected=${right}`
                     );
                 }
                 for (const arrow of arrows) {
-                    if (arrow.translation_x !== 0) {
-                        throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}`);
+                    const edge = Math.max(...arrow.get_abs_allocation_vertices().map(v => v.x));
+                    if (edge !== right) {
+                        throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}, edge=${edge}`);
                     }
                 }
             }
