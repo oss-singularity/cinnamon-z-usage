@@ -2,6 +2,10 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- Sticky popup chrome: the header (title, updated stamp, quota rings) and
+  the action footer are pinned outside the scroll view - the content scrolls
+  beneath them, so title, rings and buttons stay visible in every scroll
+  position. The popup never shows an empty chrome strip while scrolling.
 - The action grid (Z.ai Chat / Usage / Refresh now / API Keys / Z.ai / Docs)
   is a pinned footer at the bottom of the popup: it lives outside the scroll
   view, so the buttons stay visible and clickable while the quota and history

@@ -102,9 +102,12 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
         this._scroll._delegate = this._content;
         this._scroll.add_actor(this._content.actor);
+        // Pinned header (title, updated stamp, quota rings) and pinned action
+        // footer: both live outside the scroll view so they stay visible while
+        // the content scrolls behind them.
+        this._header = new St.BoxLayout({ vertical: true });
+        this.box.add_child(this._header);
         this.box.add_child(this._scroll);
-        // Pinned action footer: lives outside the scroll view so the launch
-        // buttons stay visible while the content scrolls behind them.
         this._footer = new St.BoxLayout({ vertical: true });
         this.box.add_child(this._footer);
         this._focusSignalId = global.stage.connect("notify::key-focus", () => {
@@ -977,6 +980,9 @@ class ZUsageApplet extends Applet.Applet {
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
         }
+        if (this.menu._header) {
+            this.menu._header.remove_all_children();
+        }
 
         this._addHeaderItem();
         if (this._snapshot) {
@@ -1132,7 +1138,11 @@ class ZUsageApplet extends Applet.Applet {
             row.add_child(rings);
         }
         item.addActor(row, { expand: true, span: -1 });
-        this.menu.addMenuItem(item);
+        if (this.menu._header) {
+            this.menu._header.add_child(item.actor);
+        } else {
+            this.menu.addMenuItem(item);
+        }
     }
 
     _quotaRingOpacity(window) {
@@ -3596,6 +3606,9 @@ class ZUsageApplet extends Applet.Applet {
         this._forceActorWidth(this.menu._scroll, inner);
         this._forceActorWidth(this.menu._content.actor, inner);
         this.menu._content.actor.clip_to_allocation = false;
+        if (this.menu._header) {
+            this._forceActorWidth(this.menu._header, inner);
+        }
         if (this.menu._footer) {
             this._forceActorWidth(this.menu._footer, inner);
         }
