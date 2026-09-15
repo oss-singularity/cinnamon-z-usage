@@ -79,14 +79,14 @@ for (const scale of [1, 1.25, 2]) {
             }));
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
-                actor: {
-                    allocation: { x1: menuX + 48 },
-                    get_transformed_position() { return [menuX + 48, 0]; }
-                },
-                isOpen: true
+                actor: { allocation: { x1: menuX + 48 } },
+                isOpen: true,
+                _content: { actor: {
+                    get_transformed_position() { return [menuX + 60, 0]; },
+                    get_transformed_size() { return [395, 0]; }
+                } }
             };
-            applet._popupWidth = () => 419;
-            const right = menuX + 48 + 419 - 17;
+            const right = menuX + 60 + 395 - 17;
             Object.assign(applet, {
                 _countdownWidgets: [{ actor: ring }],
                 _limitSections: [{ heading: { arrow: arrows[0] } }],
@@ -95,14 +95,17 @@ for (const scale of [1, 1.25, 2]) {
             });
             for (let rebuild = 0; rebuild < 3; rebuild++) {
                 applet._syncContentRightEdges();
-                const ringRight = ring.get_transformed_position()[0] + ring.get_transformed_size()[0] - 1;
-                const arrowEdge = Math.max(...arrows[0].get_abs_allocation_vertices().map(v => v.x));
-                if (ringRight !== right || chart.width !== right - 110 + 39 || arrowEdge !== right) {
+                if (ring.translation_x !== -14 || chart.width !== right - 110 + 39) {
                     throw new Error(
                         `Content edge drift after model/layout change: scale=${scale}, ` +
-                        `menuX=${menuX}, shift=${naturalShift}, ringRight=${ringRight}, ` +
-                        `expected=${right - 14}`
+                        `menuX=${menuX}, shift=${naturalShift}, ringTX=${ring.translation_x}, ` +
+                        `chartWidth=${chart.width}`
                     );
+                }
+                for (const arrow of arrows) {
+                    if (arrow.translation_x !== 0) {
+                        throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}`);
+                    }
                 }
             }
         }

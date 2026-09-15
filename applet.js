@@ -551,39 +551,21 @@ class ZUsageApplet extends Applet.Applet {
 
     _syncContentRightEdges() {
         if (!this.menu || !this.menu.isOpen) return;
-        if (!this.menu.actor.get_transformed_position) return;
         // Stable geometric anchor: the popup's content right edge. The pinned
         // footer action grid no longer shares an edge line with the scrolled
         // content, so its (allocation-dependent) geometry is not used here.
         // The menu actor's own translation (right-panel popup positioning)
         // pollutes the transformed position; the allocation box is the clean
         // layout position on screen.
-        const menuX = Math.round(this.menu.actor.allocation.x1);
-        const right = menuX + this._popupWidth() - POPUP_RIGHT_INSET;
-        const rings = (this._countdownWidgets || []).map(entry => entry.actor);
-        if (this._headerRings) rings.push(this._headerRings);
-        for (const actor of rings) {
-            const [x] = actor.get_transformed_position();
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // Absolute recomputation from the untranslated layout position:
-            // a cumulative += drifts when the anchor is remeasured after
-            // footer or scroll allocations.
-            const layoutX = x - actor.translation_x;
-            actor.translation_x = Math.round(right - (layoutX + width - 1));
-        }
-        const arrows = (this._submenuTriangles || []).concat(
-            (this._limitSections || []).map(section => section.heading.arrow)
-        );
-        for (const actor of arrows) {
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // The transformed origin is not the bounding-box left edge after
-            // Cinnamon rotates the disclosure. Measure the actual vertices.
-            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
-            const layoutEdge = edge - actor.translation_x;
-            actor.translation_x = Math.round(right - layoutEdge);
-        }
+        // Countdown rings and disclosure arrows keep the positions their row
+        // layout gives them: re-anchoring them from transformed coordinates
+        // races the popup positioning pass and pushed them off the edge. Only
+        // the chart widths follow the content's real right edge.
+        const contentActor = this.menu._content.actor;
+        if (!contentActor.get_transformed_position || !contentActor.get_transformed_size) return;
+        const [contentX] = contentActor.get_transformed_position();
+        const [contentW] = contentActor.get_transformed_size();
+        const right = Math.round(contentX + contentW - POPUP_RIGHT_INSET);
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
@@ -3585,22 +3567,40 @@ class ZUsageApplet extends Applet.Applet {
 
     _lockPopupLayoutWidth() {
         if (!this.menu) return;
-        const width = this._rightPanelPopupLockedWidth > 0
+        const outer = this._rightPanelPopupLockedWidth > 0
             ? this._rightPanelPopupLockedWidth
             : this._popupWidth();
-        this.menu.actor.set_width(width);
-        this.menu.box.set_width(width);
+        // The popup actor keeps the full outer width; only the children are
+        // clamped to the inner width (outer minus theme padding), otherwise
+        // the theme padding pushes them out under the panel.
+        const inner = this._menuInnerWidth(outer);
+        this.menu.actor.set_width(outer);
+        this.menu.box.set_width(outer);
         this.menu.box.clip_to_allocation = true;
-        this._forceActorWidth(this.menu._scroll, width);
-        this._forceActorWidth(this.menu._content.actor, width);
+        this._forceActorWidth(this.menu._scroll, inner);
+        this._forceActorWidth(this.menu._content.actor, inner);
         this.menu._content.actor.clip_to_allocation = false;
         if (this.menu._footer) {
-            this._forceActorWidth(this.menu._footer, width);
+            this._forceActorWidth(this.menu._footer, inner);
+        }
+        // Menu items report inflated minimum widths in the scroll regime and
+        // would overflow the popup; clamp every item to the inner width.
+        const items = this.menu._content.actor.get_children ?
+            this.menu._content.actor.get_children() : [];
+        for (const child of items) {
+            this._forceActorWidth(child, inner);
         }
         for (const entry of this._historySubmenus) {
-            this._forceActorWidth(entry.submenu.menu.actor, width);
-            this._forceActorWidth(entry.submenu.menu.box, width);
+            this._forceActorWidth(entry.submenu.menu.actor, inner);
+            this._forceActorWidth(entry.submenu.menu.box, inner);
         }
+    }
+
+    _menuInnerWidth(width) {
+        // The popup theme pads the actor even when the theme node reports no
+        // padding, so children must never be forced to the full outer width
+        // or they overflow past the right edge under the panel.
+        return Math.max(200, width - 24);
     }
 
     _forceActorWidth(actor, width) {

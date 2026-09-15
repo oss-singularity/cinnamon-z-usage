@@ -11,6 +11,11 @@
   scroll view's own adjustment (upper stayed 0), so nothing below the fold
   ever rendered. The scroll view now works on the content's natural height
   with clipping disabled on the content actor.
+- Menu items are clamped to the popup's inner width: their inflated minimum
+  widths (measured 492 px in a 419 px popup) made the scroll view allocate
+  them past the popup edge, painting the countdown rings on the panel. The
+  popup actor keeps its full outer width while scroll, content and footer are
+  clamped to the inner width (outer minus the theme padding reserve).
 - Countdown rings, disclosure arrows and plot widths align to a stable
   geometric anchor - the popup's own content right edge - instead of the
   footer action grid, whose allocation-dependent geometry let the rings
