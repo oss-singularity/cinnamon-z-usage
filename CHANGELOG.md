@@ -2,6 +2,11 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- Deterministic popup height: the height clamp computes the header, scroll
+  viewport and footer sizes from the real naturals before Cinnamon positions
+  the popup, and menu items are clamped to the inner width - so toggling
+  plan sections, scrolling and reopening can no longer shift the popup, cut
+  the header at the screen top or push the rings under the panel.
 - Sticky popup chrome: the header (title, updated stamp, quota rings) and
   the action footer are pinned outside the scroll view - the content scrolls
   beneath them, so title, rings and buttons stay visible in every scroll

@@ -3643,31 +3643,34 @@ class ZUsageApplet extends Applet.Applet {
 
     _clampPopupHeight(forActor) {
         if (!this.menu || !this.menu._scroll || !this.menu._content) return;
+        if (!this._popupWidth || !this._menuInnerWidth) return;
         if (!Main.layoutManager || !Main.layoutManager.findMonitorForActor) return;
         const monitor = Main.layoutManager.findMonitorForActor(forActor || this.menu.actor);
         if (!monitor || !Number.isFinite(monitor.height) || monitor.height <= 0) return;
-        this.menu._scroll.set_height(-1);
-        this.menu._content.actor.set_height(-1);
-        // Measure at the real popup width: labels wrap at the locked width,
-        // so an unlimited-width measurement undercounts the natural height
-        // and would leave the action rows below the screen edge.
-        let width = this.menu.actor.get_width();
-        if (!(width > 1)) width = this._popupWidth();
-        const [, menuNatural] = this.menu.actor.get_preferred_height(width);
-        // Keep the popup inside the monitor: the scroll area takes the
-        // remaining height instead of clipping the action rows off-screen.
-        const maxHeight = Math.max(240, monitor.height - 96);
-        if (!Number.isFinite(menuNatural) || menuNatural <= maxHeight) return;
-        const [, scrollNatural] = this.menu._scroll.get_preferred_height(width);
-        let chrome = Math.max(0, menuNatural - scrollNatural);
-        if (this.menu._footer) {
-            const [, footerNatural] = this.menu._footer.get_preferred_height(width);
-            chrome += Math.max(0, footerNatural);
-        }
-        this.menu._scroll.set_height(Math.max(200, maxHeight - chrome));
-        // The scroll view allocates an unfixed content at the viewport height,
-        // which clips the bottom action rows out of existence. Pin the content
-        // to its natural height so scrolling reaches every row.
+
+        const outer = this._popupWidth();
+        const inner = this._menuInnerWidth(outer);
+        // Pinned chrome naturals: header on top, footer at the bottom, both
+        // outside the scroll view.
+        const headerNat = this.menu._header ?
+            this.menu._header.get_preferred_height(inner)[1] : 0;
+        const footerNat = this.menu._footer ?
+            this.menu._footer.get_preferred_height(inner)[1] : 0;
+
+        // The content's natural height at the real inner width (children are
+        // freshly built by the rebuild, so this is the true laid-out size).
+        const [, contentNat] = this.menu._content.actor.get_preferred_height(inner);
+
+        // The popup gets at most the monitor height minus a small reserve:
+        // header and footer keep their space, the scroll view absorbs the
+        // rest, and the total height never changes while sections toggle.
+        const maxMenu = Math.max(240, monitor.height - 16);
+        const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
+
+        this.menu._scroll.set_height(viewport);
+        // A fixed popup height up front: Cinnamon positions the popup once
+        // with the final size, so nothing jumps or gets cut at the top.
+        this.menu.actor.set_height(headerNat + viewport + footerNat + 2);
     }
 
     _ensureActorVisible(actor) {
