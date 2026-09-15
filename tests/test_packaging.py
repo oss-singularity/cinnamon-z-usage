@@ -83,13 +83,14 @@ class PackageTests(unittest.TestCase):
     def test_original_artwork_sources_and_no_retired_assets(self):
         files = package.payload()
         self.assertFalse({"icons/codex.png", "icons/chatgpt-white.png"}.intersection(files))
-        for name in ["applet", "usage", "terminal-bot", "chat-bubble"]:
+        for name in ["applet", "usage", "chat-bubble"]:
             self.assertIn(f"icons/{name}.svg", files)
             self.assertIn(b"SPDX-License-Identifier: GPL-3.0-or-later", files[f"icons/{name}.svg"])
-        for name in ["icons/usage-white.png", "icons/terminal-bot.png"]:
-            self.assertIn(name, files)
+        self.assertNotIn("icons/terminal-bot.svg", files)
+        self.assertNotIn("icons/terminal-bot.png", files)
+        self.assertIn("icons/usage-white.png", files)
         self.assertIn(b'fileName: "chat-bubble.svg"', files["applet.js"])
-        self.assertIn(b'fileName: "terminal-bot.png"', files["applet.js"])
+        self.assertNotIn(b'fileName: "terminal-bot.png"', files["applet.js"])
 
     def test_upgrade_removes_only_known_retired_artwork(self):
         with TemporaryDirectory() as directory:

@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-UUID = "chatgpt-usage@oss-singularity"
+UUID = "z-usage@oss-singularity"
 POT = ROOT / "po" / f"{UUID}.pot"
 
 
@@ -28,7 +28,7 @@ def settings_messages(value):
 def extract():
     with tempfile.TemporaryDirectory(prefix="usage-gettext-") as directory:
         work = Path(directory)
-        for name in ["applet.js", "usage-format.js", "path_settings.py", "chatgpt_usage.py"]:
+        for name in ["applet.js", "usage-format.js", "z_usage.py"]:
             (work / name).write_bytes((ROOT / name).read_bytes())
         for name in ["settings-schema", "metadata"]:
             data = json.loads((ROOT / f"{name}.json").read_text())
@@ -46,9 +46,9 @@ def extract():
             "--add-location=file",
             "--sort-output",
             "--no-wrap",
-            "--package-name=ChatGPT Usage Monitor",
+            "--package-name=Z Usage Monitor",
             f"--package-version={json.loads((ROOT / 'metadata.json').read_text())['version']}",
-            "--msgid-bugs-address=https://github.com/oss-singularity/cinnamon-chatgpt-usage/issues",
+            "--msgid-bugs-address=https://github.com/oss-singularity/cinnamon-z-usage/issues",
             "--copyright-holder=OSS Singularity",
             "--output=messages.pot",
         ]
@@ -66,16 +66,16 @@ def extract():
             check=True,
         )
         subprocess.run(
-            common + ["--join-existing", "--language=Python", "path_settings.py", "chatgpt_usage.py"],
+            common + ["--join-existing", "--language=Python", "z_usage.py"],
             cwd=work,
             check=True,
         )
         result = (work / "messages.pot").read_text()
         result = re.sub(r'"POT-Creation-Date: .*?\\n"', '"POT-Creation-Date: 2026-09-08 00:00+0000\\\\n"', result)
-        result = result.replace("SOME DESCRIPTIVE TITLE.", "ChatGPT Usage Monitor translation template.")
+        result = result.replace("SOME DESCRIPTIVE TITLE.", "Z Usage Monitor translation template.")
         result = result.replace("YEAR OSS Singularity", "2026 OSS Singularity")
         result = result.replace(
-            "This file is distributed under the same license as the ChatGPT Usage Monitor package.",
+            "This file is distributed under the same license as the Z Usage Monitor package.",
             "This file is distributed under the GPL-3.0-or-later license.",
         )
         return result

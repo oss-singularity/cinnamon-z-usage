@@ -4,9 +4,12 @@
 
 const GLib = imports.gi.GLib;
 
+// The single account-level limit the Z.ai monitor API reports.
+const ACCOUNT_LIMIT_ID = "zai";
+
 const Gettext = imports.gettext;
 function _(text) {
-    return Gettext.dgettext("chatgpt-usage@oss-singularity", text);
+    return Gettext.dgettext("z-usage@oss-singularity", text);
 }
 function _f(text, ...args) {
     return imports.format.format.apply(_(text), args);
@@ -14,7 +17,7 @@ function _f(text, ...args) {
 
 
 Gettext.bindtextdomain(
-    "chatgpt-usage@oss-singularity",
+    "z-usage@oss-singularity",
     GLib.build_filenamev([GLib.get_user_data_dir(), "locale"])
 );
 
@@ -60,8 +63,8 @@ function listQuotaWindows(limits) {
     const windows = [];
     const sourceLimits = Array.from(limits || []);
     const orderedLimits = sourceLimits
-        .filter(limit => limit.id !== "codex")
-        .concat(sourceLimits.filter(limit => limit.id === "codex"));
+        .filter(limit => limit.id !== ACCOUNT_LIMIT_ID)
+        .concat(sourceLimits.filter(limit => limit.id === ACCOUNT_LIMIT_ID));
 
     for (const limit of orderedLimits) {
         const limitWindows = [];
@@ -623,7 +626,7 @@ function isSparkLimit(limit) {
 function resetNotificationEnabled(limit, options) {
     if (options.notifyAllWeeklyResets === true) return true;
     if (isSparkLimit(limit)) return options.notifySparkWeeklyReset === true;
-    return limit.id === "codex" && options.notifyCodexWeeklyReset === true;
+    return limit.id === ACCOUNT_LIMIT_ID && options.notifyCodexWeeklyReset === true;
 }
 
 function resetWasObserved(previousWindow, currentWindow) {
@@ -933,6 +936,7 @@ function formatAppTooltip(installed, version = null, prefix = "", releaseDate = 
 }
 
 module.exports = {
+    ACCOUNT_LIMIT_ID,
     hasQuotaUsage,
     summarizeWindows,
     listQuotaWindows,

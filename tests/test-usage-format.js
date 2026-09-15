@@ -39,14 +39,14 @@ function assertClose(actual, expected, message, tolerance = 1e-9) {
 
 const summaries = UsageFormat.summarizeWindows([
     {
-        id: "codex",
-        label: "Codex",
+        id: "zai",
+        label: "Z.ai",
         windows: [
             { durationMinutes: 10080, remainingPercent: 87, resetsAt: 100 }
         ]
     },
     {
-        id: "codex_model",
+        id: "zai_model",
         label: "Model",
         windows: [
             { durationMinutes: 300, remainingPercent: 100, resetsAt: 200 },
@@ -62,8 +62,8 @@ assertEqual(summaries[1].remainingPercent, 87, "Most constrained weekly bucket")
 assertEqual(
     UsageFormat.summarizeWindows([
         {
-            id: "codex",
-            label: "Codex",
+            id: "zai",
+            label: "Z.ai",
             windows: [{ durationMinutes: 10080, remainingPercent: 87, lastResetAt: 123456 }]
         }
     ])[0].lastResetAt,
@@ -72,14 +72,14 @@ assertEqual(
 );
 const quotaWindows = UsageFormat.listQuotaWindows([
     {
-        id: "codex",
-        label: "Codex",
+        id: "zai",
+        label: "Z.ai",
         windows: [
             { durationMinutes: 10080, remainingPercent: 87, resetsAt: 100 }
         ]
     },
     {
-        id: "codex_model",
+        id: "zai_model",
         label: "Model",
         windows: [
             { durationMinutes: 10080, remainingPercent: 92, resetsAt: 300 },
@@ -89,8 +89,8 @@ const quotaWindows = UsageFormat.listQuotaWindows([
 ]);
 assertEqual(quotaWindows.length, 3, "Keep quota windows from every limit");
 assertEqual(quotaWindows[0].durationMinutes, 300, "Sort model windows shortest first");
-assertEqual(quotaWindows[1].limitId, "codex_model", "Keep duplicate durations");
-assertEqual(quotaWindows[2].limitId, "codex", "Place account limits after models");
+assertEqual(quotaWindows[1].limitId, "zai_model", "Keep duplicate durations");
+assertEqual(quotaWindows[2].limitId, "zai", "Place account limits after models");
 assertEqual(
     UsageFormat.selectPanelWindows(summaries, false).length,
     1,
@@ -700,7 +700,7 @@ assertEqual(
     "Whole reset count omits decimal zeroes"
 );
 const authenticationError = UsageFormat.parseUsageHelperError(
-    "AUTH_REQUIRED: Sign in to ChatGPT with the ChatGPT App or Codex CLI."
+    "AUTH_REQUIRED: Add a Z.ai API key with Coding Plan access in the applet settings."
 );
 assertEqual(
     authenticationError.authenticationRequired,
@@ -709,7 +709,7 @@ assertEqual(
 );
 assertEqual(
     authenticationError.message,
-    "Sign in to ChatGPT with the ChatGPT App or Codex CLI.",
+    "Add a Z.ai API key with Coding Plan access in the applet settings.",
     "Authentication marker is hidden from the user"
 );
 const refreshError = UsageFormat.parseUsageHelperError("Network unavailable");
@@ -827,7 +827,7 @@ assertEqual(
 assertEqual(
     UsageFormat.formatAppTooltip(true, "codex-cli 0.152.0", "", "01.09.2026"),
     "codex-cli 0.152.0 — 01.09.2026",
-    "Installed Codex tooltip includes release date"
+    "Installed app tooltip includes release date"
 );
 assertEqual(
     UsageFormat.formatAppTooltip(true, "new-version", "chatgpt", null),
@@ -875,8 +875,8 @@ function notificationSnapshot(codexFive, codexWeekly, sparkFive, sparkWeekly, re
     return {
         limits: [
             {
-                id: "codex",
-                label: "Codex",
+                id: "zai",
+                label: "Z.ai",
                 windows: [
                     {
                         durationMinutes: 300,
@@ -891,8 +891,8 @@ function notificationSnapshot(codexFive, codexWeekly, sparkFive, sparkWeekly, re
                 ]
             },
             {
-                id: "codex_spark",
-                label: "GPT-5.3-Codex-Spark",
+                id: "zai_spark",
+                label: "GLM-Spark",
                 windows: [
                     {
                         durationMinutes: 300,
@@ -1029,7 +1029,7 @@ const resetEvents = UsageFormat.buildUsageNotificationEvents(
         enableWeeklyLowNotifications: false
     }
 );
-assertEqual(resetEvents.length, 2, "Master reset switch covers Codex and Spark");
+assertEqual(resetEvents.length, 2, "Master reset switch covers the account limit and Spark");
 assertEqual(resetEvents[0].kind, "reset", "Weekly refresh event kind");
 assertEqual(
     UsageFormat.buildUsageNotificationEvents(

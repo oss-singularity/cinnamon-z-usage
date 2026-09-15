@@ -29,21 +29,19 @@ const UsageFormat = require("./usage-format");
 
 const Gettext = imports.gettext;
 function _(text) {
-    return Gettext.dgettext("chatgpt-usage@oss-singularity", text);
+    return Gettext.dgettext("z-usage@oss-singularity", text);
 }
 function _f(text, ...args) {
     return imports.format.format.apply(_(text), args);
 }
 
 
-const UUID = "chatgpt-usage@oss-singularity";
-const CHATGPT_URL = "https://chatgpt.com/";
-const CODEX_CLOUD_URL = "https://chatgpt.com/codex/cloud";
-const ANALYTICS_URL = "https://chatgpt.com/codex/cloud/settings/analytics#usage";
-const CHATGPT_LINUX_INSTALL_URL = "https://learn.chatgpt.com/docs/linux/linux-app";
-const CODEX_CLI_INSTALL_URL = "https://learn.chatgpt.com/docs/codex/cli#getting-started";
-const CODEX_RELEASE_VERSION = "codex-cli 0.152.0";
-const CODEX_RELEASE_DATE = "01.09.2026";
+const UUID = "z-usage@oss-singularity";
+const ACCOUNT_LIMIT_ID = "zai";
+const ZAI_URL = "https://chat.z.ai/";
+const ZAI_USAGE_URL = "https://z.ai/manage-apikey/coding-plan/personal/usage";
+const ZAI_API_KEYS_URL = "https://z.ai/manage-apikey/apikey-list";
+const ZAI_DOCS_URL = "https://docs.z.ai/devpack/overview";
 const PANEL_FONT_SCALE = 0.95;
 const PANEL_LABEL_SCALE = 0.79;
 const ACTIVITY_TOOLTIP_DELAY_MS = 120;
@@ -82,9 +80,10 @@ const WEEKLY_WINDOW_MINUTES = 10080;
 const WEEKLY_WINDOW_SECONDS = WEEKLY_WINDOW_MINUTES * 60;
 const WEEKLY_RESET_HISTORY_VERSION = 1;
 const POPUP_HEADING_STYLE = "font-size: 100%; font-weight: bold;";
-const AUTH_REQUIRED_TITLE = _("No ChatGPT login found");
-const AUTH_REQUIRED_DESCRIPTION =
-    _("Sign in to ChatGPT with the ChatGPT App or Codex CLI, then choose Refresh now.");
+const AUTH_REQUIRED_TITLE = _("No Z.ai API key found");
+const AUTH_REQUIRED_DESCRIPTION = _(
+    "Add a Z.ai API key with Coding Plan access in the applet settings, then choose Refresh now."
+);
 
 // Only our own menu is specialized. Cinnamon retains ownership of its
 // menu stack, focus handling, positioning and animation completion.
@@ -181,7 +180,7 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
     }
 }
 
-class ChatGptUsageApplet extends Applet.Applet {
+class ZUsageApplet extends Applet.Applet {
     constructor(metadata, orientation, panelHeight, instanceId) {
         super(orientation, panelHeight, instanceId);
 
@@ -207,16 +206,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._rightPanelMenuBaseMarginRight = 0;
         this._refreshConfirmationTimeoutId = 0;
         this._refreshSpinnerTimeoutId = 0;
-        this._resetCancellable = null;
-        this._resetProcess = null;
         this._usageProcess = null;
-        this._backendInfo = null;
-        this._backendDiscovery = null;
-        this._backendCacheKey = null;
-        this._backendCachedAt = 0;
-        this._pendingReset = null;
-        this._resetJournalError = null;
-        this._resetJournalReady = false;
         this._weeklyResetHistory = {};
         this._weeklyResetHistoryDirty = false;
         this._weeklyResetHistoryReady = false;
@@ -243,9 +233,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._actionColumn = null;
         this._actionColumnWidth = POPUP_ACTION_GRID_WIDTH;
         this._installHelpDialog = null;
-        this._resetConfirmationDialog = null;
-        this._resetConsumeBusy = false;
-        this._resetFeedback = null;
         this._refreshQueued = false;
         this._refreshConfirmed = false;
         this._busy = false;
@@ -258,7 +245,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._clockChangedId = 0;
         this._use24HourClock = true;
 
-        this._loadResetAttempt();
         this._loadWeeklyResetHistory();
         this._setDefaults();
         this._bindSystemClockFormat();
@@ -273,8 +259,7 @@ class ChatGptUsageApplet extends Applet.Applet {
     _setDefaults() {
         this.refreshInterval = 3;
         this.activityBucketMinutes = "60";
-        this.codexPath = "";
-        this.chatGptAppPath = "";
+        this.apiKey = "";
         this.showPanelIcon = true;
         this.showWindowLabels = true;
         this.showModelSpecificLimits = true;
@@ -317,8 +302,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             "activityBucketMinutes",
             this._refreshUsage.bind(this)
         );
-        this.settings.bind("codex-path", "codexPath", this._refreshUsage.bind(this));
-        this.settings.bind("chatgpt-app-path", "chatGptAppPath", this._onChatGptAppPathChanged.bind(this));
+        this.settings.bind("api-key", "apiKey", this._refreshUsage.bind(this));
         this.settings.bind("show-panel-icon", "showPanelIcon", layoutChanged);
         this.settings.bind("show-window-labels", "showWindowLabels", layoutChanged);
         this.settings.bind("show-model-specific-limits", "showModelSpecificLimits", this._onModelVisibilityChanged.bind(this));
@@ -583,7 +567,7 @@ class ChatGptUsageApplet extends Applet.Applet {
 
         let panelLimits = this._filterModelLimits(this._snapshot ? this._snapshot.limits : []);
         if (!this.showModelLimitsInPanel) {
-            const accountLimits = panelLimits.filter(limit => limit.id === "codex");
+            const accountLimits = panelLimits.filter(limit => limit.id === ACCOUNT_LIMIT_ID);
             if (accountLimits.length > 0) panelLimits = accountLimits;
         }
         const allSummaries = UsageFormat.summarizeWindows(panelLimits);
@@ -633,12 +617,12 @@ class ChatGptUsageApplet extends Applet.Applet {
 
     _filterModelLimits(limits) {
         return this.showModelSpecificLimits === false
-            ? limits.filter(limit => (limit.id || "codex") === "codex")
+            ? limits.filter(limit => (limit.id || ACCOUNT_LIMIT_ID) === ACCOUNT_LIMIT_ID)
             : limits;
     }
 
     _modelBadge(limit) {
-        if (!limit || limit.limitId === "codex" || limit.id === "codex") return null;
+        if (!limit || limit.limitId === ACCOUNT_LIMIT_ID || limit.id === ACCOUNT_LIMIT_ID) return null;
         const label = String(limit.limitLabel || limit.label || "");
         return /spark/i.test(label) ? "S" : "M";
     }
@@ -979,12 +963,6 @@ class ChatGptUsageApplet extends Applet.Applet {
 
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             this._addCreditItems();
-            if (this._resetFeedback) {
-                this._addStatusItem(
-                    this._resetFeedback.title,
-                    this._resetFeedback.description
-                );
-            }
         } else if (this._authenticationRequired) {
             this._addStatusItem(AUTH_REQUIRED_TITLE, AUTH_REQUIRED_DESCRIPTION);
         } else {
@@ -1048,7 +1026,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._screenshotButton.y_align = Clutter.ActorAlign.START;
         this._screenshotButtonLabel = this._screenshotButton._usageLabel;
         this._buildScreenshotContextMenu();
-        const title = new St.Label({ text: _("ChatGPT Work & Codex usage") });
+        const title = new St.Label({ text: _("Z.ai GLM Coding usage") });
         title.style = POPUP_HEADING_STYLE;
         text.add_child(title);
         if (this._snapshot) {
@@ -1477,7 +1455,7 @@ class ChatGptUsageApplet extends Applet.Applet {
 
     _weeklyResetHistoryFile() {
         return Gio.File.new_for_path(GLib.build_filenamev([
-            GLib.get_user_state_dir(), "cinnamon-chatgpt-usage", "weekly-reset-history.json"
+            GLib.get_user_state_dir(), "cinnamon-z-usage", "weekly-reset-history.json"
         ]));
     }
 
@@ -1534,7 +1512,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             return { timestamp: Math.floor(explicit), estimated: false };
         }
 
-        const limitId = String(window && window.limitId || "codex");
+        const limitId = String(window && window.limitId || ACCOUNT_LIMIT_ID);
         const duration = Number(window && window.durationMinutes);
         const key = `${limitId}:${duration}`;
         const saved = this._weeklyResetHistory[key];
@@ -1556,7 +1534,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         if (Number(duration) !== WEEKLY_WINDOW_MINUTES) return;
         const timestamp = Number(resetAt);
         if (!Number.isFinite(timestamp) || timestamp <= 0) return;
-        const key = `${String(limitId || "codex")}:${WEEKLY_WINDOW_MINUTES}`;
+        const key = `${String(limitId || ACCOUNT_LIMIT_ID)}:${WEEKLY_WINDOW_MINUTES}`;
         const existing = this._weeklyResetHistory[key];
         const existingTimestamp = Number(
             existing && typeof existing === "object" ? existing.lastResetAt : existing
@@ -1773,7 +1751,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             const scale = Number(global.ui_scale) > 0 ? Number(global.ui_scale) : 1;
             const area = [x, y, width, captureHeight].map(value => Math.max(1, Math.round(value * scale)));
             const cornerRadius = this._popupCornerRadiusForScreenshot(scale);
-            const [file, stream] = Gio.file_new_tmp("chatgpt-usage-screenshot-XXXXXX.png");
+            const [file, stream] = Gio.file_new_tmp("z-usage-screenshot-XXXXXX.png");
             if (stream) stream.close(null);
             temporary = file;
             this._screenshotTempFile = file;
@@ -1854,10 +1832,6 @@ class ChatGptUsageApplet extends Applet.Applet {
     }
 
     _addLaunchButtons() {
-        const chatGptApp = this._chatGptAppInfo();
-        const codexPath = this._resolveCodexPath();
-        const codexCommand = this._codexTerminalCommand(codexPath);
-        const codexVersion = this._commandVersion(codexPath);
         const item = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
             activate: false
@@ -1900,50 +1874,19 @@ class ChatGptUsageApplet extends Applet.Applet {
             x_expand: true
         });
 
-        this._chatGptButton = this._createLaunchButton(
-            _("ChatGPT App"),
+        this._chatButton = this._createLaunchButton(
+            _("Z.ai Chat"),
             { fileName: "chat-bubble.svg" },
             true,
-            () => {
-                if (chatGptApp || this._configuredChatGptAppPath()) {
-                    this._launchChatGptApp(chatGptApp);
-                    return;
-                }
-                this._showInstallHelp(
-                    _("Install ChatGPT App"),
-                    _("The ChatGPT desktop app was not found. OpenAI provides it for supported Linux distributions."),
-                    CHATGPT_LINUX_INSTALL_URL
-                );
-            },
-            this._configuredChatGptAppPath() ? (this._resolveChatGptAppPath()
-                ? _("Open the configured ChatGPT app")
-                : _("ChatGPT app path is unavailable. Choose an executable file in settings.")) : this._chatGptAppTooltip(chatGptApp)
+            () => Util.spawn(["xdg-open", ZAI_URL]),
+            _("Open the Z.ai chat web app")
         );
-        this._codexButton = this._createLaunchButton(
-            _("Codex CLI"),
-            { fileName: "terminal-bot.png" },
+        this._usageButton = this._createLaunchButton(
+            _("Usage"),
+            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true },
             true,
-            () => {
-                if (codexCommand) {
-                    this._launchCodexTerminal(codexCommand);
-                    return;
-                }
-                this._showInstallHelp(
-                    _("Install Codex CLI"),
-                    _("No Codex CLI or ChatGPT App backend was found. Follow OpenAI's official getting-started guide to install one, sign in, and then refresh this applet."),
-                    CODEX_CLI_INSTALL_URL
-                );
-            },
-            UsageFormat.formatAppTooltip(
-                Boolean(codexPath),
-                codexVersion,
-                "",
-                this._knownReleaseDate(
-                    codexVersion,
-                    CODEX_RELEASE_VERSION,
-                    CODEX_RELEASE_DATE
-                )
-            )
+            () => Util.spawn(["xdg-open", ZAI_USAGE_URL]),
+            _("Open the Z.ai coding plan usage statistics")
         );
         const refreshConfirmed = this._refreshConfirmed;
         this._refreshButton = this._createLaunchButton(
@@ -1979,18 +1922,18 @@ class ChatGptUsageApplet extends Applet.Applet {
             0
         );
         this._syncRefreshButtonState();
-        const analyticsButton = this._createLaunchButton(
-            _("Analytics"),
+        const apiKeysButton = this._createLaunchButton(
+            _("API Keys"),
             {
-                fileName: "utilities-system-monitor-symbolic.svg",
+                fileName: "web-browser-symbolic.svg",
                 symbolic: true,
                 compact: true
             },
             true,
-            () => Util.spawn(["xdg-open", ANALYTICS_URL])
+            () => Util.spawn(["xdg-open", ZAI_API_KEYS_URL])
         );
-        const chatGptWebButton = this._createLaunchButton(
-            "ChatGPT",
+        const zaiWebButton = this._createLaunchButton(
+            "Z.ai",
             {
                 fileName: "web-browser-symbolic.svg",
                 symbolic: true,
@@ -1998,10 +1941,10 @@ class ChatGptUsageApplet extends Applet.Applet {
                 transparent: true
             },
             true,
-            () => Util.spawn(["xdg-open", CHATGPT_URL])
+            () => Util.spawn(["xdg-open", ZAI_URL])
         );
-        const codexCloudButton = this._createLaunchButton(
-            _("Codex Cloud"),
+        const docsButton = this._createLaunchButton(
+            _("Docs"),
             {
                 fileName: "web-browser-symbolic.svg",
                 symbolic: true,
@@ -2009,14 +1952,14 @@ class ChatGptUsageApplet extends Applet.Applet {
                 transparent: true
             },
             true,
-            () => Util.spawn(["xdg-open", CODEX_CLOUD_URL])
+            () => Util.spawn(["xdg-open", ZAI_DOCS_URL])
         );
-        launchRow.add_child(this._chatGptButton);
-        launchRow.add_child(this._codexButton);
+        launchRow.add_child(this._chatButton);
+        launchRow.add_child(this._usageButton);
         utilityRow.add_child(this._refreshButton);
-        utilityRow.add_child(analyticsButton);
-        webRow.add_child(chatGptWebButton);
-        webRow.add_child(codexCloudButton);
+        utilityRow.add_child(apiKeysButton);
+        webRow.add_child(zaiWebButton);
+        webRow.add_child(docsButton);
         column.add_child(launchRow);
         column.add_child(utilityRow);
         column.add_child(webRow);
@@ -2392,149 +2335,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._refreshSpinnerTimeoutId = 0;
     }
 
-    _showInstallHelp(title, description, url) {
-        if (this._installHelpDialog) this._installHelpDialog.destroy();
-
-        const dialog = new ModalDialog.ModalDialog();
-        const content = new Dialog.MessageDialogContent({ title, description });
-        dialog.contentLayout.add_child(content);
-        const fields = new St.BoxLayout({ vertical: true, x_expand: true });
-        fields.style = "spacing: 8px;";
-        const addPathEntry = (label, value) => {
-            fields.add_child(new St.Label({ text: label }));
-            const entry = new St.Entry({ style_class: "run-dialog-entry", text: value || "", hint_text: _("Automatic detection"), can_focus: true, x_expand: true });
-            entry.accessible_name = label;
-            entry._automaticPath = _("Checking automatic paths…");
-            entry.hint_text = entry._automaticPath;
-            entry.clutter_text.connect("key-focus-in", () => {
-                entry._pathFocused = true;
-                entry.hint_text = "";
-            });
-            entry.clutter_text.connect("key-focus-out", () => {
-                entry._pathFocused = false;
-                entry.hint_text = entry._automaticPath;
-            });
-            fields.add_child(entry);
-            return entry;
-        };
-        const codexEntry = addPathEntry(_("codex-cli path (optional)"), this.codexPath);
-        const chatGptEntry = addPathEntry(_("ChatGPT app path (optional)"), this.chatGptAppPath);
-        const status = new St.Label({ text: _("Leave empty for automatic detection. Codex CLI is preferred."), x_expand: true });
-        status.clutter_text.set_line_wrap(true);
-        status.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
-        fields.add_child(status);
-        const recheck = new St.Button({ label: _("Recheck"), style_class: "notification-button", can_focus: true });
-        fields.add(recheck, { x_fill: false, x_align: St.Align.END });
-        dialog.contentLayout.add_child(fields);
-        let cancelDetection = null;
-        let destroyed = false;
-        const detect = () => {
-            if (cancelDetection) cancelDetection();
-            recheck.reactive = false;
-            cancelDetection = this._detectAutomaticPaths(paths => {
-                if (destroyed) return;
-                for (const [entry, key] of [[codexEntry, "codex"], [chatGptEntry, "chatgpt"]]) {
-                    entry._automaticPath = paths && paths[key] ? paths[key] : _("No automatic path found");
-                    if (!entry._pathFocused) entry.hint_text = entry._automaticPath;
-                }
-                status.set_text(paths ? _("Leave empty for automatic detection. Codex CLI is preferred.") : _("Could not check automatic paths. Try Recheck."));
-                recheck.reactive = true;
-            });
-        };
-        recheck.connect("clicked", detect);
-        dialog.connect("destroy", () => {
-            destroyed = true;
-            if (cancelDetection) cancelDetection();
-        });
-        const close = () => {
-            dialog.destroy();
-            if (this._installHelpDialog === dialog) this._installHelpDialog = null;
-        };
-        dialog.setButtons([
-            {
-                label: _("Close"),
-                action: close,
-                key: Clutter.KEY_Escape
-            },
-            {
-                label: _("Installation guide"),
-                action: () => {
-                    close();
-                    Util.spawn(["xdg-open", url]);
-                }
-            },
-            {
-                label: _("Save and check"),
-                action: () => {
-                    try {
-                        this._saveInstallationPaths(codexEntry.get_text(), chatGptEntry.get_text());
-                        close();
-                    } catch (error) {
-                        status.set_text(String(error.message || error));
-                    }
-                },
-                default: true
-            }
-        ]);
-        this._installHelpDialog = dialog;
-        dialog.open();
-        detect();
-    }
-
-    _detectAutomaticPaths(callback) {
-        let process = null;
-        let timeout = 0;
-        let finished = false;
-        const finish = paths => {
-            if (finished) return;
-            finished = true;
-            if (timeout) Mainloop.source_remove(timeout);
-            timeout = 0;
-            if (!this._destroyed) callback(paths);
-        };
-        try {
-            const python = GLib.find_program_in_path("python3");
-            if (!python) throw new Error(_("python3 was not found"));
-            process = Gio.Subprocess.new([python, `${this.metadata.path}/chatgpt_usage.py`, "--detect-paths"],
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-            timeout = Mainloop.timeout_add_seconds(5, () => {
-                timeout = 0;
-                process.force_exit();
-                finish(null);
-                return GLib.SOURCE_REMOVE;
-            });
-            process.communicate_utf8_async(null, null, (source, result) => {
-                try {
-                    const [ok, stdout] = source.communicate_utf8_finish(result);
-                    finish(ok && source.get_exit_status() === 0 ? JSON.parse(stdout) : null);
-                } catch {
-                    finish(null);
-                }
-            });
-        } catch {
-            finish(null);
-        }
-        return () => {
-            if (finished) return;
-            finished = true;
-            if (timeout) Mainloop.source_remove(timeout);
-            if (process) process.force_exit();
-        };
-    }
-
-    _saveInstallationPaths(codex, chatgpt) {
-        const paths = [["codex-path", _("Codex CLI"), String(codex || "").trim()],
-            ["chatgpt-app-path", _("ChatGPT app"), String(chatgpt || "").trim()]];
-        for (const [, label, value] of paths) {
-            if (value && !this._resolveExecutableFile(value)) {
-                throw new Error(_f("%s: choose an executable file, or leave empty for automatic detection.", label));
-            }
-        }
-        for (const [key, , value] of paths) this.settings.setValue(key, value);
-        this._backendCacheKey = null;
-        this._onChatGptAppPathChanged();
-    }
-
     _launchButtonStyle(state, compact = false, transparent = false, corner = false) {
         if (corner) {
             return [
@@ -2568,170 +2368,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             `background-gradient-end: ${bottom}`,
             `box-shadow: inset 0 1px 2px ${this._menuColor(transparent ? 0.04 : 0.12)}`
         ].join("; ") + ";";
-    }
-
-    _backendPathArguments() {
-        const codex = String(this.codexPath || "").trim();
-        const chatgpt = this._configuredChatGptAppPath();
-        return [...(codex ? ["--codex", codex] : []), ...(chatgpt ? ["--chatgpt-app", chatgpt] : [])];
-    }
-
-    _refreshBackendInfo() {
-        const pathArguments = this._backendPathArguments();
-        const configured = JSON.stringify(pathArguments);
-        if (this._destroyed || this._backendDiscovery) return;
-        const now = GLib.get_monotonic_time();
-        if (this._backendCacheKey === configured && now - this._backendCachedAt < 300000000) return;
-        this._backendCacheKey = configured;
-        this._backendCachedAt = now;
-        this._backendInfo = null;
-        const python = GLib.find_program_in_path("python3");
-        if (!python) return;
-        const argv = [python, `${this.metadata.path}/chatgpt_usage.py`, "--describe-backend"];
-        argv.push(...pathArguments);
-        try {
-            const process = Gio.Subprocess.new(argv,
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-            this._backendDiscovery = process;
-            process.communicate_utf8_async(null, null, (source, result) => {
-                this._backendDiscovery = null;
-                try {
-                    const [ok, stdout] = source.communicate_utf8_finish(result);
-                    if (!this._destroyed && configured === JSON.stringify(this._backendPathArguments()) &&
-                        ok && source.get_exit_status() === 0) {
-                        this._backendInfo = JSON.parse(stdout);
-                        this._scheduleMenuRebuild();
-                    }
-                } catch (error) {
-                    global.logWarning(`${UUID}: backend discovery failed: ${error}`);
-                }
-                if (!this._destroyed && configured !== JSON.stringify(this._backendPathArguments())) {
-                    this._refreshBackendInfo();
-                }
-            });
-        } catch (error) {
-            global.logWarning(`${UUID}: could not start backend discovery: ${error}`);
-        }
-    }
-
-    _commandVersion(executable) {
-        this._refreshBackendInfo();
-        if (!executable || !this._backendInfo) return null;
-        return this._backendInfo.codexVersion;
-    }
-
-    _knownReleaseDate(version, knownVersion, releaseDate) {
-        return version === knownVersion ? releaseDate : null;
-    }
-
-    _chatGptAppTooltip(appInfo) {
-        // Version numbering and filesystem timestamps are not release dates.
-        return UsageFormat.formatAppTooltip(Boolean(appInfo), this._chatGptAppVersion(appInfo), "chatgpt");
-    }
-
-    _chatGptAppVersion(appInfo) {
-        if (this._configuredChatGptAppPath()) return null;
-        this._refreshBackendInfo();
-        if (this._backendInfo && this._backendInfo.chatgptVersion) {
-            return this._backendInfo.chatgptVersion;
-        }
-        if (appInfo) {
-            for (const key of ["Version", "X-AppImage-Version", "X-Version"]) {
-                const value = appInfo.get_string(key);
-                if (value && value.trim()) return value.trim();
-            }
-        }
-        return null;
-    }
-
-    _configuredChatGptAppPath() {
-        const configured = String(this.chatGptAppPath || "").trim();
-        return configured.startsWith("~/")
-            ? GLib.build_filenamev([GLib.get_home_dir(), configured.slice(2)]) : configured;
-    }
-
-    _resolveExecutableFile(value) {
-        const path = value.startsWith("~/")
-            ? GLib.build_filenamev([GLib.get_home_dir(), value.slice(2)]) : value;
-        return path && GLib.path_is_absolute(path) &&
-            GLib.file_test(path, GLib.FileTest.IS_REGULAR) &&
-            GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE) ? path : null;
-    }
-
-    _resolveChatGptAppPath() {
-        return this._resolveExecutableFile(this._configuredChatGptAppPath());
-    }
-
-    _chatGptAppInfo() {
-        if (this._configuredChatGptAppPath()) return null;
-        try {
-            return Gio.DesktopAppInfo.new("chatgpt.desktop");
-        } catch (error) {
-            global.logWarning(`${UUID}: could not inspect ChatGPT desktop app: ${error}`);
-            return null;
-        }
-    }
-
-    _resolveBundledCodexPath() {
-        // Python is the single discovery implementation for CLI and app layouts.
-        return this._backendInfo && this._backendCacheKey === JSON.stringify(this._backendPathArguments())
-            ? this._backendInfo.codex : null;
-    }
-
-    _codexTerminalCommand(codex = this._resolveCodexPath()) {
-        if (!codex) return null;
-        try {
-            const terminalSettings = new Gio.Settings({
-                schema_id: "org.cinnamon.desktop.default-applications.terminal"
-            });
-            const terminal = terminalSettings.get_string("exec").trim();
-            const terminalArgument = terminalSettings.get_string("exec-arg").trim();
-            const [terminalOk, terminalArgv] = GLib.shell_parse_argv(terminal);
-            if (!terminalOk || terminalArgv.length === 0) return null;
-            const executable = GLib.find_program_in_path(terminalArgv[0]);
-            if (!executable) return null;
-            terminalArgv[0] = executable;
-            if (terminalArgument) {
-                const [argumentOk, argumentArgv] = GLib.shell_parse_argv(terminalArgument);
-                if (!argumentOk) return null;
-                terminalArgv.push(...argumentArgv);
-            }
-            terminalArgv.push(codex);
-            return terminalArgv;
-        } catch (error) {
-            global.logWarning(`${UUID}: could not inspect the default terminal: ${error}`);
-            return null;
-        }
-    }
-
-    _launchChatGptApp(appInfo) {
-        try {
-            if (this._configuredChatGptAppPath()) {
-                const path = this._resolveChatGptAppPath();
-                if (!path) throw new Error(_("Choose an executable ChatGPT app file in settings"));
-                // Pass the path as one argv element; it is never a shell command.
-                Gio.Subprocess.new([path], Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
-            } else {
-                appInfo.launch([], null);
-            }
-        } catch (error) {
-            this._reportLaunchError(_("ChatGPT App"), error,
-                this._configuredChatGptAppPath() ? _("Check the ChatGPT app path in settings.") : "");
-        }
-    }
-
-    _launchCodexTerminal(command) {
-        try {
-            Util.spawn(command);
-        } catch (error) {
-            this._reportLaunchError(_("Codex CLI"), error);
-        }
-    }
-
-    _reportLaunchError(target, error, hint = "") {
-        this._lastError = hint ? _f("Could not open %s. %s", target, hint) : _f("Could not open %s", target);
-        global.logError(`${UUID}: ${this._lastError}: ${error}`);
-        this._rebuildMenu();
     }
 
     _addInfoItem(text, style = null, menu = this.menu) {
@@ -2908,6 +2544,9 @@ class ChatGptUsageApplet extends Applet.Applet {
     _addCreditItems() {
         const credits = this._snapshot ? this._snapshot.credits : null;
         const history = this._snapshot ? this._snapshot.history : null;
+        if (credits && credits.plan) {
+            this._addCreditItem(_("Plan"), String(credits.plan), true);
+        }
         let balance = credits
             ? UsageFormat.formatCreditNumber(credits.balance)
             : _("unavailable");
@@ -2938,28 +2577,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             Boolean(creditConsumption),
             creditConsumptionMarkup
         );
-        const resetDisplay = UsageFormat.buildResetCreditDisplay(
-            credits,
-            this._use24HourClock
-        );
-        const resetConfirmation = UsageFormat.buildResetCreditConfirmation(
-            credits,
-            this._use24HourClock
-        );
-        const resetExpiryColor = resetDisplay.suffix
-            ? this._resetExpiryColor(resetDisplay.expiresAt)
-            : null;
-        this._addCreditItem(
-            _("Limit resets"),
-            resetDisplay.count,
-            true,
-            resetDisplay.suffix,
-            resetExpiryColor,
-            (resetConfirmation.available || this._pendingReset) && this._resetJournalReady &&
-                !this._resetConsumeBusy && !this._resetJournalError
-                ? () => this._showResetConfirmation()
-                : null
-        );
     }
 
     _addCreditItem(
@@ -2983,7 +2600,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
         if (interactive) {
             item.connect("activate", () => {
-                if (!this._resetConsumeBusy) action();
+                action();
             });
         }
         const row = new St.BoxLayout({ vertical: false });
@@ -3092,36 +2709,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         }
     }
 
-    _resetAttemptFile() {
-        return Gio.File.new_for_path(GLib.build_filenamev([
-            GLib.get_user_state_dir(), "cinnamon-chatgpt-usage", "reset-attempt.json"
-        ]));
-    }
-
-    async _loadResetAttempt() {
-        try {
-            const [ok, bytes] = await new Promise((resolve, reject) => {
-                this._resetAttemptFile().load_contents_async(null, (source, result) => {
-                    try { resolve(source.load_contents_finish(result)); } catch (error) { reject(error); }
-                });
-            });
-            const attempt = ok ? JSON.parse(ByteArray.toString(bytes)) : null;
-            if (!attempt || typeof attempt.key !== "string" || !attempt.key ||
-                typeof attempt.backend !== "string" || !attempt.backend ||
-                !(attempt.creditId === null || typeof attempt.creditId === "string")) {
-                throw new Error(_("Invalid saved reset attempt; reset actions are disabled"));
-            }
-            this._pendingReset = attempt;
-        } catch (error) {
-            if (!error.matches || !error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND)) {
-                this._resetJournalError = String(error.message || error);
-            }
-        } finally {
-            this._resetJournalReady = true;
-            if (!this._destroyed && this.menu) this._scheduleMenuRebuild();
-        }
-    }
-
     async _ensureResetDirectory(directory) {
         const create = () => new Promise((resolve, reject) => {
             directory.make_directory_async(GLib.PRIORITY_DEFAULT, null, (source, result) => {
@@ -3146,261 +2733,12 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
     }
 
-    async _saveResetAttempt(backend, creditId) {
-        if (!this._resetJournalReady) throw new Error(_("Reset recovery is still loading"));
-        if (this._resetJournalError) throw new Error(this._resetJournalError);
-        if (this._pendingReset) {
-            if (this._pendingReset.backend !== backend) {
-                throw new Error(_("Retry the unresolved reset using its original backend and account"));
-            }
-            return this._pendingReset;
-        }
-        const attempt = { key: GLib.uuid_string_random(), backend, creditId: creditId || null };
-        const file = this._resetAttemptFile();
-        await this._ensureResetDirectory(file.get_parent());
-        // Exclusive creation prevents a reloaded instance from overwriting an
-        // unresolved attempt while the old instance is still finishing I/O.
-        const stream = await new Promise((resolve, reject) => {
-            file.create_async(Gio.FileCreateFlags.PRIVATE, GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                try { resolve(source.create_finish(result)); } catch (error) { reject(error); }
-            });
-        });
-        try {
-            await new Promise((resolve, reject) => {
-                stream.write_bytes_async(new GLib.Bytes(ByteArray.fromString(JSON.stringify(attempt))),
-                    GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                        try {
-                            const count = source.write_bytes_finish(result);
-                            if (count !== ByteArray.fromString(JSON.stringify(attempt)).length) {
-                                throw new Error(_("Incomplete reset journal write; no request was sent"));
-                            }
-                            resolve();
-                        } catch (error) { reject(error); }
-                    });
-            });
-        } finally {
-            await new Promise((resolve, reject) => {
-                stream.close_async(GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                    try { resolve(source.close_finish(result)); } catch (error) { reject(error); }
-                });
-            });
-        }
-        this._pendingReset = attempt;
-        return attempt;
-    }
-
-    async _clearResetAttempt() {
-        await new Promise((resolve, reject) => {
-            this._resetAttemptFile().delete_async(GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                try { resolve(source.delete_finish(result)); } catch (error) { reject(error); }
-            });
-        });
-        this._pendingReset = null;
-    }
-
-    _showResetConfirmation() {
-        if (this._destroyed || this._resetConsumeBusy || !this._snapshot) return;
-
-        const details = UsageFormat.buildResetCreditConfirmation(
-            this._snapshot.credits,
-            this._use24HourClock
-        );
-        if ((!details.available && !this._pendingReset) || !this._resetJournalReady || this._resetJournalError) return;
-        if (this.menu && this.menu.isOpen) this.menu.close(false);
-        if (this._resetConfirmationDialog) this._resetConfirmationDialog.destroy();
-
-        const content = new Dialog.MessageDialogContent({
-            title: this._pendingReset ? _("Retry the unresolved reset?") : _("Use one limit reset now?"),
-            description: this._pendingReset
-                ? _("The previous outcome is unknown. Retry the same request using the same account. Its saved key prevents a second redemption for this attempt.")
-                : [
-                _f("Available reset credits: %s", details.count),
-                _f("Next expiry: %s", details.expiryText || _("unavailable")),
-                "",
-                _("One reset credit will be consumed.")
-            ].join("\n")
-        });
-        const dialog = new ModalDialog.ModalDialog();
-        dialog.contentLayout.add_child(content);
-        const acknowledgment = new CheckBox.CheckBox(
-            this._pendingReset ? _("I confirm retrying this reset.") : _("I confirm using one reset credit."),
-            undefined,
-            false
-        );
-        dialog.contentLayout.add_child(acknowledgment.actor);
-        let submitted = false;
-        dialog.connect("destroy", () => {
-            if (this._resetConfirmationDialog === dialog) {
-                this._resetConfirmationDialog = null;
-            }
-        });
-        const cancelButton = dialog.addButton({
-            label: _("Cancel"),
-            action: () => dialog.destroy(),
-            key: Clutter.KEY_Escape,
-            default: true
-        });
-        const useButton = dialog.addButton({
-            label: this._pendingReset ? _("Retry same reset") : _("Use reset now"),
-            action: () => {
-                if (!acknowledgment.actor.checked || submitted || this._destroyed ||
-                    this._resetConsumeBusy || this._resetConfirmationDialog !== dialog) return;
-                submitted = true;
-                this._consumeResetCredit(details, dialog, content, [cancelButton, useButton, acknowledgment.actor]);
-            },
-            default: false,
-            destructive_action: true
-        });
-        const syncAcknowledgment = () => {
-            const enabled = acknowledgment.actor.checked && !submitted && !this._resetConsumeBusy;
-            useButton.reactive = enabled;
-            useButton.can_focus = enabled;
-            useButton.change_style_pseudo_class("insensitive", !enabled);
-        };
-        acknowledgment.actor.connect("notify::checked", syncAcknowledgment);
-        syncAcknowledgment();
-        this._resetConfirmationDialog = dialog;
-        dialog.open();
-    }
-
-    _setResetConfirmationBusy(dialog, content, buttons) {
-        for (const button of buttons) {
-            button.reactive = false;
-            button.can_focus = false;
-            button.add_style_pseudo_class("insensitive");
-        }
-        content.description = _f("%s\n\nUsing reset…", content.description);
-        dialog.buttonLayout.get_children().forEach(button => {
-            button.reactive = false;
-            button.can_focus = false;
-        });
-    }
-
-    _resetOutcomeFeedback(outcome) {
-        const feedback = UsageFormat.buildResetConsumeFeedback(outcome);
-        if (!feedback) {
-            throw new Error(_f("Unexpected reset outcome: %s", outcome || _("missing")));
-        }
-        return feedback;
-    }
-
-    _resetErrorFeedback(message) {
-        const detail = String(message || _("The reset request failed.")).slice(0, 180);
-        return {
-            title: _("Reset outcome unknown"),
-            description: _f("%s Retry the same request from the reset dialog; do not switch accounts until it is resolved.", detail)
-        };
-    }
-
-    _finishResetConsume(dialog, feedback, refresh) {
-        this._resetConsumeBusy = false;
-        this._resetCancellable = null;
-        if (dialog && !dialog.is_finalized()) dialog.destroy();
-        if (!feedback || this._destroyed) return;
-
-        this._resetFeedback = feedback;
-        this._rebuildPanel();
-        this._scheduleMenuRebuild();
-        if (refresh) this._refreshUsage();
-    }
-
-    async _consumeResetCredit(details, dialog, content, buttons) {
-        if (this._destroyed || this._resetConsumeBusy) return;
-
-        this._resetConsumeBusy = true;
-        this._resetFeedback = null;
-        this._setResetConfirmationBusy(dialog, content, buttons);
-        const python = GLib.find_program_in_path("python3");
-        const helper = `${this.metadata.path}/chatgpt_usage.py`;
-        const codex = this._resolveCodexPath();
-        if (!python || !codex) {
-            this._finishResetConsume(
-                dialog,
-                this._resetErrorFeedback(
-                    !python
-                        ? _("python3 was not found")
-                        : _("No Codex CLI or ChatGPT App backend was found; install one or configure its path in the applet settings")
-                ),
-                false
-            );
-            return;
-        }
-
-        let attempt;
-        try {
-            attempt = await this._saveResetAttempt(codex, details.creditId);
-            if (this._destroyed) return;
-        } catch (error) {
-            this._finishResetConsume(dialog, this._resetErrorFeedback(error.message), false);
-            return;
-        }
-        const argv = [
-            python,
-            helper,
-            "--codex",
-            codex,
-            "--timeout",
-            "25",
-            "--consume-reset",
-            "--idempotency-key",
-            attempt.key
-        ];
-        if (attempt.creditId) argv.push("--credit-id", attempt.creditId);
-
-        this._resetCancellable = new Gio.Cancellable();
-        try {
-            const process = new Gio.Subprocess({
-                argv,
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            });
-            process.init(null);
-            this._resetProcess = process;
-            process.communicate_utf8_async(
-                null,
-                this._resetCancellable,
-                async (source, result) => {
-                    this._resetProcess = null;
-                    let feedback = null;
-                    let cancelled = false;
-                    try {
-                        const [ok, stdout, stderr] = source.communicate_utf8_finish(result);
-                        if (!ok || source.get_exit_status() !== 0) {
-                            const helperError = UsageFormat.parseUsageHelperError(stderr);
-                            const error = new Error(helperError.message);
-                            error.authenticationRequired = helperError.authenticationRequired;
-                            throw error;
-                        }
-                        const payload = JSON.parse(String(stdout || "").trim());
-                        feedback = this._resetOutcomeFeedback(payload && payload.outcome);
-                        await this._clearResetAttempt();
-                    } catch (error) {
-                        cancelled = typeof error.matches === "function" &&
-                            error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
-                        if (!cancelled) {
-                            global.logError(`${UUID}: reset consume failed: ${error}`);
-                            feedback = this._resetErrorFeedback(error.message || error);
-                        }
-                    }
-
-                    this._finishResetConsume(
-                        cancelled ? null : dialog,
-                        feedback,
-                        !cancelled
-                    );
-                }
-            );
-        } catch (error) {
-            global.logError(`${UUID}: could not start reset consume: ${error}`);
-            this._finishResetConsume(dialog, this._resetErrorFeedback(error), false);
-        }
-    }
-
     _selectCreditHistoryWindow(windows) {
         const source = Array.from(windows || []);
         return source.find(window =>
-            window.id === "codex" && Number(window.durationMinutes) === 10080
+            window.id === ACCOUNT_LIMIT_ID && Number(window.durationMinutes) === 10080
         ) || source.find(window =>
-            window.id === "codex" && Number(window.durationMinutes) === 300
+            window.id === ACCOUNT_LIMIT_ID && Number(window.durationMinutes) === 300
         ) || source.find(window =>
             Number(window.durationMinutes) === 10080
         ) || source[0] || null;
@@ -3429,13 +2767,13 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._addSectionHeading(_("Recent consumption"));
         const windowsByLimit = new Map();
         for (const window of visibleWindows) {
-            const limitId = window.id || "codex";
+            const limitId = window.id || ACCOUNT_LIMIT_ID;
             if (!windowsByLimit.has(limitId)) windowsByLimit.set(limitId, []);
             windowsByLimit.get(limitId).push(window);
         }
         const showLimitLabels = windowsByLimit.size > 1;
         for (const [limitId, windows] of windowsByLimit) {
-            if (showLimitLabels && limitId !== "codex") {
+            if (showLimitLabels && limitId !== ACCOUNT_LIMIT_ID) {
                 const first = windows[0];
                 const submenu = new PopupMenu.PopupSubMenuMenuItem(
                     ""
@@ -3975,6 +3313,10 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
     }
 
+    _usageHelperPath() {
+        return `${this.metadata.path}/z_usage.py`;
+    }
+
     _refreshUsage(showConfirmation = false) {
         if (this._destroyed) return;
         if (this._busy) {
@@ -3983,14 +3325,11 @@ class ChatGptUsageApplet extends Applet.Applet {
         }
 
         const python = GLib.find_program_in_path("python3");
-        const helper = `${this.metadata.path}/chatgpt_usage.py`;
-        this._refreshBackendInfo();
-        const pathArguments = this._backendPathArguments();
+        const helper = this._usageHelperPath();
+        const apiKey = String(this.apiKey || "").trim();
         if (!python) {
             this._authenticationRequired = false;
-            this._lastError = !python
-                ? _("python3 was not found")
-                : _("No Codex CLI or ChatGPT App backend was found; install one or configure its path in the applet settings");
+            this._lastError = _("python3 was not found");
             this._rebuildPanel();
             this._scheduleMenuRebuild();
             return;
@@ -4007,7 +3346,7 @@ class ChatGptUsageApplet extends Applet.Applet {
                 argv: [
                     python,
                     helper,
-                    ...pathArguments,
+                    ...(apiKey ? ["--api-key", apiKey] : []),
                     "--timeout",
                     "25",
                     "--activity-bucket-minutes",
@@ -4093,11 +3432,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             if (!this._destroyed) this._syncRefreshButtonState();
             return GLib.SOURCE_REMOVE;
         });
-    }
-
-    _resolveCodexPath() {
-        this._refreshBackendInfo();
-        return this._resolveBundledCodexPath();
     }
 
     on_applet_clicked() {
@@ -4261,7 +3595,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             this._screenshotTempFile = null;
         }
         this._stopRefreshSpinner();
-        for (const process of [this._usageProcess, this._resetProcess, this._backendDiscovery]) {
+        for (const process of [this._usageProcess]) {
             if (process) {
                 // SIGTERM lets the Python helper terminate and reap its backend.
                 process.send_signal(15);
@@ -4277,15 +3611,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             this._cancellable = null;
         }
         this._refreshQueued = false;
-        if (this._resetCancellable) {
-            this._resetCancellable.cancel();
-            this._resetCancellable = null;
-        }
-        this._resetConsumeBusy = false;
-        if (this._resetConfirmationDialog) {
-            this._resetConfirmationDialog.destroy();
-            this._resetConfirmationDialog = null;
-        }
         if (this._installHelpDialog) {
             this._installHelpDialog.destroy();
             this._installHelpDialog = null;
@@ -4321,5 +3646,5 @@ function main(metadata, orientation, panelHeight, instanceId) {
         UUID,
         GLib.build_filenamev([GLib.get_user_data_dir(), "locale"])
     );
-    return new ChatGptUsageApplet(metadata, orientation, panelHeight, instanceId);
+    return new ZUsageApplet(metadata, orientation, panelHeight, instanceId);
 }

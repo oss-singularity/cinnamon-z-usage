@@ -5,7 +5,7 @@ const ByteArray = imports.byteArray;
 const [ok, contents] = GLib.file_get_contents("applet.js");
 if (!ok) throw new Error("Cannot read applet.js");
 const AppletClass = new Function("imports", "require",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     { gettext: imports.gettext, format: imports.format, ui: { applet: { Applet: class {}, AppletPopupMenu: class {} } }, misc: {}, gi: { St: { Side: { RIGHT: 1 } } } },
     () => ({})

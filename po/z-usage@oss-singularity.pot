@@ -1,4 +1,4 @@
-# ChatGPT Usage Monitor translation template.
+# Z Usage Monitor translation template.
 # Copyright (C) 2026 OSS Singularity
 # This file is distributed under the GPL-3.0-or-later license.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
@@ -6,8 +6,8 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: ChatGPT Usage Monitor 1.0.6\n"
-"Report-Msgid-Bugs-To: https://github.com/oss-singularity/cinnamon-chatgpt-usage/issues\n"
+"Project-Id-Version: Z Usage Monitor 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/oss-singularity/cinnamon-z-usage/issues\n"
 "POT-Creation-Date: 2026-09-08 00:00+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
@@ -60,14 +60,6 @@ msgstr ""
 msgid "%"
 msgstr ""
 
-#: applet.js
-#, javascript-format
-msgid ""
-"%s\n"
-"\n"
-"Using reset…"
-msgstr ""
-
 #: usage-format.js
 #, javascript-format
 msgid ""
@@ -108,11 +100,6 @@ msgstr ""
 #: usage-format.js
 #, javascript-format
 msgid "%s 7d limit refreshed"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "%s Retry the same request from the reset dialog; do not switch accounts until it is resolved."
 msgstr ""
 
 #: usage-format.js
@@ -187,11 +174,6 @@ msgstr ""
 
 #: applet.js
 #, javascript-format
-msgid "%s: choose an executable file, or leave empty for automatic detection."
-msgstr ""
-
-#: applet.js
-#, javascript-format
 msgid "%s: could not start usage helper: %s"
 msgstr ""
 
@@ -253,7 +235,7 @@ msgstr ""
 msgid "2 hours"
 msgstr ""
 
-#: chatgpt_usage.py
+#: z_usage.py
 msgid "24-hour activity bucket size"
 msgstr ""
 
@@ -284,11 +266,15 @@ msgstr ""
 #: metadata.json.js
 msgid ""
 "A tiny Cinnamon companion\n"
-"keeping ChatGPT Work & Codex usage beautifully in view."
+"keeping Z.ai GLM Coding Plan usage beautifully in view."
 msgstr ""
 
 #: applet.js
 msgid "AIC"
+msgstr ""
+
+#: applet.js
+msgid "API Keys"
 msgstr ""
 
 #: applet.js
@@ -300,122 +286,19 @@ msgid "Activity details unavailable"
 msgstr ""
 
 #: applet.js
-msgid "Analytics"
+msgid "Add a Z.ai API key with Coding Plan access in the applet settings, then choose Refresh now."
+msgstr ""
+
+#: z_usage.py
+msgid "Add a Z.ai API key with Coding Plan access in the applet settings, then refresh this applet."
 msgstr ""
 
 #: settings-schema.json.js
 msgid "Applet display"
 msgstr ""
 
-#: applet.js
-msgid "Automatic detection"
-msgstr ""
-
-#: path_settings.py
-msgid "Automatic paths checked. Your manual entries are unchanged."
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "Available reset credits: %s"
-msgstr ""
-
 #: settings-schema.json.js
 msgid "Base color of panel percentages, window labels and separators. Warning and critical colors can override percentages below the configured thresholds."
-msgstr ""
-
-#: applet.js
-msgid "Cancel"
-msgstr ""
-
-#: applet.js
-msgid "ChatGPT App"
-msgstr ""
-
-#: metadata.json.js
-msgid "ChatGPT Usage Monitor"
-msgstr ""
-
-#: applet.js
-msgid "ChatGPT Work & Codex usage"
-msgstr ""
-
-#: applet.js
-msgid "ChatGPT app"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "ChatGPT app executable used for bundled-backend fallback"
-msgstr ""
-
-#: applet.js
-msgid "ChatGPT app path (optional)"
-msgstr ""
-
-#: applet.js
-msgid "ChatGPT app path is unavailable. Choose an executable file in settings."
-msgstr ""
-
-#: settings-schema.json.js path_settings.py
-msgid "ChatGPT path (optional)"
-msgstr ""
-
-#: applet.js
-msgid "Check the ChatGPT app path in settings."
-msgstr ""
-
-#: applet.js path_settings.py
-msgid "Checking automatic paths…"
-msgstr ""
-
-#: applet.js
-msgid "Choose an executable ChatGPT app file in settings"
-msgstr ""
-
-#: applet.js
-msgid "Close"
-msgstr ""
-
-#: applet.js
-msgid "Codex CLI"
-msgstr ""
-
-#: chatgpt_usage.py
-#, python-format
-msgid "Codex CLI is not executable: %(path)s"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex CLI or ChatGPT App backend was not found"
-msgstr ""
-
-#: applet.js
-msgid "Codex Cloud"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex app-server closed its output before replying"
-msgstr ""
-
-#: chatgpt_usage.py
-#, python-format
-msgid "Codex app-server rejected the request: %(detail)s"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex app-server response exceeded the size limit"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex app-server returned an invalid reset outcome"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex app-server returned no reset outcome"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Codex app-server returned no usage data"
 msgstr ""
 
 #: settings-schema.json.js
@@ -450,25 +333,12 @@ msgstr ""
 msgid "Copy Usage Monitor Screenshot to Clipboard"
 msgstr ""
 
-#: applet.js path_settings.py
-msgid "Could not check automatic paths. Try Recheck."
+#: z_usage.py
+#, python-format
+msgid "Could not reach the Z.ai usage API: %(error)s"
 msgstr ""
 
-#: applet.js
-#, javascript-format
-msgid "Could not open %s"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "Could not open %s. %s"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Could not open Codex app-server pipes"
-msgstr ""
-
-#: chatgpt_usage.py
+#: z_usage.py
 #, python-format
 msgid "Could not store local history: %(error)s"
 msgstr ""
@@ -490,12 +360,12 @@ msgstr ""
 msgid "Critical color"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Discover local commands without account access"
+#: z_usage.py
+msgid "Do not read or write history"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Do not read or write history"
+#: applet.js
+msgid "Docs"
 msgstr ""
 
 #: usage-format.js
@@ -511,52 +381,12 @@ msgstr ""
 msgid "Enable 7d low-limit notifications"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Explicitly consume one earned rate-limit reset credit"
-msgstr ""
-
-#: path_settings.py
-msgid "Find automatic paths again without changing your entries."
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Find automatic paths without executing commands"
-msgstr ""
-
 #: settings-schema.json.js
 msgid "Font size"
 msgstr ""
 
 #: settings-schema.json.js
 msgid "General"
-msgstr ""
-
-#: applet.js
-msgid "I confirm retrying this reset."
-msgstr ""
-
-#: applet.js
-msgid "I confirm using one reset credit."
-msgstr ""
-
-#: applet.js
-msgid "Incomplete reset journal write; no request was sent"
-msgstr ""
-
-#: applet.js
-msgid "Install ChatGPT App"
-msgstr ""
-
-#: applet.js
-msgid "Install Codex CLI"
-msgstr ""
-
-#: applet.js
-msgid "Installation guide"
-msgstr ""
-
-#: applet.js
-msgid "Invalid saved reset attempt; reset actions are disabled"
 msgstr ""
 
 #: usage-format.js
@@ -578,20 +408,8 @@ msgstr ""
 msgid "Last refresh failed"
 msgstr ""
 
-#: applet.js
-msgid "Leave empty for automatic detection. Codex CLI is preferred."
-msgstr ""
-
 #: settings-schema.json.js
-msgid "Leave empty for automatic detection. Otherwise enter the ChatGPT executable path, such as ~/Applications/ChatGPT/chatgpt, without quotes or arguments. Used to launch the app and find its bundled backend when no Codex CLI is installed. An explicit Codex backend path takes priority."
-msgstr ""
-
-#: settings-schema.json.js
-msgid "Leave empty to find Codex CLI or the ChatGPT app's bundled backend automatically. Set an executable path only to override detection. Example: /home/user/.local/bin/codex"
-msgstr ""
-
-#: applet.js
-msgid "Limit resets"
+msgid "Leave empty for automatic detection: the applet reuses the Coding Plan API key of the signed-in ZCode app, then falls back to the ZAI_API_KEY environment variable and the ~/.config/cinnamon-z-usage/api-key file."
 msgstr ""
 
 #: applet.js
@@ -603,28 +421,7 @@ msgid "Low remaining usage"
 msgstr ""
 
 #: applet.js
-#, javascript-format
-msgid "Next expiry: %s"
-msgstr ""
-
-#: applet.js
-msgid "No ChatGPT login found"
-msgstr ""
-
-#: applet.js
-msgid "No Codex CLI or ChatGPT App backend was found. Follow OpenAI's official getting-started guide to install one, sign in, and then refresh this applet."
-msgstr ""
-
-#: applet.js
-msgid "No Codex CLI or ChatGPT App backend was found; install one or configure its path in the applet settings"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "No Codex CLI or bundled backend found; check the ChatGPT app path and its resources/codex file"
-msgstr ""
-
-#: applet.js path_settings.py
-msgid "No automatic path found"
+msgid "No Z.ai API key found"
 msgstr ""
 
 #: usage-format.js
@@ -668,18 +465,14 @@ msgid "One reset credit was consumed. Usage limits are refreshing."
 msgstr ""
 
 #: applet.js
-msgid "One reset credit will be consumed."
+msgid "Open the Z.ai chat web app"
 msgstr ""
 
 #: applet.js
-msgid "Open the configured ChatGPT app"
+msgid "Open the Z.ai coding plan usage statistics"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Optional opaque reset-credit ID"
-msgstr ""
-
-#: chatgpt_usage.py
+#: z_usage.py
 msgid "Override the local history path"
 msgstr ""
 
@@ -691,20 +484,16 @@ msgstr ""
 msgid "Panel text color"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Path to the Codex app-server executable"
+#: applet.js
+msgid "Plan"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Read ChatGPT Work and Codex limits through the local Codex app-server."
+#: z_usage.py
+msgid "Read Z.ai GLM Coding Plan limits through the Z.ai usage monitor API."
 msgstr ""
 
 #: applet.js
 msgid "Recent consumption"
-msgstr ""
-
-#: applet.js path_settings.py
-msgid "Recheck"
 msgstr ""
 
 #: settings-schema.json.js
@@ -724,11 +513,11 @@ msgstr ""
 msgid "Remaining: %s"
 msgstr ""
 
-#: chatgpt_usage.py
+#: z_usage.py
 msgid "Request timeout in seconds"
 msgstr ""
 
-#: chatgpt_usage.py
+#: z_usage.py
 msgid "Request timeout must be finite and positive"
 msgstr ""
 
@@ -740,20 +529,8 @@ msgstr ""
 msgid "Reset applied"
 msgstr ""
 
-#: chatgpt_usage.py
-msgid "Reset consume requires a non-empty idempotency key"
-msgstr ""
-
 #: usage-format.js
 msgid "Reset not applied"
-msgstr ""
-
-#: applet.js
-msgid "Reset outcome unknown"
-msgstr ""
-
-#: applet.js
-msgid "Reset recovery is still loading"
 msgstr ""
 
 #: usage-format.js
@@ -766,22 +543,6 @@ msgstr ""
 msgid ""
 "Reset window: %s\n"
 "Elapsed: unavailable"
-msgstr ""
-
-#: applet.js
-msgid "Retry same reset"
-msgstr ""
-
-#: applet.js
-msgid "Retry the unresolved reset using its original backend and account"
-msgstr ""
-
-#: applet.js
-msgid "Retry the unresolved reset?"
-msgstr ""
-
-#: applet.js
-msgid "Save and check"
 msgstr ""
 
 #: settings-schema.json.js
@@ -824,49 +585,12 @@ msgstr ""
 msgid "Show usage icon"
 msgstr ""
 
-#: applet.js
-msgid "Sign in to ChatGPT with the ChatGPT App or Codex CLI, then choose Refresh now."
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Sign in to ChatGPT with the ChatGPT App or Codex CLI, then refresh this applet."
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Stable key for one explicit reset-redemption attempt"
-msgstr ""
-
-#: applet.js
-msgid "The ChatGPT desktop app was not found. OpenAI provides it for supported Linux distributions."
-msgstr ""
-
 #: usage-format.js
 msgid "The displayed count was stale. The available reset count is refreshing."
 msgstr ""
 
-#: applet.js
-msgid "The previous outcome is unknown. Retry the same request using the same account. Its saved key prevents a second redemption for this attempt."
-msgstr ""
-
-#: applet.js
-msgid "The reset request failed."
-msgstr ""
-
 #: usage-format.js
 msgid "This redemption was already completed. Usage limits are refreshing."
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Timed out while consuming a rate-limit reset"
-msgstr ""
-
-#: chatgpt_usage.py
-msgid "Timed out while reading ChatGPT usage limits"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "Unexpected reset outcome: %s"
 msgstr ""
 
 #: applet.js
@@ -882,7 +606,7 @@ msgstr ""
 msgid "Updating…"
 msgstr ""
 
-#: usage-format.js
+#: applet.js usage-format.js
 msgid "Usage"
 msgstr ""
 
@@ -907,16 +631,8 @@ msgstr ""
 msgid "Usage limits"
 msgstr ""
 
-#: chatgpt_usage.py
+#: z_usage.py
 msgid "Usage request cancelled"
-msgstr ""
-
-#: applet.js
-msgid "Use one limit reset now?"
-msgstr ""
-
-#: applet.js
-msgid "Use reset now"
 msgstr ""
 
 #: settings-schema.json.js
@@ -935,8 +651,50 @@ msgstr ""
 msgid "Weekly limit refreshes"
 msgstr ""
 
-#: applet.js settings-schema.json.js path_settings.py
-msgid "codex-cli path (optional)"
+#: metadata.json.js
+msgid "Z Usage Monitor"
+msgstr ""
+
+#: z_usage.py
+msgid "Z.ai API base URL for the monitor endpoints"
+msgstr ""
+
+#: settings-schema.json.js
+msgid "Z.ai API key (optional)"
+msgstr ""
+
+#: z_usage.py
+msgid "Z.ai API key; defaults to ZAI_API_KEY or the key file"
+msgstr ""
+
+#: applet.js
+msgid "Z.ai Chat"
+msgstr ""
+
+#: z_usage.py
+msgid "Z.ai Coding Plan"
+msgstr ""
+
+#: applet.js
+msgid "Z.ai GLM Coding usage"
+msgstr ""
+
+#: z_usage.py
+#, python-format
+msgid "Z.ai rejected the request: %(message)s"
+msgstr ""
+
+#: z_usage.py
+#, python-format
+msgid "Z.ai rejected the request: HTTP %(code)s %(detail)s"
+msgstr ""
+
+#: z_usage.py
+msgid "Z.ai returned an unreadable usage response"
+msgstr ""
+
+#: z_usage.py
+msgid "Z.ai returned no usage data"
 msgstr ""
 
 #: applet.js
@@ -949,10 +707,6 @@ msgstr ""
 
 #: settings-schema.json.js
 msgid "minutes"
-msgstr ""
-
-#: applet.js
-msgid "missing"
 msgstr ""
 
 #: usage-format.js

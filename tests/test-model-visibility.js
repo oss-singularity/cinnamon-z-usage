@@ -5,7 +5,7 @@ const ByteArray = imports.byteArray;
 const [ok, contents] = GLib.file_get_contents("applet.js");
 if (!ok) throw new Error("Cannot read applet.js");
 const AppletClass = new Function("imports", "require",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     { gettext: imports.gettext, format: imports.format, ui: { applet: { Applet: class {}, AppletPopupMenu: class {} }, popupMenu: { PopupSeparatorMenuItem: class {} } }, misc: {}, gi: {} },
     () => ({
@@ -19,15 +19,15 @@ const applet = Object.create(AppletClass.prototype);
 applet.metadata = JSON.parse(ByteArray.toString(GLib.file_get_contents("metadata.json")[1]));
 applet._setDefaults();
 const limits = Object.freeze([
-    Object.freeze({ id: "codex", label: "Codex", windows: [{ durationMinutes: 300, remainingPercent: 50 }] }),
+    Object.freeze({ id: "zai", label: "Z.ai", windows: [{ durationMinutes: 300, remainingPercent: 50 }] }),
     Object.freeze({ id: "spark", label: "Spark", windows: [{ durationMinutes: 300, remainingPercent: 20 }] }),
     Object.freeze({ id: "future-model", label: "Future", windows: [] })
 ]);
 assert(applet.showModelSpecificLimits && applet._filterModelLimits(limits).length === 3, "Default must show all models");
 applet.showModelSpecificLimits = false;
-assert(applet._filterModelLimits(limits).length === 1 && applet._filterModelLimits(limits)[0] === limits[0], "Hidden models must not replace Codex");
+assert(applet._filterModelLimits(limits).length === 1 && applet._filterModelLimits(limits)[0] === limits[0], "Hidden models must not replace the account limit");
 assert(applet._filterModelLimits(limits.slice(1)).length === 0, "Never fall back to hidden model limits");
-assert(applet._filterModelLimits([{ durationMinutes: 300 }]).length === 1, "Legacy unlabelled history is Codex");
+assert(applet._filterModelLimits([{ durationMinutes: 300 }]).length === 1, "Legacy unlabelled history is the account limit");
 applet._snapshot = { limits, history: { windows: limits.map(limit => ({ id: limit.id, label: limit.label })) } };
 applet.set_applet_tooltip = text => { applet.tooltip = text; };
 applet._updateTooltip([]);
@@ -37,7 +37,7 @@ applet.menu = { addMenuItem() {} };
 applet._addSectionHeading = () => {};
 applet._addHistoryWindow = window => renderedHistory.push(window.id);
 applet._addHistoryItems();
-assert(JSON.stringify(renderedHistory) === '["codex"]', "Hidden history sections must not render");
+assert(JSON.stringify(renderedHistory) === '["zai"]', "Hidden history sections must not render");
 let historyOpened = false;
 applet._historySubmenus = [{ id: "spark", submenu: { menu: { open() { historyOpened = true; } } } }];
 applet._openActiveSparkHistory();

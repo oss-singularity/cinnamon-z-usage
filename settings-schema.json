@@ -23,7 +23,7 @@
       "keys": [
         "refresh-interval",
         "activity-bucket-minutes",
-        "installation-paths"
+        "api-key"
       ]
     },
     "display-section": {
@@ -95,17 +95,11 @@
       "2 hours": "120"
     }
   },
-  "codex-path": {
+  "api-key": {
     "type": "entry",
     "default": "",
-    "description": "codex-cli path (optional)",
-    "tooltip": "Leave empty to find Codex CLI or the ChatGPT app's bundled backend automatically. Set an executable path only to override detection. Example: /home/user/.local/bin/codex"
-  },
-  "chatgpt-app-path": {
-    "type": "entry",
-    "default": "",
-    "description": "ChatGPT path (optional)",
-    "tooltip": "Leave empty for automatic detection. Otherwise enter the ChatGPT executable path, such as ~/Applications/ChatGPT/chatgpt, without quotes or arguments. Used to launch the app and find its bundled backend when no Codex CLI is installed. An explicit Codex backend path takes priority."
+    "description": "Z.ai API key (optional)",
+    "tooltip": "Leave empty for automatic detection: the applet reuses the Coding Plan API key of the signed-in ZCode app, then falls back to the ZAI_API_KEY environment variable and the ~/.config/cinnamon-z-usage/api-key file."
   },
   "show-panel-icon": {
     "type": "switch",
@@ -325,22 +319,17 @@
     "units": "%",
     "description": "7d warning at or below"
   },
-  "weekly-critical-remaining-control": {
-    "type": "custom",
-    "file": "notification_settings.py",
-    "widget": "NotificationThresholdWidget",
-    "default": "",
-    "setting-key": "weekly-critical-remaining",
-    "dependency-key": "enable-weekly-low-notifications",
-    "min": 0,
-    "max": 99,
-    "step": 1,
-    "units": "%",
-    "description": "7d critical at or below"
-  },
-  "installation-paths": {
-    "type": "custom",
-    "file": "path_settings.py",
-    "widget": "InstallationPaths"
+    "weekly-critical-remaining-control": {
+      "type": "custom",
+      "file": "notification_settings.py",
+      "widget": "NotificationThresholdWidget",
+      "default": "",
+      "setting-key": "weekly-critical-remaining",
+      "dependency-key": "enable-weekly-low-notifications",
+      "min": 0,
+      "max": 99,
+      "step": 1,
+      "units": "%",
+      "description": "7d critical at or below"
+    }
   }
-}

@@ -29,7 +29,7 @@ class Menu {
 }
 
 const AppletClass = new Function("imports", "require", "global",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     {
         gettext: imports.gettext, format: imports.format, ui: {

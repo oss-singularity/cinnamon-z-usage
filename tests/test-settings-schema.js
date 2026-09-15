@@ -6,10 +6,10 @@ const GLib = imports.gi.GLib;
 const [ok, contents] = GLib.file_get_contents("settings-schema.json");
 if (!ok) throw new Error("Cannot read settings-schema.json");
 const schema = JSON.parse(ByteArray.toString(contents));
-if (schema["chatgpt-app-path"].default !== "" ||
-    !schema.layout["data-section"].keys.includes("installation-paths") ||
-    schema["installation-paths"].file !== "path_settings.py") {
-    throw new Error("Optional ChatGPT app path must default to desktop discovery in Usage data");
+if (schema["api-key"].default !== "" ||
+    !schema.layout["data-section"].keys.includes("api-key") ||
+    schema.layout["data-section"].keys.includes("installation-paths")) {
+    throw new Error("Optional Z.ai API key must default to automatic detection in Usage data");
 }
 if (schema["show-model-specific-limits"].default !== true ||
     schema["show-model-limits-in-panel"].dependency !== "show-model-specific-limits") {

@@ -16,7 +16,7 @@ const bindings = new Map();
 const Icon = class extends Actor {};
 const Gio = { File: { new_for_path() {} }, FileIcon: class {} };
 const AppletClass = new Function("imports", "require",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     {
         gettext: imports.gettext, format: imports.format, ui: {
@@ -74,7 +74,7 @@ for (const vertical of [false, true]) {
     }
 }
 applet._isVertical = true;
-const windowWithIcon = applet._createWindowActor({ id: "codex", durationMinutes: 10080, remainingPercent: 76 }, true);
+const windowWithIcon = applet._createWindowActor({ id: "zai", durationMinutes: 10080, remainingPercent: 76 }, true);
 if (!windowWithIcon.children[0].style.includes("min-width: 40px;")) {
     throw new Error("Vertical quota label rows must share the icon column");
 }

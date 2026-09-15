@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCES = {
     "icon.png": "icons/applet.svg",
     "icons/usage-white.png": "icons/usage.svg",
-    "icons/terminal-bot.png": "icons/terminal-bot.svg",
 }
 
 
