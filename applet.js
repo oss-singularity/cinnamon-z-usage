@@ -188,7 +188,8 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         owner._clampPopupHeight(owner.actor);
         super.open(animate);
         owner._lockPopupLayoutWidth();
-        owner._clampPopupHeight();
+        // No post-open clamp: the pre-open clamp already fixed the final
+        // height, and a post-position resize is the visible jump.
         if (freshOpen && this._scroll && this._scroll.get_vscroll_bar) {
             // A fresh open always starts at the header, whatever earlier
             // rebuilds or the previous session left scrolled.
