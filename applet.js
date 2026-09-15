@@ -103,6 +103,10 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         this._scroll._delegate = this._content;
         this._scroll.add_actor(this._content.actor);
         this.box.add_child(this._scroll);
+        // Pinned action footer: lives outside the scroll view so the launch
+        // buttons stay visible while the content scrolls behind them.
+        this._footer = new St.BoxLayout({ vertical: true });
+        this.box.add_child(this._footer);
         this._focusSignalId = global.stage.connect("notify::key-focus", () => {
             this._revealFocus();
         });
@@ -967,12 +971,11 @@ class ZUsageApplet extends Applet.Applet {
         this._activityCharts = [];
         this._submenuTriangles = [];
         this.menu.removeAll();
+        if (this.menu._footer) {
+            this.menu._footer.remove_all_children();
+        }
 
         this._addHeaderItem();
-        // Action rows live directly under the header: with every plan section
-        // expanded the content outgrows the monitor, and a bottom action grid
-        // would sit below the scroll fold.
-        this._addLaunchButtons();
         if (this._snapshot) {
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             const limits = this._filterModelLimits(this._snapshot.limits || []);
@@ -1008,6 +1011,9 @@ class ZUsageApplet extends Applet.Applet {
         }
 
         if (this._lastError) this._addStatusItem(_("Last refresh failed"), this._lastError);
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        this._addLaunchButtons();
 
         if (wasOpen) {
             for (const entry of this._historySubmenus) {
@@ -2018,7 +2024,11 @@ class ZUsageApplet extends Applet.Applet {
         column.add_child(utilityRow);
         column.add_child(webRow);
         item.addActor(actionFrame, { span: -1, expand: true });
-        this.menu.addMenuItem(item);
+        if (this.menu._footer) {
+            this.menu._footer.add_child(item.actor);
+        } else {
+            this.menu.addMenuItem(item);
+        }
     }
 
     _createLaunchButton(label, iconSpec, available, action, tooltipText = null) {
@@ -3579,6 +3589,9 @@ class ZUsageApplet extends Applet.Applet {
         this.menu.box.clip_to_allocation = true;
         this._forceActorWidth(this.menu._scroll, width);
         this._forceActorWidth(this.menu._content.actor, width);
+        if (this.menu._footer) {
+            this._forceActorWidth(this.menu._footer, width);
+        }
         for (const entry of this._historySubmenus) {
             this._forceActorWidth(entry.submenu.menu.actor, width);
             this._forceActorWidth(entry.submenu.menu.box, width);
@@ -3612,7 +3625,11 @@ class ZUsageApplet extends Applet.Applet {
         const maxHeight = Math.max(240, monitor.height - 96);
         if (!Number.isFinite(menuNatural) || menuNatural <= maxHeight) return;
         const [, scrollNatural] = this.menu._scroll.get_preferred_height(width);
-        const chrome = Math.max(0, menuNatural - scrollNatural);
+        let chrome = Math.max(0, menuNatural - scrollNatural);
+        if (this.menu._footer) {
+            const [, footerNatural] = this.menu._footer.get_preferred_height(width);
+            chrome += Math.max(0, footerNatural);
+        }
         this.menu._scroll.set_height(Math.max(200, maxHeight - chrome));
         // The scroll view allocates an unfixed content at the viewport height,
         // which clips the bottom action rows out of existence. Pin the content

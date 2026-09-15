@@ -43,7 +43,8 @@ const AppletClass = new Function("imports", "require", "global",
         misc: {},
         gi: { St: {
             PolicyType: { AUTOMATIC: 1, NEVER: 0 },
-            ScrollView: class extends Actor { set_policy() {} add_actor() {} }
+            ScrollView: class extends Actor { set_policy() {} add_actor() {} },
+            BoxLayout: class extends Actor { add_child() {} remove_all_children() {} }
         } }
     },
     () => ({}),
