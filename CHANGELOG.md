@@ -2,6 +2,13 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- Popup layout hardening from live testing: the header rings stay the coding
+  plan's 5h/7d overview (plan badges no longer collide with ring labels), the
+  ZCode plan sections are expanded by default with a "Keep ZCode plan sections
+  expanded" switch, the popup height is clamped to the monitor so the action
+  rows scroll into view instead of disappearing, and recent-consumption
+  submenus behave as an accordion so expanded content never overdraws.
+
 - Show the stacked ZCode quota sources: Start Plan and Global Build token
   buckets are read from the signed-in ZCode app's billing balance endpoint and
   rendered as collapsible per-model limits with G/S badges below the coding

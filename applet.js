@@ -164,11 +164,13 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         owner._openActiveSparkHistory();
         if (!this.isOpen) {
             for (const section of owner._limitSections) {
-                section.setExpanded(UsageFormat.hasQuotaUsage(section.limit.windows));
+                if (section._usageUserToggled) continue;
+                section.setExpanded(owner._defaultSectionExpanded(section.limit));
             }
         }
         super.open(animate);
         owner._lockPopupLayoutWidth();
+        owner._clampPopupHeight();
     }
 
     close(animate) {
@@ -265,6 +267,7 @@ class ZUsageApplet extends Applet.Applet {
         this.showWindowLabels = true;
         this.showModelSpecificLimits = true;
         this.showZcodePlanQuotas = true;
+        this.expandZcodePlanSections = true;
         this.showModelLimitsInPanel = false;
         this.showCreditsInPanel = false;
         this.showWeeklyWithFiveHour = true;
@@ -309,6 +312,7 @@ class ZUsageApplet extends Applet.Applet {
         this.settings.bind("show-window-labels", "showWindowLabels", layoutChanged);
         this.settings.bind("show-model-specific-limits", "showModelSpecificLimits", this._onModelVisibilityChanged.bind(this));
         this.settings.bind("show-zcode-plan-quotas", "showZcodePlanQuotas", this._onModelVisibilityChanged.bind(this));
+        this.settings.bind("expand-zcode-plan-sections", "expandZcodePlanSections", this._onModelVisibilityChanged.bind(this));
         this.settings.bind(
             "show-model-limits-in-panel",
             "showModelLimitsInPanel",
@@ -626,6 +630,11 @@ class ZUsageApplet extends Applet.Applet {
         return this.showModelSpecificLimits === false
             ? list.filter(limit => (limit.id || ACCOUNT_LIMIT_ID) === ACCOUNT_LIMIT_ID)
             : list;
+    }
+
+    _defaultSectionExpanded(limit) {
+        return this.expandZcodePlanSections === true ||
+            UsageFormat.hasQuotaUsage(limit.windows);
     }
 
     _modelBadge(limit) {
@@ -956,7 +965,7 @@ class ZUsageApplet extends Applet.Applet {
                         limit,
                         wasOpen && limitStates.has(limit.id)
                             ? limitStates.get(limit.id)
-                            : UsageFormat.hasQuotaUsage(limit.windows)
+                            : this._defaultSectionExpanded(limit)
                     );
                     continue;
                 }
@@ -987,6 +996,7 @@ class ZUsageApplet extends Applet.Applet {
             for (const entry of this._historySubmenus) {
                 if (expandedSubmenus.has(entry.id)) entry.submenu.menu.open(false);
             }
+            if (this.menu.isOpen) this._clampPopupHeight();
         }
     }
 
@@ -1069,7 +1079,11 @@ class ZUsageApplet extends Applet.Applet {
         if (this.menu._boxWrapper) this.menu._boxWrapper.add_actor(this._screenshotButton);
 
         if (this._snapshot) {
-            const summaries = UsageFormat.listQuotaWindows(this._filterModelLimits(this._snapshot.limits));
+            // The header rings stay the account's 5h/7d overview; plan sections
+            // carry their own rings next to their rows.
+            const accountLimits = this._filterModelLimits(this._snapshot.limits)
+                .filter(limit => limit.id === ACCOUNT_LIMIT_ID);
+            const summaries = UsageFormat.listQuotaWindows(accountLimits);
             const compact = summaries.length >= 4;
             const rings = new St.BoxLayout({
                 vertical: false,
@@ -1289,22 +1303,28 @@ class ZUsageApplet extends Applet.Applet {
             heading,
             rows,
             expanded: false,
+            _usageUserToggled: false,
             setExpanded: open => {
                 section.expanded = open;
                 for (const row of rows) row.actor.visible = open;
                 heading.arrow.rotation_angle_z = open ? 90 : 0;
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
+                this._clampPopupHeight();
             }
         };
         heading.actor.add_accessible_state(Atk.StateType.EXPANDABLE);
         // The native base activation emits the menu-closing signal. A
         // disclosure must instead keep the popup open for mouse and keyboard.
-        heading.activate = () => section.setExpanded(!section.expanded);
+        heading.activate = () => {
+            section._usageUserToggled = true;
+            section.setExpanded(!section.expanded);
+        };
         heading.actor.connect("key-press-event", (actor, event) => {
             const key = event.get_key_symbol();
             const rtl = actor.get_direction() === St.TextDirection.RTL;
             if (key !== Clutter.KEY_Left && key !== Clutter.KEY_Right) return false;
+            section._usageUserToggled = true;
             section.setExpanded((key === Clutter.KEY_Right) !== rtl);
             return true;
         });
@@ -2815,7 +2835,17 @@ class ZUsageApplet extends Applet.Applet {
                 submenu.actor.label_actor = submenuLabel;
                 this.menu.addMenuItem(submenu);
                 this._historySubmenus.push({ id: limitId, submenu });
-                submenu.menu.connect("open-state-changed", () => {
+                submenu.menu.connect("open-state-changed", (_menu, open) => {
+                    if (open) {
+                        // Nested submenu content does not participate in the
+                        // section's height allocation; two open submenus would
+                        // draw over each other. Keep one accordion leaf open.
+                        for (const entry of this._historySubmenus) {
+                            if (entry.submenu !== submenu && entry.submenu.menu.isOpen) {
+                                entry.submenu.menu.close(false);
+                            }
+                        }
+                    }
                     this._syncPopupRightInsets();
                 });
                 const shareSparkActivityChart = this._modelBadge({
@@ -3198,6 +3228,7 @@ class ZUsageApplet extends Applet.Applet {
         this._syncContentRightEdges();
         if (this.menu.isOpen) {
             this._lockPopupLayoutWidth();
+            this._clampPopupHeight();
         }
     }
 
@@ -3526,6 +3557,22 @@ class ZUsageApplet extends Applet.Applet {
         actor.natural_width_set = true;
         actor.set_width(width);
         actor.clip_to_allocation = true;
+    }
+
+    _clampPopupHeight() {
+        if (!this.menu || !this.menu._scroll || !this.menu.isOpen) return;
+        if (!Main.layoutManager || !Main.layoutManager.findMonitorForActor) return;
+        const monitor = Main.layoutManager.findMonitorForActor(this.menu.actor);
+        if (!monitor || !Number.isFinite(monitor.height) || monitor.height <= 0) return;
+        this.menu._scroll.set_height(-1);
+        const [, menuNatural] = this.menu.actor.get_preferred_height(-1);
+        // Keep the popup inside the monitor: the scroll area takes the
+        // remaining height instead of clipping the action rows off-screen.
+        const maxHeight = Math.max(240, monitor.height - 96);
+        if (!Number.isFinite(menuNatural) || menuNatural <= maxHeight) return;
+        const [, scrollNatural] = this.menu._scroll.get_preferred_height(-1);
+        const chrome = Math.max(0, menuNatural - scrollNatural);
+        this.menu._scroll.set_height(Math.max(200, maxHeight - chrome));
     }
 
     _clearForcedActorWidth(actor) {

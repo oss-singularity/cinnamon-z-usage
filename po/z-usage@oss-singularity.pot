@@ -394,6 +394,10 @@ msgstr ""
 msgid "General"
 msgstr ""
 
+#: settings-schema.json.js
+msgid "Keep ZCode plan sections expanded"
+msgstr ""
+
 #: usage-format.js
 #, javascript-format
 msgid "Last %s reset: %s"
@@ -479,6 +483,10 @@ msgstr ""
 
 #: applet.js
 msgid "Open the Z.ai coding plan usage statistics"
+msgstr ""
+
+#: settings-schema.json.js
+msgid "Open the ZCode plan sections by default whenever the popup is rebuilt. Manual collapsing still works per popup."
 msgstr ""
 
 #: z_usage.py

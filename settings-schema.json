@@ -34,6 +34,7 @@
         "show-window-labels",
         "show-model-specific-limits",
         "show-zcode-plan-quotas",
+        "expand-zcode-plan-sections",
         "show-model-limits-in-panel",
         "show-credits-in-panel",
         "show-weekly-with-five-hour",
@@ -129,6 +130,13 @@
     "default": true,
     "description": "Show ZCode plan quotas",
     "tooltip": "Show the collapsible ZCode Start Plan and Global Build token buckets next to the coding plan limits. They are read from the signed-in ZCode app's billing balance endpoint."
+  },
+  "expand-zcode-plan-sections": {
+    "type": "switch",
+    "default": true,
+    "dependency": "show-zcode-plan-quotas",
+    "description": "Keep ZCode plan sections expanded",
+    "tooltip": "Open the ZCode plan sections by default whenever the popup is rebuilt. Manual collapsing still works per popup."
   },
   "show-credits-in-panel": {
     "type": "switch",
