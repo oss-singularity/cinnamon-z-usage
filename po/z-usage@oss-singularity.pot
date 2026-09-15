@@ -340,6 +340,11 @@ msgstr ""
 
 #: z_usage.py
 #, python-format
+msgid "Could not reach the ZCode plan balance API: %(error)s"
+msgstr ""
+
+#: z_usage.py
+#, python-format
 msgid "Could not store local history: %(error)s"
 msgstr ""
 
@@ -422,6 +427,10 @@ msgstr ""
 
 #: applet.js
 msgid "No Z.ai API key found"
+msgstr ""
+
+#: z_usage.py
+msgid "No ZCode plan token found"
 msgstr ""
 
 #: usage-format.js
@@ -562,6 +571,10 @@ msgid "Show 7d in the panel when 5h is active"
 msgstr ""
 
 #: settings-schema.json.js
+msgid "Show ZCode plan quotas"
+msgstr ""
+
+#: settings-schema.json.js
 msgid "Show additional model limits such as Spark in the menu, history, rings, panel and tooltip. Turn off to show only Codex. Notification preferences are configured separately."
 msgstr ""
 
@@ -579,6 +592,10 @@ msgstr ""
 
 #: settings-schema.json.js
 msgid "Show the available AIC credit balance as an additional compact panel value."
+msgstr ""
+
+#: settings-schema.json.js
+msgid "Show the collapsible ZCode Start Plan and Global Build token buckets next to the coding plan limits. They are read from the signed-in ZCode app's billing balance endpoint."
 msgstr ""
 
 #: settings-schema.json.js
@@ -695,6 +712,29 @@ msgstr ""
 
 #: z_usage.py
 msgid "Z.ai returned no usage data"
+msgstr ""
+
+#: z_usage.py
+#, python-format
+msgid "ZCode plan balance request failed: HTTP %(code)s"
+msgstr ""
+
+#: z_usage.py
+#, python-format
+msgid "ZCode plan quotas unavailable: %(error)s"
+msgstr ""
+
+#: z_usage.py
+#, python-format
+msgid "ZCode rejected the plan balance request: %(message)s"
+msgstr ""
+
+#: z_usage.py
+msgid "ZCode returned an unreadable plan balance response"
+msgstr ""
+
+#: z_usage.py
+msgid "ZCode returned no plan balance data"
 msgstr ""
 
 #: applet.js

@@ -38,6 +38,7 @@ function _f(text, ...args) {
 
 const UUID = "z-usage@oss-singularity";
 const ACCOUNT_LIMIT_ID = "zai";
+const ZCODE_PLAN_SOURCE = "zcode-plan";
 const ZAI_URL = "https://chat.z.ai/";
 const ZAI_USAGE_URL = "https://z.ai/manage-apikey/coding-plan/personal/usage";
 const ZAI_API_KEYS_URL = "https://z.ai/manage-apikey/apikey-list";
@@ -263,6 +264,7 @@ class ZUsageApplet extends Applet.Applet {
         this.showPanelIcon = true;
         this.showWindowLabels = true;
         this.showModelSpecificLimits = true;
+        this.showZcodePlanQuotas = true;
         this.showModelLimitsInPanel = false;
         this.showCreditsInPanel = false;
         this.showWeeklyWithFiveHour = true;
@@ -306,6 +308,7 @@ class ZUsageApplet extends Applet.Applet {
         this.settings.bind("show-panel-icon", "showPanelIcon", layoutChanged);
         this.settings.bind("show-window-labels", "showWindowLabels", layoutChanged);
         this.settings.bind("show-model-specific-limits", "showModelSpecificLimits", this._onModelVisibilityChanged.bind(this));
+        this.settings.bind("show-zcode-plan-quotas", "showZcodePlanQuotas", this._onModelVisibilityChanged.bind(this));
         this.settings.bind(
             "show-model-limits-in-panel",
             "showModelLimitsInPanel",
@@ -616,15 +619,21 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _filterModelLimits(limits) {
+        let list = Array.from(limits || []);
+        if (this.showZcodePlanQuotas === false) {
+            list = list.filter(limit => limit.source !== ZCODE_PLAN_SOURCE);
+        }
         return this.showModelSpecificLimits === false
-            ? limits.filter(limit => (limit.id || ACCOUNT_LIMIT_ID) === ACCOUNT_LIMIT_ID)
-            : limits;
+            ? list.filter(limit => (limit.id || ACCOUNT_LIMIT_ID) === ACCOUNT_LIMIT_ID)
+            : list;
     }
 
     _modelBadge(limit) {
         if (!limit || limit.limitId === ACCOUNT_LIMIT_ID || limit.id === ACCOUNT_LIMIT_ID) return null;
         const label = String(limit.limitLabel || limit.label || "");
-        return /spark/i.test(label) ? "S" : "M";
+        if (/global/i.test(label)) return "G";
+        if (/start/i.test(label)) return "S";
+        return "M";
     }
 
     _modelBadgeStyle(fontPercent) {
@@ -942,7 +951,7 @@ class ZUsageApplet extends Applet.Applet {
             usageTitle.actor.style = "padding-bottom: 2px;";
             const showLimitLabels = limits.length > 1;
             for (const limit of limits) {
-                if (this._modelBadge(limit) === "S") {
+                if (limit.id !== ACCOUNT_LIMIT_ID) {
                     this._addCollapsibleLimit(
                         limit,
                         wasOpen && limitStates.has(limit.id)
@@ -1088,7 +1097,8 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _quotaRingOpacity(window) {
-        if (this._modelBadge(window) !== "S") return 255;
+        const badge = this._modelBadge(window);
+        if (badge !== "S" && badge !== "G") return 255;
         const limit = (this._snapshot.limits || []).find(
             candidate => candidate.id === window.limitId
         );

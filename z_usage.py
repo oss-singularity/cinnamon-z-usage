@@ -9,6 +9,7 @@ import gettext
 import json
 import math
 import os
+import re
 import signal
 import sys
 import tempfile
@@ -28,6 +29,13 @@ QUOTA_LIMIT_PATH = "/api/monitor/usage/quota/limit"
 ACCOUNT_LIMIT_ID = "zai"
 ACCOUNT_LIMIT_LABEL = _("Z.ai Coding Plan")
 KEY_FILE_RELATIVE = ("cinnamon-z-usage", "api-key")
+
+ZCODE_PLAN_BASE = "https://zcode.z.ai"
+ZCODE_PLAN_BALANCE_PATH = "/api/v1/zcode-plan/billing/balance"
+# ZCode's own client version as of this fork; the endpoint accepts the value
+# ZCode itself sends and the payload shape is validated independently.
+ZCODE_PLAN_APP_VERSION = "3.11.2"
+ZCODE_PLAN_SOURCE = "zcode-plan"
 
 HISTORY_VERSION = 1
 HISTORY_RETENTION_SECONDS = 8 * 24 * 60 * 60
@@ -449,6 +457,7 @@ def build_usage_history(
                     "id": limit_id,
                     "label": limit_label,
                     "durationMinutes": duration,
+                    "source": limit.get("source") or "coding-plan",
                     "trackedSince": points[0][0] if points else now,
                     "periods": period_values,
                     "activity24h": activity,
@@ -500,6 +509,34 @@ def config_key_path() -> Path:
 def zcode_provider_key() -> str:
     """Return the Coding Plan API key cached by the ZCode app, if any."""
 
+    providers = _zcode_providers()
+    for provider_id in ("builtin:zai-coding-plan", "builtin:bigmodel-coding-plan"):
+        options = _provider_options(providers, provider_id)
+        key = str(options.get("apiKey") or "").strip()
+        if key:
+            return key
+    return ""
+
+
+def zcode_plan_token() -> str:
+    """Return the token ZCode uses for its own plan billing endpoints."""
+
+    candidates = (
+        str(os.environ.get("ZAI_START_PLAN_TOKEN") or "").strip(),
+    )
+    for candidate in candidates:
+        if candidate:
+            return candidate
+    providers = _zcode_providers()
+    for provider_id in ("builtin:zai-start-plan", "builtin:bigmodel-start-plan"):
+        options = _provider_options(providers, provider_id)
+        key = str(options.get("apiKey") or "").strip()
+        if key:
+            return key
+    return ""
+
+
+def _zcode_providers() -> dict[str, Any]:
     cache_candidates = []
     v2_home = os.environ.get("ZCODE_HOME")
     if v2_home:
@@ -510,20 +547,16 @@ def zcode_provider_key() -> str:
             config = json.loads(cache_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if not isinstance(config, dict):
-            continue
-        providers = config.get("provider")
-        if not isinstance(providers, dict):
-            continue
-        for provider_id in ("builtin:zai-coding-plan", "builtin:bigmodel-coding-plan"):
-            options = providers.get(provider_id)
-            if isinstance(options, dict):
-                options = options.get("options")
-            if isinstance(options, dict):
-                key = str(options.get("apiKey") or "").strip()
-                if key:
-                    return key
-    return ""
+        if isinstance(config, dict) and isinstance(config.get("provider"), dict):
+            return config["provider"]
+    return {}
+
+
+def _provider_options(providers: dict[str, Any], provider_id: str) -> dict[str, Any]:
+    options = providers.get(provider_id)
+    if isinstance(options, dict):
+        options = options.get("options")
+    return options if isinstance(options, dict) else {}
 
 
 def resolve_api_key(explicit: str | None) -> str:
@@ -598,6 +631,150 @@ def fetch_quota_limits(api_key: str, base_url: str, timeout: float) -> dict[str,
     return data
 
 
+def zcode_source_headers(origin: str) -> dict[str, str]:
+    """Mirror the client headers ZCode sends to its own plan endpoints."""
+
+    platform_names = {"darwin": "macos", "win32": "windows"}
+    platform = sys.platform
+    headers = {
+        "User-Agent": f"ZCode/{ZCODE_PLAN_APP_VERSION}",
+        "HTTP-Referer": origin,
+        "X-Title": "Z Code@electron",
+        "X-ZCode-App-Version": ZCODE_PLAN_APP_VERSION,
+        "X-Platform": f"{platform}-{os.uname().machine}",
+        "X-Client-Language": os.environ.get("LC_ALL", "").split(".")[0] or "en-US",
+        "X-Client-Timezone": time.tzname[0] if time.tzname else "UTC",
+        "X-Os-Category": platform_names.get(platform, "linux"),
+        "X-Os-Version": os.uname().release,
+    }
+    try:
+        telemetry = json.loads(
+            (Path.home() / ".zcode" / "v2" / "telemetry-state.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        telemetry = None
+    device_mid = telemetry.get("deviceMid") if isinstance(telemetry, dict) else None
+    if isinstance(device_mid, str) and device_mid.strip():
+        headers["X-Device-Mid"] = device_mid.strip()
+    return headers
+
+
+def fetch_plan_balances(token: str, base_url: str, timeout: float) -> dict[str, Any]:
+    """Read the ZCode plan buckets (Start Plan, Global Build, ...) if available."""
+
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise UsageError(_("Request timeout must be finite and positive"))
+    key = str(token or "").strip()
+    if not key:
+        raise UsageError(_("No ZCode plan token found"))
+    base = str(base_url or ZCODE_PLAN_BASE).strip().rstrip("/")
+    origin = base if "://" in base else f"https://{base}"
+    url = f"{origin}{ZCODE_PLAN_BALANCE_PATH}?app_version={ZCODE_PLAN_APP_VERSION}"
+    request = urllib.request.Request(
+        url,
+        headers={
+            **zcode_source_headers(origin),
+            "Authorization": f"Bearer {key}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as error:
+        raise UsageError(
+            _("ZCode plan balance request failed: HTTP %(code)s") % {"code": error.code}
+        ) from error
+    except (urllib.error.URLError, OSError, TimeoutError) as error:
+        raise UsageError(_("Could not reach the ZCode plan balance API: %(error)s") % {"error": error}) from error
+    try:
+        envelope = json.loads(body)
+    except json.JSONDecodeError as error:
+        raise UsageError(_("ZCode returned an unreadable plan balance response")) from error
+    if not isinstance(envelope, dict) or envelope.get("code") not in (0, 200):
+        message = str(envelope.get("msg") or "") if isinstance(envelope, dict) else ""
+        raise UsageError(_("ZCode rejected the plan balance request: %(message)s") % {"message": message or "unknown"})
+    data = envelope.get("data")
+    if not isinstance(data, dict):
+        raise UsageError(_("ZCode returned no plan balance data"))
+    return data
+
+
+def normalise_plan_balances(data: Any, now: int | None = None) -> list[dict[str, Any]]:
+    """Convert ZCode plan buckets into secondary applet limits (one per model)."""
+
+    now = int(time.time()) if now is None else int(now)
+    if not isinstance(data, dict):
+        return []
+    plans = {}
+    for plan in data.get("plans") or []:
+        if isinstance(plan, dict) and plan.get("plan_id"):
+            plans[str(plan["plan_id"])] = plan
+
+    limits = []
+    for bucket in data.get("balances") or []:
+        if not isinstance(bucket, dict):
+            continue
+        total = _number(bucket.get("total_units"), -1)
+        if total <= 0:
+            continue
+        remaining = _number(bucket.get("remaining_units"), -1)
+        used = _number(bucket.get("used_units"), 0)
+        if remaining < 0 or used < 0:
+            continue
+        period_start = int(_number(bucket.get("period_start"))) or None
+        period_end = int(_number(bucket.get("period_end"))) or None
+        duration = 0
+        if period_start and period_end and period_end > period_start:
+            duration = int(round((period_end - period_start) / 60))
+        if duration <= 0:
+            duration = 1440
+
+        plan = plans.get(str(bucket.get("plan_id") or ""), {})
+        plan_name = str(plan.get("name") or bucket.get("plan_id") or "ZCode Plan")
+        plan_short = re.sub(r"^ZCode\s+", "", plan_name).strip() or plan_name
+        model = _bucket_model_name(bucket)
+        label = f"{plan_short} · {model}" if model else plan_short
+        limit_id = "zai-" + re.sub(r"[^a-z0-9]+", "-", f"{plan_short} {model}".lower()).strip("-")
+        limits.append(
+            {
+                "id": limit_id,
+                "label": label,
+                "planType": plan_short,
+                "source": ZCODE_PLAN_SOURCE,
+                "priority": _number(bucket.get("plan_priority") or bucket.get("priority"), 0),
+                "windows": [
+                    {
+                        "durationMinutes": duration,
+                        "usedPercent": min(100.0, max(0.0, 100.0 * used / total)),
+                        "remainingPercent": min(100.0, max(0.0, 100.0 * remaining / total)),
+                        "resetsAt": period_end,
+                        "lastResetAt": period_start,
+                        "usedCredits": used,
+                        "totalCredits": total,
+                        "unit": str(bucket.get("unit_type") or "token"),
+                    }
+                ],
+            }
+        )
+
+    limits.sort(key=lambda limit: (-limit.pop("priority", 0), limit["label"].lower()))
+    return limits
+
+
+def _bucket_model_name(bucket: dict[str, Any]) -> str:
+    show_name = str(bucket.get("show_name") or "").strip()
+    if show_name:
+        return show_name
+    capabilities = bucket.get("capabilities")
+    if isinstance(capabilities, list):
+        for capability in capabilities:
+            text = str(capability or "").strip()
+            if text.lower().startswith("model:"):
+                return text[6:].strip()
+    return ""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=_("Read Z.ai GLM Coding Plan limits through the Z.ai usage monitor API.")
@@ -631,6 +808,20 @@ def main() -> int:
             max(1.0, args.timeout),
         )
         snapshot = normalise_quota_limits(result)
+        try:
+            plan_token = zcode_plan_token()
+            if plan_token:
+                plan_data = fetch_plan_balances(
+                    plan_token,
+                    os.environ.get("ZCODE_PLAN_BASE") or ZCODE_PLAN_BASE,
+                    max(1.0, args.timeout),
+                )
+                snapshot["limits"].extend(normalise_plan_balances(plan_data))
+        except (OSError, UsageError) as plan_error:
+            print(
+                _("ZCode plan quotas unavailable: %(error)s") % {"error": plan_error},
+                file=sys.stderr,
+            )
         if not args.no_history:
             try:
                 update_usage_history(

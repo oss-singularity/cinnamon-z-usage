@@ -33,6 +33,7 @@
         "show-panel-icon",
         "show-window-labels",
         "show-model-specific-limits",
+        "show-zcode-plan-quotas",
         "show-model-limits-in-panel",
         "show-credits-in-panel",
         "show-weekly-with-five-hour",
@@ -122,6 +123,12 @@
     "default": false,
     "dependency": "show-model-specific-limits",
     "description": "Show model-specific limits in the panel"
+  },
+  "show-zcode-plan-quotas": {
+    "type": "switch",
+    "default": true,
+    "description": "Show ZCode plan quotas",
+    "tooltip": "Show the collapsible ZCode Start Plan and Global Build token buckets next to the coding plan limits. They are read from the signed-in ZCode app's billing balance endpoint."
   },
   "show-credits-in-panel": {
     "type": "switch",
