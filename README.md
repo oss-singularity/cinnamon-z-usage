@@ -1,130 +1,100 @@
 <p align="center">
   <picture>
-    <img src="icon.png" width="96" height="96" alt="ChatGPT Usage Monitor icon">
+    <img src="icon.png" width="96" height="96" alt="Z Usage Monitor icon">
   </picture>
 </p>
 
-<h1 align="center">ChatGPT Usage Monitor for Cinnamon</h1>
+<h1 align="center">Z Usage Monitor for Cinnamon</h1>
 
 <p align="center">
-  Keep ChatGPT Work, Codex and Codex Spark usage beautifully in view — right in
-  your Cinnamon panel.
+  Keep your Z.ai GLM Coding Plan usage beautifully in view — right in your
+  Cinnamon panel.
 </p>
 
 <p align="center">
-  <a href="https://github.com/oss-singularity/cinnamon-chatgpt-usage/actions/workflows/check.yml"><img alt="Checks" src="https://github.com/oss-singularity/cinnamon-chatgpt-usage/actions/workflows/check.yml/badge.svg"></a>
+  <a href="https://github.com/oss-singularity/cinnamon-z-usage/actions/workflows/check.yml"><img alt="Checks" src="https://github.com/oss-singularity/cinnamon-z-usage/actions/workflows/check.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-6f5bd5"></a>
   <img alt="Cinnamon 5.8 or newer supported" src="https://img.shields.io/badge/Cinnamon-5.8%2B%20supported-75c46b">
-  <img alt="Codex app-server" src="https://img.shields.io/badge/data-Codex%20app--server-111111">
+  <img alt="Z.ai monitor API" src="https://img.shields.io/badge/data-Z.ai%20usage%20monitor%20API-4f2fff">
 </p>
 
-![ChatGPT Usage Monitor for Cinnamon — live limits, reset times and 24-hour history](.github/social-preview.png)
+`z-usage@oss-singularity` is a Cinnamon applet that shows the 5-hour and weekly
+quota windows of a Z.ai GLM Coding Plan directly in the panel: remaining usage,
+reset countdowns, per-window credit consumption and a 24-hour activity chart.
+It is the Z.ai sibling of
+[cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage)
+and shares its git history so upstream improvements can be backported.
 
-## See it in action
+## Features
 
-| Common Codex-only two-window details                                                                                                   | AIC balance in the detailed usage view                                                                                  |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| ![Codex-only usage menu with 5h and 7d quota rings and the vertical panel anchor visible](docs/model-limits/usage-menu-codex-only.png) | ![Codex-only usage menu with the optional AIC balance displayed in the panel](docs/model-limits/usage-menu-credits.png) |
+- **Panel display** for horizontal and vertical panels with the 5h and 7d
+  windows, threshold colors and an optional credit balance.
+- **Usage popup** with quota rings, reset countdowns, observed consumption
+  (1h/4h/12h/24h/today), a 24-hour activity chart and plan information.
+- **API-key-less by default.** The backend resolves the Coding Plan API key the
+  same way the Codex applet finds its app-server:
+  1. the *Z.ai API key* applet setting (optional),
+  2. the `ZAI_API_KEY` environment variable,
+  3. `~/.config/cinnamon-z-usage/api-key` (recommended for a manual override),
+  4. the Coding Plan API key cached by the signed-in
+     [ZCode](https://zcode.z.ai) app in `~/.zcode/v2/config.json`.
+- **Weekly reset notifications** and optional low-usage notifications with
+  configurable warning/critical thresholds.
+- **Launch buttons** for the Z.ai chat, the usage statistics dashboard, the API
+  key list and the developer docs.
 
-<p align="center"><sub>The opt-in AIC balance is also included in the detailed usage view, while the quota and activity sections remain unchanged.</sub></p>
-
-| Panel state               | Horizontal panel                                                                                               | 40 px vertical panel                                                                                                 |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Common Codex-only 5h + 7d | ![Common Codex-only horizontal panel with 5h and 7d indicators](docs/model-limits/topbar-codex-two.png)        | ![Common Codex-only vertical panel with 5h and 7d indicators](docs/model-limits/vertical-panel-codex-two.png)        |
-| Default Codex 7d          | ![Default horizontal panel with only the Codex 7d indicator](docs/model-limits/topbar-codex-only.png)          | ![Default vertical panel with only the Codex 7d indicator](docs/model-limits/vertical-panel-codex-only.png)          |
-| Codex 7d + Spark          | ![Codex and Spark limits in a horizontal top bar with both panel indicators](docs/model-limits/topbar.png)     | ![Codex and Spark limits in a vertical panel with both panel indicators](docs/model-limits/vertical-panel.png)       |
-| Optional AIC + Codex 7d   | ![Horizontal panel with the optional AIC balance and Codex 7d indicator](docs/model-limits/topbar-credits.png) | ![Vertical panel with the optional AIC balance and Codex 7d indicator](docs/model-limits/vertical-panel-credits.png) |
-
-<p align="center"><sub>Typical Plus and standard Business accounts use the common two-window state; the 5x Business variant is separate. The compact default keeps only account-wide Codex 7d, while the AIC row requires <em>Show credits in the panel</em> and places our usage icon before the balance.</sub></p>
-
-| Usage overview                                                                                          | Spark quotas and recent activity                                                                                                            |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| ![Usage menu with model-specific panel indicators and hourly history](docs/model-limits/usage-menu.png) | ![Expanded Spark 5h and 7d demo histories sharing one activity chart with the panel anchor visible](docs/model-limits/usage-menu-spark.png) |
-
-<p align="center"><sub>Native horizontal and vertical layouts keep the panel indicators visible as a visual anchor while the popup expands to show the details.</sub></p>
-
-| Default overview on a horizontal panel                                                                                                   | Conditional four-ring quota state                                                                                                                                   |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ![Horizontal-panel default with muted unused Spark rings and both Spark sections collapsed](docs/model-limits/usage-menu-horizontal.png) | ![Usage menu with account-wide Codex 5h and 7d plus Spark 5h and 7d quota rings and the vertical panel anchor visible](docs/model-limits/usage-menu-four-rings.png) |
-
-<table>
-  <tr style="background-color: transparent;">
-    <td rowspan="2" align="center" valign="top">
-      <strong>Precise hourly bucket details</strong><br>
-      <img src="docs/model-limits/bucket-tooltip.png" width="467" alt="Hourly bucket hover details beside both model-specific panel indicators">
-    </td>
-    <td align="center" valign="top">
-      <strong>Explicit earned-reset confirmation</strong><br>
-      <img src="docs/model-limits/reset-confirmation.png" width="393" alt="Native confirmation dialog before using an earned limit reset with the vertical panel anchor and both model-specific indicators visible">
-    </td>
-  </tr>
-  <tr style="background-color: transparent;">
-    <td align="center" valign="top">
-      <strong>Every active quota at a glance</strong><br>
-      <img src="docs/model-limits/panel-tooltip.png" width="278" alt="Compact panel hover summary beside both model-specific panel indicators">
-    </td>
-  </tr>
-</table>
-
-| ChatGPT desktop app guidance                                                                                        | Codex CLI guidance                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| ![ChatGPT App installation help beside both model-specific panel indicators](docs/model-limits/install-chatgpt.png) | ![Codex CLI installation help beside both model-specific panel indicators](docs/model-limits/install-codex.png) |
-
-| General settings with model-specific panel limits enabled                                            | Colors and thresholds beside both model-specific panel indicators                                    |
-| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| ![General settings with model-specific panel limits enabled](docs/model-limits/settings-general.png) | ![Color settings beside both model-specific panel indicators](docs/model-limits/settings-colors.png) |
-
-![Notification settings with weekly refresh and optional low-limit alerts](docs/model-limits/settings-notifications.png)
-
-## Why it feels at home
-
-- Live remaining usage, reset countdowns, credits and earned-reset status in a
-  compact native Cinnamon popup.
-- Clear 5h and 7d rings, observed 24-hour activity, hourly bucket details and
-  helpful reset tooltips.
-- Automatic Codex Spark discovery with an uncluttered default that can show only
-  the account-wide Codex 7d indicator in the panel.
-- Optional compact AIC credit-balance display beside the panel quota indicators.
-- One polished layout for horizontal panels and real 40 px vertical panels,
-  with configurable colors, thresholds, labels and text size.
-- Native ChatGPT App and Codex CLI launch guidance, configurable backend paths,
-  notifications and a Copy Screenshot action.
-- Local-first by design: no browser scraping, API key, hosted account service,
-  prompt storage or background daemon.
-
-## Get started
+## Installation
 
 ```bash
-git clone https://github.com/oss-singularity/cinnamon-chatgpt-usage.git
-cd cinnamon-chatgpt-usage
-./install.sh
+./install.sh          # or: make install
+make uninstall
 ```
 
-Then open **System Settings → Applets** and add **ChatGPT Usage Monitor** to a
-panel. Use a signed-in Codex CLI or a supported ChatGPT desktop app as the local
-backend; the applet does not install either product.
+The installer copies the applet to `~/.local/share/cinnamon/applets/z-usage@oss-singularity`.
+Enable it via *System Settings → Applets*, or add it to a panel with Cinnamon's
+applet management. Requires Python 3.10+; the applet never installs a backend
+and only performs read-only GET requests against `https://api.z.ai`.
 
-## Documentation
+## Fork relationship and backports
 
-The [technical documentation hub](docs/README.md) contains backend and settings
-details, privacy boundaries, testing and capture reproduction, package
-validation, release receipts and the Cinnamon Spices handoff.
+This repository is a fork of
+[cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage)
+(`upstream` remote). Upstream fixes flow in through a normal merge:
 
-Useful entry points:
+```bash
+git fetch upstream
+git merge upstream/main     # resolve conflicts in the Z-specific regions
+```
 
-- [Technical and maintainer documentation](docs/README.md)
-- [Security policy](SECURITY.md)
-- [Attribution](ATTRIBUTION.md) and [icon notices](icons/ATTRIBUTION.md)
-- [License](LICENSE)
+Divergence map, to keep conflicts small:
 
-## Trust and attribution
+| Area | Z-specific state |
+| --- | --- |
+| Backend | `z_usage.py` talks to the Z.ai monitor API; the Codex app-server transport is gone. |
+| Identity | UUID `z-usage@oss-singularity`, gettext domain, metadata and icons. |
+| Launch buttons | Z.ai chat, usage statistics, API keys, docs. |
+| Reset credits | Dropped — Z.ai coding plans expose no reset-credit redemption (ZCode hints at `/api/v1/coding-plan/reset`; porting that is roadmap). |
+| Path settings | Dropped — there is no local Z.ai backend binary. |
+| Neutral code | History, activity charts, notifications, popup layout, settings widget classes are intentionally unchanged for clean merges. |
 
-The applet talks to the user's locally installed Codex app-server and stores
-only the small local history needed for its charts. Credentials and prompts are
-never read or bundled. Earned resets always require an explicit confirmation.
+The account-level limit uses the id `zai` (constant `ACCOUNT_LIMIT_ID` in
+`applet.js`/`usage-format.js`).
 
-Made with love by Claudiu & Codex. 🩷
+## Development
 
-Licensed under GPL-3.0-or-later. OpenAI, ChatGPT and Codex are trademarks of
-OpenAI; this independent community project is not affiliated with or endorsed
-by OpenAI.
+```bash
+make check        # cjs regression suites, python unittest suite, schema,
+                  # icon verification, translation template, shellcheck
+make translations # regenerate po/z-usage@oss-singularity.pot
+```
+
+## Credits
+
+Built with love by Claudiu & ZCode as part of
+[OSS Singularity](https://github.com/oss-singularity). Forked from
+[cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage)
+by Claudiu & Codex. All bundled icons are original OSS Singularity artwork
+(GPL-3.0-or-later) except the bundled symbolic action icons from
+[Ubuntu Yaru](https://github.com/ubuntu/yaru); see `icons/ATTRIBUTION.md`.
+
+Licensed under [GPL-3.0-or-later](LICENSE).

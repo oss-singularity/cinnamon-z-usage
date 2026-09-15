@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0 — 2026-09-15 (Z fork)
+
+- Forked cinnamon-chatgpt-usage 1.0.6 into the Z Usage Monitor
+  (`z-usage@oss-singularity`) with shared git history for upstream backports.
+- New `z_usage.py` backend reading the Z.ai usage monitor API
+  (`/api/monitor/usage/quota/limit`) with 5h and weekly credit windows,
+  reset timestamps and the plan level.
+- API-key-less credential resolution: applet setting, `ZAI_API_KEY`,
+  `~/.config/cinnamon-z-usage/api-key`, then the Coding Plan API key cached by
+  the signed-in ZCode app.
+- Z.ai launch buttons, Plan/Credits rows, original Z ribbon icons; dropped the
+  Codex app-server plumbing, ChatGPT path settings and the ChatGPT-only
+  reset-credit flow.
+
 ## 1.0.6 — 2026-09-15
 
 - Keep limit remaining percentages at the integer precision exposed by the
