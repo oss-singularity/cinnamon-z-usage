@@ -33,6 +33,7 @@ reproduction commands and release evidence live here.
 
 Versioned receipts are kept together under [`releases/`](releases/):
 
+- [1.0.6 receipt](releases/release-1.0.6.json)
 - [1.0.1 receipt](releases/release-1.0.1.json)
 - [1.0.2 receipt](releases/release-1.0.2.json)
 - [1.0.3 receipt](releases/release-1.0.3.json)
