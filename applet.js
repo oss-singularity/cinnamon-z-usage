@@ -575,9 +575,7 @@ class ZUsageApplet extends Applet.Applet {
             const layoutX = x - actor.translation_x;
             actor.translation_x = Math.round(right - (layoutX + width - 1));
         }
-        const arrows = (this._submenuTriangles || []).concat(
-            (this._limitSections || []).map(section => section.heading.arrow)
-        );
+        const arrows = this._submenuTriangles || [];
         for (const actor of arrows) {
             const [width] = actor.get_transformed_size();
             if (width <= 0) continue;
@@ -1313,11 +1311,6 @@ class ZUsageApplet extends Applet.Applet {
         if (collapsible) {
             label.opacity = 128;
             item.actor.style = `padding-right: ${POPUP_RIGHT_INSET}px;`;
-            const arrowBin = new St.Bin({ x_align: St.Align.END });
-            item.addActor(arrowBin, { expand: true, span: -1, align: St.Align.END });
-            item.arrow = PopupMenu.arrowIcon(St.Side.RIGHT);
-            item.arrow.set_pivot_point(0.5, 0.5);
-            arrowBin.child = item.arrow;
             item.actor.label_actor = label;
         }
         menu.addMenuItem(item);
@@ -1344,7 +1337,6 @@ class ZUsageApplet extends Applet.Applet {
             setExpanded: open => {
                 section.expanded = open;
                 for (const row of rows) row.actor.visible = open;
-                heading.arrow.rotation_angle_z = open ? 90 : 0;
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
                 this._clampPopupHeight();

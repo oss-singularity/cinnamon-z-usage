@@ -65,18 +65,17 @@ for (const scale of [1, 1.25, 2]) {
                 get_theme_node() { return { get_padding() { return 39; } }; },
                 set_width(width) { this.width = width; }
             };
-            const arrows = [10, 12].map((width, index) => ({
+            const triangle = {
                 translation_x: 0,
-                rotation_angle_z: index ? 90 : 0,
                 get_transformed_position() {
-                    return [480 + naturalShift + this.translation_x + (this.rotation_angle_z ? width : 0), 0];
+                    return [480 + naturalShift + this.translation_x, 0];
                 },
                 get_abs_allocation_vertices() {
                     const x = 480 + naturalShift + this.translation_x;
-                    return [{ x }, { x: x + width }, { x }, { x: x + width }];
+                    return [{ x }, { x: x + 12 }, { x }, { x: x + 12 }];
                 },
-                get_transformed_size() { return [width, width]; }
-            }));
+                get_transformed_size() { return [12, 12]; }
+            };
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
                 actor: { allocation: { x1: menuX + 48 } },
@@ -89,8 +88,7 @@ for (const scale of [1, 1.25, 2]) {
                     get_transformed_size() { return [352, 0]; }
                 },
                 _countdownWidgets: [{ actor: ring }],
-                _limitSections: [{ heading: { arrow: arrows[0] } }],
-                _submenuTriangles: [arrows[1]],
+                _submenuTriangles: [triangle],
                 _activityCharts: [{ chart }]
             });
             for (let rebuild = 0; rebuild < 3; rebuild++) {
@@ -103,11 +101,9 @@ for (const scale of [1, 1.25, 2]) {
                         `expected=${right}`
                     );
                 }
-                for (const arrow of arrows) {
-                    const edge = Math.max(...arrow.get_abs_allocation_vertices().map(v => v.x));
-                    if (edge !== right) {
-                        throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}, edge=${edge}`);
-                    }
+                const triEdge = Math.max(...triangle.get_abs_allocation_vertices().map(v => v.x));
+                if (triEdge !== right) {
+                    throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}, edge=${triEdge}`);
                 }
             }
         }

@@ -7,6 +7,10 @@
   the popup, and menu items are clamped to the inner width - so toggling
   plan sections, scrolling and reopening can no longer shift the popup, cut
   the header at the screen top or push the rings under the panel.
+- Remove the collapsible section disclosure arrows entirely: their flash
+  during collapse and the sideways ring shift were the last animation
+  artifacts. The expand/collapse state is shown by the section rows
+  themselves.
 - Sticky popup chrome: the header (title, updated stamp, quota rings) and
   the action footer are pinned outside the scroll view - the content scrolls
   beneath them, so title, rings and buttons stay visible in every scroll
