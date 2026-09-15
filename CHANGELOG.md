@@ -2,6 +2,11 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- Second layout pass: the popup height is clamped before Cinnamon positions
+  it so a fully expanded popup stays on screen, a fresh open starts at the
+  header (the upstream active-Spark auto-open no longer fires for the new
+  Start Plan badges), expanding a section scrolls its rows into view, and the
+  recent-consumption accordion resets stale leaf heights on reopen.
 - Popup layout hardening from live testing: the header rings stay the coding
   plan's 5h/7d overview (plan badges no longer collide with ring labels), the
   ZCode plan sections are expanded by default with a "Keep ZCode plan sections

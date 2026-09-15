@@ -160,17 +160,33 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
 
     open(animate) {
         const owner = this._usageOwner;
+        const freshOpen = !this.isOpen;
         owner._applyPopupWidth();
-        owner._openActiveSparkHistory();
-        if (!this.isOpen) {
-            for (const section of owner._limitSections) {
-                if (section._usageUserToggled) continue;
-                section.setExpanded(owner._defaultSectionExpanded(section.limit));
+        if (freshOpen) {
+            // The default expansion on open must not yank the scroll position
+            // away from the header; auto-scrolling is for manual toggles only.
+            owner._suppressSectionAutoScroll = true;
+            try {
+                for (const section of owner._limitSections) {
+                    if (section._usageUserToggled) continue;
+                    section.setExpanded(owner._defaultSectionExpanded(section.limit));
+                }
+            } finally {
+                owner._suppressSectionAutoScroll = false;
             }
         }
+        // Clamp BEFORE the base positioning pass: Cinnamon places the popup
+        // from its preferred height, so a late clamp would leave the top of
+        // a taller-than-monitor popup off-screen.
+        owner._clampPopupHeight(owner.actor);
         super.open(animate);
         owner._lockPopupLayoutWidth();
         owner._clampPopupHeight();
+        if (freshOpen && this._scroll && this._scroll.get_vscroll_bar) {
+            // A fresh open always starts at the header, whatever earlier
+            // rebuilds or the previous session left scrolled.
+            this._scroll.get_vscroll_bar().get_adjustment().set_value(0);
+        }
     }
 
     close(animate) {
@@ -1311,6 +1327,13 @@ class ZUsageApplet extends Applet.Applet {
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
                 this._clampPopupHeight();
+                if (open && rows.length > 0 && typeof Mainloop !== "undefined" &&
+                    !this._suppressSectionAutoScroll && this.menu && this.menu.isOpen) {
+                    Mainloop.idle_add(() => {
+                        if (!this._destroyed) this._ensureActorVisible(rows[rows.length - 1].actor);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
             }
         };
         heading.actor.add_accessible_state(Atk.StateType.EXPANDABLE);
@@ -2845,6 +2868,17 @@ class ZUsageApplet extends Applet.Applet {
                                 entry.submenu.menu.close(false);
                             }
                         }
+                        // A previous scroll-viewport pass can leave a stale
+                        // height on the reopened leaf; clear it and settle.
+                        submenu.menu.actor.set_height(-1);
+                        submenu.menu.box.set_height(-1);
+                        this._clampPopupHeight();
+                        if (typeof Mainloop !== "undefined" && this.menu && this.menu.isOpen) {
+                            Mainloop.idle_add(() => {
+                                if (!this._destroyed) this._ensureActorVisible(submenu.menu.actor);
+                                return GLib.SOURCE_REMOVE;
+                            });
+                        }
                     }
                     this._syncPopupRightInsets();
                 });
@@ -3559,10 +3593,10 @@ class ZUsageApplet extends Applet.Applet {
         actor.clip_to_allocation = true;
     }
 
-    _clampPopupHeight() {
-        if (!this.menu || !this.menu._scroll || !this.menu.isOpen) return;
+    _clampPopupHeight(forActor) {
+        if (!this.menu || !this.menu._scroll) return;
         if (!Main.layoutManager || !Main.layoutManager.findMonitorForActor) return;
-        const monitor = Main.layoutManager.findMonitorForActor(this.menu.actor);
+        const monitor = Main.layoutManager.findMonitorForActor(forActor || this.menu.actor);
         if (!monitor || !Number.isFinite(monitor.height) || monitor.height <= 0) return;
         this.menu._scroll.set_height(-1);
         const [, menuNatural] = this.menu.actor.get_preferred_height(-1);
@@ -3573,6 +3607,25 @@ class ZUsageApplet extends Applet.Applet {
         const [, scrollNatural] = this.menu._scroll.get_preferred_height(-1);
         const chrome = Math.max(0, menuNatural - scrollNatural);
         this.menu._scroll.set_height(Math.max(200, maxHeight - chrome));
+    }
+
+    _ensureActorVisible(actor) {
+        if (!this.menu || !this.menu.isOpen || !this.menu._scroll) return;
+        const scroll = this.menu._scroll;
+        if (!actor || actor.is_finalized() || !actor.mapped) return;
+        const [scrollX, scrollY] = scroll.get_transformed_position();
+        const [, scrollH] = scroll.get_transformed_size();
+        const [actorX, actorY] = actor.get_transformed_position();
+        const [, actorH] = actor.get_transformed_size();
+        if (!Number.isFinite(actorY) || !Number.isFinite(actorH) || actorH <= 0) return;
+        const adjustment = scroll.get_vscroll_bar().get_adjustment();
+        const value = adjustment.get_value();
+        const relativeTop = actorY - scrollY + value;
+        const relativeBottom = relativeTop + actorH;
+        const viewTop = value;
+        const viewBottom = value + scrollH;
+        if (relativeBottom > viewBottom) adjustment.set_value(relativeBottom - scrollH);
+        else if (relativeTop < viewTop) adjustment.set_value(relativeTop);
     }
 
     _clearForcedActorWidth(actor) {
