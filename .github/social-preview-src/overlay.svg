@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
   <defs>
     <linearGradient id="leftShade" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#080a0f" stop-opacity="0.99"/>
+      <stop offset="0" stop-color="#080a0f" stop-opacity="0.97"/>
       <stop offset="0.52" stop-color="#080a0f" stop-opacity="0.90"/>
       <stop offset="0.72" stop-color="#080a0f" stop-opacity="0.38"/>
       <stop offset="1" stop-color="#080a0f" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#10a37f"/>
-      <stop offset="0.56" stop-color="#49dcb1"/>
-      <stop offset="1" stop-color="#45bdf5"/>
+      <stop offset="0" stop-color="#4f9cf5"/>
+      <stop offset="0.56" stop-color="#62c7f5"/>
+      <stop offset="1" stop-color="#4fe3c1"/>
     </linearGradient>
     <linearGradient id="iconTile" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#34363d"/>
@@ -26,31 +26,21 @@
   </defs>
 
   <rect width="1280" height="640" fill="url(#leftShade)"/>
-  <rect x="1" y="1" width="1278" height="638" rx="26" fill="none" stroke="#8ddfc8" stroke-opacity="0.20" stroke-width="2"/>
+  <rect x="1" y="1" width="1278" height="638" rx="26" fill="none" stroke="#62c7f5" stroke-opacity="0.22" stroke-width="2"/>
 
   <text x="76" y="78" fill="#9aa8b7" font-family="Noto Sans, sans-serif" font-size="18" font-weight="700" letter-spacing="3">OSS SINGULARITY  /  OPEN SOURCE</text>
   <rect x="76" y="101" width="244" height="5" rx="2.5" fill="url(#accent)"/>
 
-  <rect x="78" y="158" width="108" height="108" rx="31" fill="#10a37f" opacity="0.16" filter="url(#tileGlow)"/>
-  <rect x="76" y="156" width="112" height="112" rx="32" fill="url(#iconTile)" stroke="#7be3c6" stroke-opacity="0.42"/>
+  <rect x="78" y="158" width="108" height="108" rx="31" fill="#4f9cf5" opacity="0.16" filter="url(#tileGlow)"/>
+  <rect x="76" y="156" width="112" height="112" rx="32" fill="url(#iconTile)" stroke="#62c7f5" stroke-opacity="0.42"/>
 
-  <text x="218" y="205" fill="#ffffff" font-family="Noto Sans, sans-serif" font-size="42" font-weight="800">ChatGPT Usage Monitor</text>
+  <text x="218" y="205" fill="#ffffff" font-family="Noto Sans, sans-serif" font-size="42" font-weight="800">Z Usage Monitor</text>
   <text x="218" y="250" fill="#d7e2e8" font-family="Noto Sans, sans-serif" font-size="32" font-weight="600">for Cinnamon</text>
 
-  <text x="76" y="356" fill="#f4f8fa" font-family="Noto Sans, sans-serif" font-size="30" font-weight="600">Your limits, beautifully in view.</text>
-  <text x="76" y="399" fill="#aebbc6" font-family="Noto Sans, sans-serif" font-size="18">{{TAGLINE}}</text>
+  <text x="76" y="356" fill="#f4f8fa" font-family="Noto Sans, sans-serif" font-size="30" font-weight="600">{{TAGLINE}}</text>
+  <text x="76" y="408" fill="#c3cdd6" font-family="Noto Sans, sans-serif" font-size="22" font-weight="500">5-hour and weekly quota rings, ZCode Start Plan and Global Build</text>
+  <text x="76" y="440" fill="#c3cdd6" font-family="Noto Sans, sans-serif" font-size="22" font-weight="500">buckets, live reset countdowns and a 24-hour activity chart.</text>
 
-  <g font-family="Noto Sans, sans-serif" font-size="15" font-weight="700" letter-spacing="1.35">
-    <rect x="76" y="449" width="145" height="38" rx="19" fill="#121820" stroke="#21b68e" stroke-opacity="0.82"/>
-    <circle cx="97" cy="468" r="4" fill="#4ee1ae"/>
-    <text x="154" y="474" text-anchor="middle" fill="#dcfff3">LIVE LIMITS</text>
-
-    <rect x="235" y="449" width="153" height="38" rx="19" fill="#121820" stroke="#45bdf5" stroke-opacity="0.76"/>
-    <text x="311.5" y="474" text-anchor="middle" fill="#ddf5ff">RESET TIMES</text>
-
-    <rect x="402" y="449" width="148" height="38" rx="19" fill="#121820" stroke="#8a7df5" stroke-opacity="0.72"/>
-    <text x="476" y="474" text-anchor="middle" fill="#ebe8ff">24H HISTORY</text>
-  </g>
-
-  <text x="76" y="571" fill="#7f91a0" font-family="Noto Sans, sans-serif" font-size="16">github.com/oss-singularity/cinnamon-chatgpt-usage</text>
+  <text x="76" y="520" fill="#8fd8f7" font-family="Noto Sans, sans-serif" font-size="20" font-weight="700" letter-spacing="1">API-KEY-LESS  ·  MULTI-PLAN  ·  HORIZONTAL + VERTICAL PANELS</text>
+  <text x="76" y="560" fill="#7f8b97" font-family="Noto Sans, sans-serif" font-size="18" font-weight="500">Forked from cinnamon-chatgpt-usage  ·  GPL-3.0-or-later</text>
 </svg>

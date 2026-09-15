@@ -7,8 +7,7 @@
 <h1 align="center">Z Usage Monitor for Cinnamon</h1>
 
 <p align="center">
-  Keep your Z.ai GLM Coding Plan usage beautifully in view — right in your
-  Cinnamon panel.
+  Keep your <strong>Z.ai GLM Coding Plan</strong> beautifully in view — right in your Cinnamon panel.
 </p>
 
 <p align="center">
@@ -18,96 +17,53 @@
   <img alt="Z.ai monitor API" src="https://img.shields.io/badge/data-Z.ai%20usage%20monitor%20API-4f2fff">
 </p>
 
-`z-usage@oss-singularity` is a Cinnamon applet that shows the 5-hour and weekly
-quota windows of a Z.ai GLM Coding Plan directly in the panel: remaining usage,
-reset countdowns, per-window credit consumption and a 24-hour activity chart.
-It is the Z.ai sibling of
-[cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage)
-and shares its git history so upstream improvements can be backported.
+<p align="center">
+  <img src=".github/social-preview.png" alt="Z Usage Monitor — quota rings, plan buckets and activity chart" width="720">
+</p>
 
-## Features
+## Why you will love it
 
-- **Panel display** for horizontal and vertical panels with the 5h and 7d
-  windows, threshold colors and an optional credit balance.
-- **Usage popup** with quota rings, reset countdowns, observed consumption
-  (1h/4h/12h/24h/today), a 24-hour activity chart and plan information.
-- **API-key-less by default.** The backend resolves the Coding Plan API key the
-  same way the Codex applet finds its app-server:
-  1. the *Z.ai API key* applet setting (optional),
-  2. the `ZAI_API_KEY` environment variable,
-  3. `~/.config/cinnamon-z-usage/api-key` (recommended for a manual override),
-  4. the Coding Plan API key cached by the signed-in
-     [ZCode](https://zcode.z.ai) app in `~/.zcode/v2/config.json`.
-- **Weekly reset notifications** and optional low-usage notifications with
-  configurable warning/critical thresholds.
-- **Launch buttons** for the Z.ai chat, the usage statistics dashboard, the API
-  key list and the developer docs.
+- **Everything at a glance** — 5-hour and weekly quota windows as rings in the
+  panel and the popup, with live reset countdowns.
+- **All your plans, stacked** — the personal Coding Plan *plus* the ZCode Start
+  Plan and Global Build token buckets, each with its own collapsible section.
+- **API-key-less by default** — no setup: the applet reuses the credentials of
+  your signed-in ZCode app. It only performs read-only GET requests against
+  `https://api.z.ai`.
+- **Built for real panels** — horizontal and vertical panels, threshold
+  colors, pinned header and action footer, and a scrollable popup that never
+  lets content escape.
+- **Sticky chrome** — title, quota rings and the action buttons stay visible
+  while the details scroll beneath them.
 
 ## Installation
 
 ```bash
-./install.sh          # or: make install
-make uninstall
+./install.sh
 ```
 
-The installer copies the applet to `~/.local/share/cinnamon/applets/z-usage@oss-singularity`.
-Enable it via *System Settings → Applets*, or add it to a panel with Cinnamon's
-applet management. Requires Python 3.10+; the applet never installs a backend
-and only performs read-only GET requests against `https://api.z.ai`.
+Then enable *Z Usage Monitor* via *System Settings → Applets* and add it to a
+panel. Requires Python 3.10+ and Cinnamon 5.8 or newer.
 
-## Fork relationship and backports
+**Credentials:** nothing to configure if the ZCode app is signed in — the
+applet picks up its Coding Plan API key automatically. Optional overrides:
+the *Z.ai API key* setting, the `ZAI_API_KEY` environment variable, or the
+file `~/.config/cinnamon-z-usage/api-key`.
 
-This repository is a fork of
-[cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage)
-(`upstream` remote). Upstream fixes flow in through a normal merge:
+## The popup
 
-```bash
-git fetch upstream
-git merge upstream/main     # resolve conflicts in the Z-specific regions
-```
-
-Divergence map, to keep conflicts small:
-
-| Area | Z-specific state |
+| Zone | What you get |
 | --- | --- |
-| Backend | `z_usage.py` talks to the Z.ai monitor API; the Codex app-server transport is gone. |
-| Identity | UUID `z-usage@oss-singularity`, gettext domain, metadata and icons. |
-| Launch buttons | Z.ai chat, usage statistics, API keys, docs. |
-| Reset credits | Dropped — Z.ai coding plans expose no reset-credit redemption (ZCode hints at `/api/v1/coding-plan/reset`; porting that is roadmap). |
-| Path settings | Dropped — there is no local Z.ai backend binary. |
-| Neutral code | History, activity charts, notifications, popup layout, settings widget classes are intentionally unchanged for clean merges. |
+| Header (pinned) | Title, last-update stamp and the 5h / 7d quota rings |
+| Usage limits | Coding Plan 5h/7d plus ZCode Start Plan and Global Build sections, each with reset countdowns |
+| Recent consumption | 1h/4h/12h/24h observed consumption and a 24-hour activity chart |
+| Plan / Credits | Plan level, remaining credits and observed credit consumption |
+| Footer (pinned) | Z.ai Chat, Usage dashboard, Refresh, API Keys, Z.ai and Docs |
 
-The account-level limit uses the id `zai` (constant `ACCOUNT_LIMIT_ID` in
-`applet.js`/`usage-format.js`).
+## Links
 
-## Roadmap: stacked Z.ai quota sources
-
-A Z.ai account can stack several quota sources on top of the personal coding
-plan, and the applet is designed to grow into them — the popup already ships
-collapsible per-limit sections and model badges from the upstream codebase:
-
-- **Personal Coding Plan** (tracked since 0.1.0): 5h + weekly credit windows
-  via `api.z.ai/api/monitor/usage/quota/limit`.
-- **ZCode Start Plan / ZCode Global Build** (roadmap): per-model token buckets
-  (for example GLM-5.3 3M/day, GLM-5.3-Flash 5M/day and a 100M one-time Global
-  Build bonus). ZCode reads them from
-  `zcode.z.ai/api/v1/zcode-plan/billing/balance`, which returns `plans[]`
-  (name, entitlements, period) and `balances[]` (total/used/remaining units
-  with `period_end`/`expires_at`). Planned mapping: one limit per plan, one
-  window per model bucket (`remainingPercent` from remaining/total, `resetsAt`
-  from the bucket period). Auth still needs ZCode's own session tokens — the
-  keyless-resolution pattern will be extended.
-- **Reset opportunities**: ZCode exposes `/api/v1/coding-plan/reset` with
-  five-hour/week reset history; port the upstream reset flow once the
-  semantics are confirmed.
-
-## Development
-
-```bash
-make check        # cjs regression suites, python unittest suite, schema,
-                  # icon verification, translation template, shellcheck
-make translations # regenerate po/z-usage@oss-singularity.pot
-```
+- **Development, architecture and the fork/backport guide:** [docs/README.md](docs/README.md)
+- **Sibling applet:** [cinnamon-chatgpt-usage](https://github.com/oss-singularity/cinnamon-chatgpt-usage) (ChatGPT Work & Codex)
 
 ## Credits
 
