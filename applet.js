@@ -551,6 +551,7 @@ class ZUsageApplet extends Applet.Applet {
 
     _syncContentRightEdges() {
         if (!this.menu || !this.menu.isOpen) return;
+        if (!this.menu.actor.get_transformed_position) return;
         // Stable geometric anchor: the popup's content right edge. The pinned
         // footer action grid no longer shares an edge line with the scrolled
         // content, so its (allocation-dependent) geometry is not used here.
