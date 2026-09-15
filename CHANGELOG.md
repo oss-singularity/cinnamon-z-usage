@@ -7,6 +7,9 @@
   view, so the buttons stay visible and clickable while the quota and history
   content scrolls behind them. The former empty reserve at the popup bottom is
   gone — the footer occupies it.
+- Flush scroll bottom: after the allocation pass the pinned content height is
+  corrected to the real extent of its rows, so a fully scrolled popup ends
+  directly above the footer instead of carrying an empty reserve.
 - Root fix for the clipped action rows: the scroll view allocated the popup
   content at the viewport height, so everything below the fold (the button
   grid) was cut off entirely. The clamp now pins the content to its natural

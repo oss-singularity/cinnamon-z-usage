@@ -1011,7 +1011,6 @@ class ZUsageApplet extends Applet.Applet {
         }
 
         if (this._lastError) this._addStatusItem(_("Last refresh failed"), this._lastError);
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._addLaunchButtons();
 
@@ -3636,6 +3635,24 @@ class ZUsageApplet extends Applet.Applet {
         // to its natural height so scrolling reaches every row.
         const [, contentNatural] = this.menu._content.actor.get_preferred_height(width);
         this.menu._content.actor.set_height(Math.max(200, contentNatural));
+        // The preferred measurement can exceed the laid-out rows (padding and
+        // separators report inflated naturals). Once the allocation pass has
+        // run, repin the content to the real extent of its children so a fully
+        // scrolled popup ends flush above the footer.
+        if (typeof Mainloop !== "undefined") {
+            Mainloop.timeout_add(60, () => {
+                if (this._destroyed || !this.menu || !this.menu._content) return GLib.SOURCE_REMOVE;
+                let bottom = 0;
+                for (const child of this.menu._content.actor.get_children()) {
+                    bottom = Math.max(bottom, child.y + child.get_height());
+                }
+                const current = this.menu._content.actor.get_height();
+                if (bottom > 0 && Math.abs(current - bottom) > 1) {
+                    this.menu._content.actor.set_height(Math.ceil(bottom));
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     _ensureActorVisible(actor) {
