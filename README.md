@@ -80,6 +80,27 @@ Divergence map, to keep conflicts small:
 The account-level limit uses the id `zai` (constant `ACCOUNT_LIMIT_ID` in
 `applet.js`/`usage-format.js`).
 
+## Roadmap: stacked Z.ai quota sources
+
+A Z.ai account can stack several quota sources on top of the personal coding
+plan, and the applet is designed to grow into them — the popup already ships
+collapsible per-limit sections and model badges from the upstream codebase:
+
+- **Personal Coding Plan** (tracked since 0.1.0): 5h + weekly credit windows
+  via `api.z.ai/api/monitor/usage/quota/limit`.
+- **ZCode Start Plan / ZCode Global Build** (roadmap): per-model token buckets
+  (for example GLM-5.3 3M/day, GLM-5.3-Flash 5M/day and a 100M one-time Global
+  Build bonus). ZCode reads them from
+  `zcode.z.ai/api/v1/zcode-plan/billing/balance`, which returns `plans[]`
+  (name, entitlements, period) and `balances[]` (total/used/remaining units
+  with `period_end`/`expires_at`). Planned mapping: one limit per plan, one
+  window per model bucket (`remainingPercent` from remaining/total, `resetsAt`
+  from the bucket period). Auth still needs ZCode's own session tokens — the
+  keyless-resolution pattern will be extended.
+- **Reset opportunities**: ZCode exposes `/api/v1/coding-plan/reset` with
+  five-hour/week reset history; port the upstream reset flow once the
+  semantics are confirmed.
+
 ## Development
 
 ```bash
