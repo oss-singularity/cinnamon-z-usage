@@ -551,21 +551,13 @@ class ZUsageApplet extends Applet.Applet {
 
     _syncContentRightEdges() {
         if (!this.menu || !this.menu.isOpen) return;
-        // Stable geometric anchor: the popup's content right edge. The pinned
-        // footer action grid no longer shares an edge line with the scrolled
-        // content, so its (allocation-dependent) geometry is not used here.
-        // The menu actor's own translation (right-panel popup positioning)
-        // pollutes the transformed position; the allocation box is the clean
-        // layout position on screen.
-        const contentActor = this.menu._content.actor;
-        if (!contentActor.get_transformed_position || !contentActor.get_transformed_size) return;
-        const [contentX] = contentActor.get_transformed_position();
-        const [contentW] = contentActor.get_transformed_size();
-        // Anchor: the content's real right edge minus the row inset and the
-        // original ring shift - this is where the countdown rings sat in the
-        // original design.
-        const right = Math.round(contentX + contentW - POPUP_RIGHT_INSET -
-            POPUP_RESET_RING_LEFT_SHIFT);
+        if (!this._actionWidthFrame) return;
+        // Anchor: the button grid's right edge - rings, disclosure arrows and
+        // charts close flush with it (the original design).
+        const [gridX] = this._actionWidthFrame.get_transformed_position();
+        const [gridWidth] = this._actionWidthFrame.get_transformed_size();
+        if (gridWidth <= 0) return;
+        const right = Math.round(gridX + gridWidth);
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {

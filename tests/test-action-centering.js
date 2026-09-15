@@ -80,14 +80,14 @@ for (const scale of [1, 1.25, 2]) {
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
                 actor: { allocation: { x1: menuX + 48 } },
-                isOpen: true,
-                _content: { actor: {
-                    get_transformed_position() { return [menuX + 60, 0]; },
-                    get_transformed_size() { return [395, 0]; }
-                } }
+                isOpen: true
             };
-            const right = menuX + 60 + 395 - 17 - 14;
+            const right = menuX + 48 + 352;
             Object.assign(applet, {
+                _actionWidthFrame: {
+                    get_transformed_position() { return [menuX + 48, 0]; },
+                    get_transformed_size() { return [352, 0]; }
+                },
                 _countdownWidgets: [{ actor: ring }],
                 _limitSections: [{ heading: { arrow: arrows[0] } }],
                 _submenuTriangles: [arrows[1]],
