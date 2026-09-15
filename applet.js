@@ -185,6 +185,7 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         // Clamp BEFORE the base positioning pass: Cinnamon places the popup
         // from its preferred height, so a late clamp would leave the top of
         // a taller-than-monitor popup off-screen.
+        owner._popupFrameHeight = 0;
         owner._clampPopupHeight(owner.actor);
         super.open(animate);
         owner._lockPopupLayoutWidth();
@@ -3664,14 +3665,19 @@ class ZUsageApplet extends Applet.Applet {
 
         // The popup gets at most the monitor height minus a small reserve:
         // header and footer keep their space, the scroll view absorbs the
-        // rest, and the total height never changes while sections toggle.
+        // rest. The frame height is locked once per open - later section
+        // toggles only change the scrollbar range, never the popup frame, so
+        // nothing drifts, jumps or gets cut while the popup is open.
         const maxMenu = Math.max(240, monitor.height - 16);
-        const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
-
-        this.menu._scroll.set_height(viewport);
+        if (!this._popupFrameHeight) {
+            const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
+            this._popupViewport = viewport;
+            this._popupFrameHeight = headerNat + viewport + footerNat + 2;
+        }
+        this.menu._scroll.set_height(this._popupViewport);
         // A fixed popup height up front: Cinnamon positions the popup once
         // with the final size, so nothing jumps or gets cut at the top.
-        this.menu.actor.set_height(headerNat + viewport + footerNat + 2);
+        this.menu.actor.set_height(this._popupFrameHeight);
     }
 
     _ensureActorVisible(actor) {
