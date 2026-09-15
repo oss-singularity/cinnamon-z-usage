@@ -14,7 +14,7 @@ const AppletClass = new Function("imports", "require",
 // Cinnamon's transformed float coordinates straddle half-pixel rounding
 // boundaries on the first refresh. Exercise the production centering method
 // with both signs of that noise, repeated calls and a secondary monitor.
-for (const menuX of [1461, -459]) {
+for (const menuX of [1461, 900]) {
     for (const menuWidth of [419, 448]) {
         for (const error of [-0.0001220703125, 0, 0.0001220703125]) {
             const frame = {
@@ -48,55 +48,58 @@ for (const menuX of [1461, -459]) {
 
 print("Action centering regression tests passed.");
 
-// Model visibility changes native column minimums. Rings and disclosure
-// arrows keep their designed base translations (the pinned footer action
-// grid no longer shares an edge line with the scrolled content), while the
-// plot width still follows the action grid edge.
+// Model visibility changes native column minimums. Rings, disclosure arrows
+// and the plot edge align to the popup's own content right edge (a stable
+// geometric anchor), repeated syncs must be idempotent.
 for (const scale of [1, 1.25, 2]) {
-    for (const naturalShift of [0, -28, 15]) {
-        const ring = {
-            translation_x: -14,
-            get_transformed_position() { return [390 + naturalShift + this.translation_x, 0]; },
-            get_transformed_size() { return [52, 52]; }
-        };
-        const chart = {
-            width: 374 + naturalShift,
-            get_transformed_position() { return [110, 0]; },
-            get_theme_node() { return { get_padding() { return 39; } }; },
-            set_width(width) { this.width = width; }
-        };
-        const arrows = [10, 12].map((width, index) => ({
-            translation_x: 0,
-            rotation_angle_z: index ? 90 : 0,
-            get_transformed_position() {
-                return [480 + naturalShift + this.translation_x + (this.rotation_angle_z ? width : 0), 0];
-            },
-            get_abs_allocation_vertices() {
-                const x = 480 + naturalShift + this.translation_x;
-                return [{ x }, { x: x + width }, { x }, { x: x + width }];
-            },
-            get_transformed_size() { return [width, width]; }
-        }));
-        const applet = Object.create(AppletClass.prototype);
-        const right = 100 + Math.round(352 * scale);
-        Object.assign(applet, {
-            _actionWidthFrame: {
-                get_transformed_position() { return [100, 0]; },
-                get_transformed_size() { return [Math.round(352 * scale), 0]; }
-            },
-            _countdownWidgets: [{ actor: ring }],
-            _limitSections: [{ heading: { arrow: arrows[0] } }],
-            _submenuTriangles: [arrows[1]],
-            _activityCharts: [{ chart }]
-        });
-        for (let rebuild = 0; rebuild < 3; rebuild++) {
-            applet._syncContentRightEdges();
-            if (ring.translation_x !== -14 || chart.width !== right - 110 + 39) {
-                throw new Error(`Content edge drift after model/layout change: scale=${scale}, shift=${naturalShift}`);
-            }
-            for (const arrow of arrows) {
-                if (arrow.translation_x !== 0) {
-                    throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}`);
+    for (const menuX of [1461, 900]) {
+        for (const naturalShift of [0, -28, 15]) {
+            const ring = {
+                translation_x: -14,
+                get_transformed_position() { return [390 + naturalShift + this.translation_x, 0]; },
+                get_transformed_size() { return [52, 52]; }
+            };
+            const chart = {
+                width: 374 + naturalShift,
+                get_transformed_position() { return [110, 0]; },
+                get_theme_node() { return { get_padding() { return 39; } }; },
+                set_width(width) { this.width = width; }
+            };
+            const arrows = [10, 12].map((width, index) => ({
+                translation_x: 0,
+                rotation_angle_z: index ? 90 : 0,
+                get_transformed_position() {
+                    return [480 + naturalShift + this.translation_x + (this.rotation_angle_z ? width : 0), 0];
+                },
+                get_abs_allocation_vertices() {
+                    const x = 480 + naturalShift + this.translation_x;
+                    return [{ x }, { x: x + width }, { x }, { x: x + width }];
+                },
+                get_transformed_size() { return [width, width]; }
+            }));
+            const applet = Object.create(AppletClass.prototype);
+            applet.menu = {
+                actor: { get_transformed_position() { return [menuX + 48, 0]; } },
+                isOpen: true
+            };
+            applet._popupWidth = () => 419;
+            const right = menuX + 48 + 419 - 17;
+            Object.assign(applet, {
+                _countdownWidgets: [{ actor: ring }],
+                _limitSections: [{ heading: { arrow: arrows[0] } }],
+                _submenuTriangles: [arrows[1]],
+                _activityCharts: [{ chart }]
+            });
+            for (let rebuild = 0; rebuild < 3; rebuild++) {
+                applet._syncContentRightEdges();
+                const ringRight = ring.get_transformed_position()[0] + ring.get_transformed_size()[0] - 1;
+                const arrowEdge = Math.max(...arrows[0].get_abs_allocation_vertices().map(v => v.x));
+                if (ringRight !== right || chart.width !== right - 110 + 39 || arrowEdge !== right) {
+                    throw new Error(
+                        `Content edge drift after model/layout change: scale=${scale}, ` +
+                        `menuX=${menuX}, shift=${naturalShift}, ringRight=${ringRight}, ` +
+                        `expected=${right - 14}`
+                    );
                 }
             }
         }

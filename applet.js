@@ -550,15 +550,36 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _syncContentRightEdges() {
-        if (!this._actionWidthFrame) return;
-        const [gridX] = this._actionWidthFrame.get_transformed_position();
-        const [gridWidth] = this._actionWidthFrame.get_transformed_size();
-        if (gridWidth <= 0) return;
-        const right = Math.round(gridX + gridWidth);
-        // Countdown rings and disclosure arrows keep their designed base
-        // translations; the footer action grid no longer shares an edge line
-        // with the scrolled content, so any alignment shift would drift them
-        // under the scrollbar.
+        if (!this.menu || !this.menu.isOpen) return;
+        // Stable geometric anchor: the popup's content right edge. The pinned
+        // footer action grid no longer shares an edge line with the scrolled
+        // content, so its (allocation-dependent) geometry is not used here.
+        const [menuX] = this.menu.actor.get_transformed_position();
+        const right = Math.round(menuX + this._popupWidth() - POPUP_RIGHT_INSET);
+        const rings = (this._countdownWidgets || []).map(entry => entry.actor);
+        if (this._headerRings) rings.push(this._headerRings);
+        for (const actor of rings) {
+            const [x] = actor.get_transformed_position();
+            const [width] = actor.get_transformed_size();
+            if (width <= 0) continue;
+            // Absolute recomputation from the untranslated layout position:
+            // a cumulative += drifts when the anchor is remeasured after
+            // footer or scroll allocations.
+            const layoutX = x - actor.translation_x;
+            actor.translation_x = Math.round(right - (layoutX + width - 1));
+        }
+        const arrows = (this._submenuTriangles || []).concat(
+            (this._limitSections || []).map(section => section.heading.arrow)
+        );
+        for (const actor of arrows) {
+            const [width] = actor.get_transformed_size();
+            if (width <= 0) continue;
+            // The transformed origin is not the bounding-box left edge after
+            // Cinnamon rotates the disclosure. Measure the actual vertices.
+            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
+            const layoutEdge = edge - actor.translation_x;
+            actor.translation_x = Math.round(right - layoutEdge);
+        }
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
@@ -1097,7 +1118,6 @@ class ZUsageApplet extends Applet.Applet {
             rings.translation_x = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
-            rings._usageBaseTX = rings.translation_x;
             for (const summary of summaries) {
                 rings.add_child(
                     this._createQuotaRing(
@@ -1352,7 +1372,6 @@ class ZUsageApplet extends Applet.Applet {
             track_hover: true
         });
         actor.translation_x = -POPUP_RESET_RING_LEFT_SHIFT;
-        actor._usageBaseTX = actor.translation_x;
         const area = new St.DrawingArea({ width: size, height: size });
         const label = new St.Label({
             x_align: Clutter.ActorAlign.CENTER,

@@ -11,9 +11,10 @@
   scroll view's own adjustment (upper stayed 0), so nothing below the fold
   ever rendered. The scroll view now works on the content's natural height
   with clipping disabled on the content actor.
-- Countdown rings and disclosure arrows keep their designed positions: the
-  footer action grid no longer acts as an edge anchor, which previously
-  pushed the rings under the popup scrollbar.
+- Countdown rings, disclosure arrows and plot widths align to a stable
+  geometric anchor - the popup's own content right edge - instead of the
+  footer action grid, whose allocation-dependent geometry let the rings
+  wander under the popup scrollbar. Repeated syncs are idempotent.
 - Flush scroll bottom: after the allocation pass the pinned content height is
   corrected to the real extent of its rows, so a fully scrolled popup ends
   directly above the footer instead of carrying an empty reserve.
