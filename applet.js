@@ -969,6 +969,10 @@ class ZUsageApplet extends Applet.Applet {
         this.menu.removeAll();
 
         this._addHeaderItem();
+        // Action rows live directly under the header: with every plan section
+        // expanded the content outgrows the monitor, and a bottom action grid
+        // would sit below the scroll fold.
+        this._addLaunchButtons();
         if (this._snapshot) {
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             const limits = this._filterModelLimits(this._snapshot.limits || []);
@@ -1004,9 +1008,6 @@ class ZUsageApplet extends Applet.Applet {
         }
 
         if (this._lastError) this._addStatusItem(_("Last refresh failed"), this._lastError);
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
-        this._addLaunchButtons();
 
         if (wasOpen) {
             for (const entry of this._historySubmenus) {

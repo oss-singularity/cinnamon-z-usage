@@ -2,6 +2,11 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- The action grid (Z.ai Chat / Usage / Refresh now / API Keys / Z.ai / Docs)
+  now lives directly under the popup header: with every plan section expanded
+  the content outgrows the monitor, so a bottom action grid sat below the
+  scroll fold. Header plus actions are always visible; the quota and history
+  content scrolls beneath them.
 - Root fix for the clipped action rows: the scroll view allocated the popup
   content at the viewport height, so everything below the fold (the button
   grid) was cut off entirely. The clamp now pins the content to its natural
