@@ -48,8 +48,10 @@ for (const menuX of [1461, -459]) {
 
 print("Action centering regression tests passed.");
 
-// Model visibility changes native column minimums. Those changes must not
-// move the painted rings or the plot edge relative to the footer buttons.
+// Model visibility changes native column minimums. Rings and disclosure
+// arrows keep their designed base translations (the pinned footer action
+// grid no longer shares an edge line with the scrolled content), while the
+// plot width still follows the action grid edge.
 for (const scale of [1, 1.25, 2]) {
     for (const naturalShift of [0, -28, 15]) {
         const ring = {
@@ -89,15 +91,15 @@ for (const scale of [1, 1.25, 2]) {
         });
         for (let rebuild = 0; rebuild < 3; rebuild++) {
             applet._syncContentRightEdges();
-            if (ring.get_transformed_position()[0] + 51 !== right || 110 + chart.width - 39 !== right) {
+            if (ring.translation_x !== -14 || chart.width !== right - 110 + 39) {
                 throw new Error(`Content edge drift after model/layout change: scale=${scale}, shift=${naturalShift}`);
             }
             for (const arrow of arrows) {
-                if (Math.max(...arrow.get_abs_allocation_vertices().map(vertex => vertex.x)) !== right) {
-                    throw new Error(`Disclosure edge drift: scale=${scale}, shift=${naturalShift}`);
+                if (arrow.translation_x !== 0) {
+                    throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}`);
                 }
             }
         }
     }
 }
-print("Content alignment: model visibility, larger fonts and repeated layout preserve the button edge.");
+print("Content alignment: rings and arrows keep their designed positions, the plot edge follows the button grid.");

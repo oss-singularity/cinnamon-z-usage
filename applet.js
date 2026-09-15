@@ -555,34 +555,10 @@ class ZUsageApplet extends Applet.Applet {
         const [gridWidth] = this._actionWidthFrame.get_transformed_size();
         if (gridWidth <= 0) return;
         const right = Math.round(gridX + gridWidth);
-        // Native menu columns change their natural width when a model section
-        // disappears. Anchor our visuals to the actual button edge instead.
-        const rings = (this._countdownWidgets || []).map(entry => entry.actor);
-        if (this._headerRings) rings.push(this._headerRings);
-        for (const actor of rings) {
-            const [x] = actor.get_transformed_position();
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // The circular glow ends one pixel inside its drawing allocation.
-            // Absolute recomputation from the untranslated layout position:
-            // a cumulative += drifts when the anchor is remeasured after
-            // footer or scroll allocations.
-            const base = actor._usageBaseTX || 0;
-            const layoutX = x - actor.translation_x;
-            actor.translation_x = base + Math.round(right - (layoutX + width - 1));
-        }
-        const arrows = (this._submenuTriangles || []).concat(
-            (this._limitSections || []).map(section => section.heading.arrow)
-        );
-        for (const actor of arrows) {
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // The transformed origin is not the bounding-box left edge after
-            // Cinnamon rotates the disclosure. Measure the actual vertices.
-            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
-            const layoutEdge = edge - actor.translation_x;
-            actor.translation_x = Math.round(right - layoutEdge);
-        }
+        // Countdown rings and disclosure arrows keep their designed base
+        // translations; the footer action grid no longer shares an edge line
+        // with the scrolled content, so any alignment shift would drift them
+        // under the scrollbar.
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
