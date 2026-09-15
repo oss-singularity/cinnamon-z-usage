@@ -78,6 +78,29 @@ Live iteration uses the `cinnamon-z-usage-live-sync` skill (copy-based install
 plus a targeted `ReloadXlet`, never symlinks, never a Cinnamon restart); the
 `cinnamon-z-usage-release` skill guards merges, tags and releases.
 
+## Documentation map
+
+### Product and contribution guides
+
+- [Packaging README](../packaging/README.md) — the portable README shipped in
+  the Cinnamon applet archive.
+- [Translation instructions](../po/README.md) — gettext/POT workflow.
+- [Security policy](../SECURITY.md)
+- [Project attribution](../ATTRIBUTION.md)
+- [Icon attribution and license notices](../icons/ATTRIBUTION.md)
+- [License](../LICENSE)
+- [Social-preview source notes](../.github/social-preview-src/README.md)
+
+### Upstream historical records (inherited from the chatgpt fork)
+
+- [Screenshot inventory](model-limits/inventory.json) and the capture PNGs in
+  this directory — chatgpt-era documentation captures, kept as provenance.
+- [Rights inventory](rights-inventory.json) — raster/vector coverage, hashes,
+  licenses and provenance evidence.
+- [Release receipts](releases/) — upstream 1.0.x validation checkpoints
+  (`release-checkpoint.json`, `release-1.0.1` … `release-1.0.6`).
+- [Drafts](drafts/) — upstream working notes.
+
 ## Testing
 
 - `tests/test_z_usage.py` — snapshot normalisation, window mapping, credential

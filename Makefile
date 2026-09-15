@@ -17,6 +17,7 @@ check:
 	python3 tests/check-png.py icon.png icons/usage-white.png
 	python3 scripts/render-icons.py --check
 	shellcheck install.sh uninstall.sh
+	$(MAKE) check-social-preview
 
 verify:
 	git diff --check
