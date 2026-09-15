@@ -57,6 +57,11 @@ with `--only topbar vertical-panel` into separate output directories. This
 private fixture shows 25% warning and 10% critical values at the exact default
 boundaries, with the switch enabled or disabled. It does not alter live settings.
 
+For the opt-in credits-panel preview, run
+`QA_SHOW_CREDITS_IN_PANEL=1` with `--only topbar vertical-panel`. The private
+fixture renders the available AIC balance beside the quota indicators and
+restores the original setting before the isolated session exits.
+
 Outputs include raw frames, geometry, cropped PNGs, diagnostic logs and
 `inventory.json`: variant, panel, panel scope, theme, locale, scale, screen,
 producing base commit, exact source hashes, capture time, output dimensions and
@@ -76,14 +81,17 @@ shows the master refresh option enabled and the low-limit options disabled, with
 the dependent reset switches shown as effectively enabled while disabled, and
 the threshold controls still visible in their native disabled state.
 
-`topbar-codex-two.png` and `vertical-panel-codex-two.png` are the common Codex
-5h+7d two-window panel state, produced by the `panel-codex-two` fixture.
+`topbar-credits.png` and `vertical-panel-credits.png` show the opt-in AIC
+balance beside the account-wide Codex 7d indicator with model-specific limits
+hidden. `usage-menu-credits.png` carries that enabled state into the detailed
+usage view. `topbar-codex-two.png` and `vertical-panel-codex-two.png` are the
+common Codex 5h+7d two-window panel state, produced by the `panel-codex-two` fixture.
 `topbar-codex-only.png` and `vertical-panel-codex-only.png` use the same
 native path with model-specific limits disabled, matching the compact default
 configuration. `topbar.png` and `vertical-panel.png` are the current
-Codex+Spark all-visible-model anchors. All three panel-state pairs retain the
-common panel context crop (94×40 horizontally and 40×96 vertically), so the
-panel placement remains visible instead of isolating the icons too tightly.
+Codex+Spark all-visible-model anchors. The three non-AIC panel-state pairs
+retain the common panel context crop (94×40 horizontally and 40×96 vertically),
+so the panel placement remains visible instead of isolating the icons too tightly.
 They must be regenerated when the applet icon or panel rendering changes, so
 the public anchors always show the current packaged artwork. A historical
 panel capture may be retained only when it is explicitly approved as a

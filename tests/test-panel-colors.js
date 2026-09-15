@@ -13,6 +13,8 @@ class Actor {
     add_child(actor) { this.children.push(actor); }
 }
 const bindings = new Map();
+const Icon = class extends Actor {};
+const Gio = { File: { new_for_path() {} }, FileIcon: class {} };
 const AppletClass = new Function("imports", "require",
     `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
 )(
@@ -25,7 +27,8 @@ const AppletClass = new Function("imports", "require",
         },
         misc: {},
         gi: {
-            St: { BoxLayout: Actor, Label: Actor },
+            St: { BoxLayout: Actor, Label: Actor, Icon },
+            Gio,
             Clutter: { ActorAlign: { CENTER: 0 } },
             Pango: { Alignment: { CENTER: 0 } }
         }
@@ -33,11 +36,13 @@ const AppletClass = new Function("imports", "require",
     () => ({
         formatDuration: value => `${value}m`,
         formatPercent: value => `${value}%`,
-        formatPanelPercent: value => `${value}%`
+        formatPanelPercent: value => `${value}%`,
+        formatCreditNumber: value => String(value)
     })
 );
 const applet = Object.create(AppletClass.prototype);
 applet._setDefaults();
+applet.metadata = { path: "." };
 applet.panelTextColor = "#abcdef";
 applet.warningColor = "#fedcba";
 applet.criticalColor = "#123456";
@@ -68,7 +73,39 @@ for (const vertical of [false, true]) {
         }
     }
 }
+applet._isVertical = true;
+const windowWithIcon = applet._createWindowActor({ id: "codex", durationMinutes: 10080, remainingPercent: 76 }, true);
+if (!windowWithIcon.children[0].style.includes("min-width: 40px;")) {
+    throw new Error("Vertical quota label rows must share the icon column");
+}
 if (!binding || binding.property !== "showPanelThresholdColors") throw new Error("Missing panel color binding");
+const creditsBinding = bindings.get("show-credits-in-panel");
+if (!creditsBinding || creditsBinding.property !== "showCreditsInPanel") {
+    throw new Error("Missing credits-in-panel binding");
+}
+applet._isVertical = false;
+const horizontalCreditsActor = applet._createPanelCreditsActor("203.3");
+if (horizontalCreditsActor.vertical !== true || horizontalCreditsActor.children[1].translation_y !== 1 ||
+    horizontalCreditsActor.children[1].style.includes("padding-left")) {
+    throw new Error("Horizontal panel credits must retain the compact vertical layout");
+}
+applet._isVertical = true;
+const creditsActor = applet._createPanelCreditsActor("203.3");
+if (creditsActor.vertical !== true || creditsActor.children.length !== 2 || creditsActor.children[0].children.length !== 2 ||
+    !(creditsActor.children[0].children[0] instanceof Icon) ||
+    creditsActor.children[0].children[1].text !== "AIC" ||
+    creditsActor.children[1].text !== "203.3" ||
+    !creditsActor.children[0].style.includes("min-width: 40px;") ||
+    !creditsActor.children[1].style.includes(`color: ${applet.panelTextColor};`)) {
+    throw new Error("Panel credits must render a compact labeled balance");
+}
+applet._snapshot = { credits: { balance: "203.3", unlimited: false } };
+if (applet._panelCreditsValue() !== null) throw new Error("Panel credits must default off");
+applet.showCreditsInPanel = true;
+if (applet._panelCreditsValue() !== "203.3") throw new Error("Panel credits must expose the formatted balance");
+applet._snapshot.credits.unlimited = true;
+if (applet._panelCreditsValue() !== "∞") throw new Error("Unlimited credits must stay compact in the panel");
+applet.showCreditsInPanel = false;
 let rebuilds = 0;
 applet._rebuildPanel = () => rebuilds++;
 binding.changed();

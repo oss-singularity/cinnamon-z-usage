@@ -22,27 +22,20 @@
 
 ## See it in action
 
-<p align="center"><strong>Common Codex-only two-window state</strong></p>
+| Common Codex-only two-window details                                                                                                   | AIC balance in the detailed usage view                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ![Codex-only usage menu with 5h and 7d quota rings and the vertical panel anchor visible](docs/model-limits/usage-menu-codex-only.png) | ![Codex-only usage menu with the optional AIC balance displayed in the panel](docs/model-limits/usage-menu-credits.png) |
 
-| Horizontal top bar with Codex 5h + 7d panel indicators                                                  | 40 px vertical panel with Codex 5h + 7d panel indicators                                                      |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| ![Common Codex-only horizontal panel with 5h and 7d indicators](docs/model-limits/topbar-codex-two.png) | ![Common Codex-only vertical panel with 5h and 7d indicators](docs/model-limits/vertical-panel-codex-two.png) |
+<p align="center"><sub>The opt-in AIC balance is also included in the detailed usage view, while the quota and activity sections remain unchanged.</sub></p>
 
-<p align="center"><sub>Typical Plus and standard Business accounts show the two Codex quota windows; the 5x Business variant is a separate state. Pink credit buckets remain historical and end before the current healthy quota activity.</sub></p>
+| Panel state               | Horizontal panel                                                                                               | 40 px vertical panel                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Common Codex-only 5h + 7d | ![Common Codex-only horizontal panel with 5h and 7d indicators](docs/model-limits/topbar-codex-two.png)        | ![Common Codex-only vertical panel with 5h and 7d indicators](docs/model-limits/vertical-panel-codex-two.png)        |
+| Default Codex 7d          | ![Default horizontal panel with only the Codex 7d indicator](docs/model-limits/topbar-codex-only.png)          | ![Default vertical panel with only the Codex 7d indicator](docs/model-limits/vertical-panel-codex-only.png)          |
+| Codex 7d + Spark          | ![Codex and Spark limits in a horizontal top bar with both panel indicators](docs/model-limits/topbar.png)     | ![Codex and Spark limits in a vertical panel with both panel indicators](docs/model-limits/vertical-panel.png)       |
+| Optional AIC + Codex 7d   | ![Horizontal panel with the optional AIC balance and Codex 7d indicator](docs/model-limits/topbar-credits.png) | ![Vertical panel with the optional AIC balance and Codex 7d indicator](docs/model-limits/vertical-panel-credits.png) |
 
-<p align="center"><strong>Default panel with Codex 7d indicator</strong></p>
-
-| Default horizontal panel with Codex 7d indicator                                                      | 40 px vertical panel with Codex 7d indicator                                                                |
-| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| ![Default horizontal panel with only the Codex 7d indicator](docs/model-limits/topbar-codex-only.png) | ![Default vertical panel with only the Codex 7d indicator](docs/model-limits/vertical-panel-codex-only.png) |
-
-<p align="center"><sub>When model-specific limits are disabled, the compact default keeps the account-wide Codex 7d indicator in the panel.</sub></p>
-
-<p align="center"><strong>Codex 7d + Spark panel indicators</strong></p>
-
-| Horizontal top bar with Codex + Spark panel indicators                                                     | 40 px vertical panel with Codex + Spark panel indicators                                                       |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| ![Codex and Spark limits in a horizontal top bar with both panel indicators](docs/model-limits/topbar.png) | ![Codex and Spark limits in a vertical panel with both panel indicators](docs/model-limits/vertical-panel.png) |
+<p align="center"><sub>Typical Plus and standard Business accounts use the common two-window state; the 5x Business variant is separate. The compact default keeps only account-wide Codex 7d, while the AIC row requires <em>Show credits in the panel</em> and places our usage icon before the balance.</sub></p>
 
 | Usage overview                                                                                          | Spark quotas and recent activity                                                                                                            |
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -50,29 +43,28 @@
 
 <p align="center"><sub>Native horizontal and vertical layouts keep the panel indicators visible as a visual anchor while the popup expands to show the details.</sub></p>
 
-<p align="center"><strong>Default overview on a horizontal panel</strong></p>
-<p align="center">
-  <img src="docs/model-limits/usage-menu-horizontal.png" width="427" alt="Horizontal-panel default with muted unused Spark rings and both Spark sections collapsed">
-</p>
+| Default overview on a horizontal panel                                                                                                   | Conditional four-ring quota state                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Horizontal-panel default with muted unused Spark rings and both Spark sections collapsed](docs/model-limits/usage-menu-horizontal.png) | ![Usage menu with account-wide Codex 5h and 7d plus Spark 5h and 7d quota rings and the vertical panel anchor visible](docs/model-limits/usage-menu-four-rings.png) |
 
-<p align="center"><strong>Conditional four-ring quota state</strong></p>
-<p align="center">
-  <img src="docs/model-limits/usage-menu-four-rings.png" width="467" alt="Usage menu with account-wide Codex 5h and 7d plus Spark 5h and 7d quota rings and the vertical panel anchor visible">
-</p>
-
-<p align="center"><strong>Common Codex-only two-window details</strong></p>
-<p align="center">
-  <img src="docs/model-limits/usage-menu-codex-only.png" width="467" alt="Codex-only usage menu with 5h and 7d quota rings and the vertical panel anchor visible">
-</p>
-
-<p align="center"><strong>Explicit earned-reset confirmation</strong></p>
-<p align="center">
-  <img src="docs/model-limits/reset-confirmation.png" width="393" alt="Native confirmation dialog before using an earned limit reset with the vertical panel anchor and both model-specific indicators visible">
-</p>
-
-| Precise hourly bucket details                                                                                    | Every active quota at a glance                                                                                  |
-| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| ![Hourly bucket hover details beside both model-specific panel indicators](docs/model-limits/bucket-tooltip.png) | ![Compact panel hover summary beside both model-specific panel indicators](docs/model-limits/panel-tooltip.png) |
+<table>
+  <tr style="background-color: transparent;">
+    <td rowspan="2" align="center" valign="top">
+      <strong>Precise hourly bucket details</strong><br>
+      <img src="docs/model-limits/bucket-tooltip.png" width="467" alt="Hourly bucket hover details beside both model-specific panel indicators">
+    </td>
+    <td align="center" valign="top">
+      <strong>Explicit earned-reset confirmation</strong><br>
+      <img src="docs/model-limits/reset-confirmation.png" width="393" alt="Native confirmation dialog before using an earned limit reset with the vertical panel anchor and both model-specific indicators visible">
+    </td>
+  </tr>
+  <tr style="background-color: transparent;">
+    <td align="center" valign="top">
+      <strong>Every active quota at a glance</strong><br>
+      <img src="docs/model-limits/panel-tooltip.png" width="278" alt="Compact panel hover summary beside both model-specific panel indicators">
+    </td>
+  </tr>
+</table>
 
 | ChatGPT desktop app guidance                                                                                        | Codex CLI guidance                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -92,6 +84,7 @@
   helpful reset tooltips.
 - Automatic Codex Spark discovery with an uncluttered default that can show only
   the account-wide Codex 7d indicator in the panel.
+- Optional compact AIC credit-balance display beside the panel quota indicators.
 - One polished layout for horizontal panels and real 40 px vertical panels,
   with configurable colors, thresholds, labels and text size.
 - Native ChatGPT App and Codex CLI launch guidance, configurable backend paths,

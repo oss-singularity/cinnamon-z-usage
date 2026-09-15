@@ -18,6 +18,13 @@ SPECS = [
     ("usage-menu-spark", "spark", "vertical", {}, "native"),
     ("usage-menu-four-rings", "four", "vertical", {}, "native"),
     ("usage-menu-codex-only", "codex-two", "vertical", {}, "native"),
+    (
+        "usage-menu-credits",
+        "credits",
+        "vertical",
+        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
+        "native",
+    ),
     ("bucket-tooltip", "bucket", "vertical", {}, "native"),
     ("topbar", "panel", "horizontal", {}, "native"),
     ("vertical-panel", "panel", "vertical", {}, "native"),
@@ -34,6 +41,20 @@ SPECS = [
         "vertical",
         {"QA_MODEL_SPECIFIC_LIMITS": "off"},
         "context",
+    ),
+    (
+        "topbar-credits",
+        "credits-panel",
+        "horizontal",
+        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
+        "native",
+    ),
+    (
+        "vertical-panel-credits",
+        "credits-panel",
+        "vertical",
+        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
+        "native",
     ),
     ("topbar-codex-two", "panel-codex-two", "horizontal", {}, "context"),
     ("vertical-panel-codex-two", "panel-codex-two", "vertical", {}, "context"),
@@ -139,7 +160,7 @@ def main():
         alpha_match = re.search(r"private-panel-alpha=(\d+)", (output / f"{name}.log").read_text())
         if not alpha_match or int(alpha_match[1]) >= 255:
             raise ValueError("Native panel transparency was not verified")
-        if variant in {"panel", "panel-codex-two"}:
+        if variant in {"panel", "panel-codex-two", "credits-panel"}:
             crop = [str(UI / "crop-panel.sh"), str(raw), str(panel), str(image), mode, panel_crop]
         else:
             crop = [str(UI / "crop-menu.sh"), str(raw), str(geometry), str(image), str(panel), mode]
@@ -162,7 +183,7 @@ def main():
         corner_rgb = [int(value) for value in corner.split(",")]
         if variant in {"reset", "install-chatgpt", "install-codex"} and min(corner_rgb) < 60:
             raise ValueError("Modal backdrop is too dark for the approved blue composition")
-        is_popup = variant in {"overview", "basic", "spark", "four", "codex-two", "bucket"}
+        is_popup = variant in {"overview", "basic", "spark", "four", "codex-two", "credits", "bucket"}
         if is_popup and actor_geometry[2] != 419:
             raise RuntimeError(f"{name}: expected 419 px popup actor plus 1 px edge, got {actor_geometry[2]}")
         manifest[name + ".png"] = {
@@ -178,7 +199,7 @@ def main():
                 "codex-only-two-window"
                 if variant == "panel-codex-two"
                 else "codex-only"
-                if capture_env.get("QA_MODEL_SPECIFIC_LIMITS") == "off"
+                if variant in {"credits", "credits-panel"} or capture_env.get("QA_MODEL_SPECIFIC_LIMITS") == "off"
                 else "all-visible-models"
             ),
             "panelCrop": panel_crop,

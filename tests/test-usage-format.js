@@ -145,29 +145,29 @@ assertEqual(
 );
 assertEqual(UsageFormat.formatPanelPercent(1), "1%", "Panel one percent stays numeric");
 assertEqual(
-    UsageFormat.formatPercent(0, 15),
+    UsageFormat.formatPercent(0),
     "0%",
-    "Exact zero remains an integer percentage below the critical threshold"
+    "Exact zero remains an integer percentage"
 );
 assertEqual(
-    UsageFormat.formatPercent(0.01, 15),
-    "0.01%",
-    "Positive critical percentages keep two decimals"
+    UsageFormat.formatPercent(0.01),
+    "0%",
+    "API-scale fractional percentages round to the reported integer precision"
 );
 assertEqual(
-    UsageFormat.formatPercent(0.49, 15),
-    "0.49%",
-    "Small positive critical percentages remain visible"
+    UsageFormat.formatPercent(0.49),
+    "0%",
+    "Sub-half-percent values remain the API-compatible zero display"
 );
 assertEqual(
-    UsageFormat.formatPercent(14.99, 15),
-    "14.99%",
-    "Critical percentages keep two decimals below the threshold"
-);
-assertEqual(
-    UsageFormat.formatPercent(15, 15),
+    UsageFormat.formatPercent(14.99),
     "15%",
-    "Critical threshold itself keeps normal rounding"
+    "Critical percentages use whole values"
+);
+assertEqual(
+    UsageFormat.formatPercent(15),
+    "15%",
+    "Critical threshold itself uses normal rounding"
 );
 assertEqual(
     UsageFormat.formatConsumedPercent({ consumedPercent: 2.25, complete: true }),

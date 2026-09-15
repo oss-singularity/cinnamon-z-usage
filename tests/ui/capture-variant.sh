@@ -8,7 +8,7 @@ panel_geometry_file=${4:-}
 uuid='chatgpt-usage@oss-singularity'
 
 case "$variant" in
-    basic|overview|spark|bucket|four|codex-two|reset|panel|panel-codex-two|panel-tooltip|install-chatgpt|install-codex|settings-general|settings-colors|settings-notifications) ;;
+    basic|overview|spark|bucket|four|codex-two|credits|credits-panel|reset|panel|panel-codex-two|panel-tooltip|install-chatgpt|install-codex|settings-general|settings-colors|settings-notifications) ;;
     *)
         printf 'Unsupported variant: %s\n' "$variant" >&2
         exit 2
@@ -73,7 +73,7 @@ cleanup() {
     # that controlled driver shutdown as a successful capture.
     if (( status == 143 )); then status=0; fi
     if [[ -n "$cinnamon_pid" ]] && kill -0 "$cinnamon_pid" 2>/dev/null; then
-        eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0];if(!a)return {restored:false};if(a.menu&&a.menu.isOpen)a.menu.close(false);if(a.__captureOriginalSnapshot!==undefined){a._snapshot=a.__captureOriginalSnapshot;a._lastError=a.__captureOriginalLastError;a._authenticationRequired=a.__captureOriginalAuthRequired;a._resetConsumeBusy=a.__captureOriginalResetBusy;a.showModelLimitsInPanel=a.__captureOriginalShowModelLimitsInPanel;a._rebuildPanel();a._rebuildMenu();}if(a.__captureBackgroundActor){a.__captureBackgroundActor.destroy();a.__captureBackgroundActor=null;}if(global.background_actor){if(a.__captureOriginalBackgroundVisible)global.background_actor.show();else global.background_actor.hide();}var desk=imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor;if(desk&&a.__captureOriginalDeskletsVisible)desk.show();if(desk&&!a.__captureOriginalDeskletsVisible)desk.hide();var pointer=a.__captureOriginalPointer;if(pointer)global.set_pointer(pointer[0],pointer[1]);return {restored:true};})())' >/dev/null 2>&1 || true
+    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0];if(!a)return {restored:false};if(a.menu&&a.menu.isOpen)a.menu.close(false);if(a.__captureOriginalSnapshot!==undefined){a._snapshot=a.__captureOriginalSnapshot;a._lastError=a.__captureOriginalLastError;a._authenticationRequired=a.__captureOriginalAuthRequired;a._resetConsumeBusy=a.__captureOriginalResetBusy;a.showModelLimitsInPanel=a.__captureOriginalShowModelLimitsInPanel;a.showCreditsInPanel=a.__captureOriginalShowCreditsInPanel;a._rebuildPanel();a._rebuildMenu();}if(a.__captureBackgroundActor){a.__captureBackgroundActor.destroy();a.__captureBackgroundActor=null;}if(global.background_actor){if(a.__captureOriginalBackgroundVisible)global.background_actor.show();else global.background_actor.hide();}var desk=imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor;if(desk&&a.__captureOriginalDeskletsVisible)desk.show();if(desk&&!a.__captureOriginalDeskletsVisible)desk.hide();var pointer=a.__captureOriginalPointer;if(pointer)global.set_pointer(pointer[0],pointer[1]);return {restored:true};})())' >/dev/null 2>&1 || true
         kill -TERM "$cinnamon_pid" 2>/dev/null || true
         for _ in {1..40}; do
             kill -0 "$cinnamon_pid" 2>/dev/null || break
@@ -163,6 +163,7 @@ JSON.stringify((function(){
     a.__captureOriginalAuthRequired=a._authenticationRequired;
     a.__captureOriginalResetBusy=a._resetConsumeBusy;
     a.__captureOriginalShowModelLimitsInPanel=a.showModelLimitsInPanel;
+    a.__captureOriginalShowCreditsInPanel=a.showCreditsInPanel;
     a.__captureOriginalDeskletsVisible=!!(imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor&&imports.ui.main.deskletContainer.actor.visible);
     a.__captureOriginalPointer=global.get_pointer();
     a.__captureOriginalBackgroundVisible=!!(global.background_actor&&global.background_actor.visible);
@@ -181,16 +182,17 @@ JSON.stringify((function(){
     function bucket(value){return {consumedPercent:value,complete:true,observed:true};}
     function creditBucket(value){return {consumed:value,complete:true,observed:true};}
     function historyWindow(id,label,duration,periods,values){periods["24h"]={consumedPercent:values.reduce(function(a,b){return a+b;},0),complete:true};return {id:id,label:label,durationMinutes:duration,trackedSince:now-8*86400,periods:periods,activity24h:values.map(bucket)};}
-    var codexLabel="Codex",sparkLabel="GPT-5.3-Codex-Spark",hasSpark="VARIANT"!=="codex-two"&&"VARIANT"!=="panel-codex-two";
+    var codexLabel="Codex",sparkLabel="GPT-5.3-Codex-Spark",hasSpark="VARIANT"!=="codex-two"&&"VARIANT"!=="panel-codex-two"&&"VARIANT"!=="credits"&&"VARIANT"!=="credits-panel";
     // Use a healthy 7d baseline for the secondary README states; the primary
     // overview below intentionally overrides this with the critical 0% case.
     var codexWindows=[win(10080,76,6*86400+3*3600)];
     var sparkWindows=[win(300,82,3*3600+41*60),win(10080,76,6*86400+3*3600)];
     if("VARIANT"==="four"||"VARIANT"==="codex-two"||"VARIANT"==="panel-codex-two")codexWindows.unshift(win(300,68,2*3600+13*60));
-    // Keep the credit story chronological: pink credit-only buckets are
-    // historical, then healthy quota activity resumes. The recent buckets
-    // stay green while the displayed 5h and 7d windows have capacity left.
-    var codexValues=[0,0,0,0,1,2,3,1,0,0,1,0,0,0,2,0,0,0,1,1,0,0,0,0];
+    // Keep public demo histories chronological: pink credit-only activity
+    // leads into a green quota phase through one stacked transition, then a
+    // second stacked transition leads back to pink credit activity. This
+    // exercises the mixed-bar rendering without alternating colors mid-phase.
+    var codexValues=[0,0,0,0,0,1,2,3,1,0,1,0,0,0,2,0,0,0,2,0,0,0,0,0];
     var sparkFiveValues=[0,0,0,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,1,0,0,0,0,0];
     var sparkWeeklyValues=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,0,0,1,0];
     if("VARIANT"==="basic"||"VARIANT"==="four"){
@@ -205,7 +207,7 @@ JSON.stringify((function(){
     var sparkFiveHistory=historyWindow("spark",sparkLabel,300,sparkFivePeriods,sparkFiveValues);
     var sparkWeeklyHistory=historyWindow("spark",sparkLabel,10080,sparkWeeklyPeriods,sparkWeeklyValues);
     var creditPeriods={"24h":{consumed:97.8,complete:true},"12h":{consumed:84.4,complete:true},"4h":{consumed:73.8,complete:true},"1h":{consumed:20.1,complete:true}};
-    var creditValues=[0,2.2,3.4,4.8,3.0,0,0,0,10.6,17.2,28.4,8.1,20.1,0,0,0,0,0,0,0,0,0,0,0];
+    var creditValues=[0,2.2,3.4,4.8,3.0,1.0,0,0,0,0,0,0,0,0,0,0,0,0,2.0,7.6,17.2,28.4,8.1,20.1];
     var historyWindows=[codexHistory];
     if("VARIANT"==="four"||"VARIANT"==="codex-two"||"VARIANT"==="panel-codex-two")historyWindows.push(historyWindow("codex",codexLabel,300,{"1h":{consumedPercent:2,complete:true},"4h":{consumedPercent:5,complete:true}},[0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0,2,0,0]));
     if(hasSpark)historyWindows.push(sparkFiveHistory,sparkWeeklyHistory);
@@ -223,9 +225,11 @@ JSON.stringify((function(){
         a._snapshot.credits={balance:"250.0",availableResetCount:1,nextResetExpiresAt:now+29*86400+13*3600,hasCredits:true,unlimited:false};
         a._snapshot.history.windows[0].periods={"1h":{consumedPercent:0,complete:true},"4h":{consumedPercent:0,complete:true},"12h":{consumedPercent:30,complete:true},today:{consumedPercent:85,complete:true}};
         // Keep the reset-boundary example in the primary README overview too:
-        // pink-only buckets lead into one mixed transition, then green quota
-        // activity; the later pink phase starts only after quota exhaustion.
-        a._snapshot.history.windows[0].activity24h=[0,0,0,0,1,3,5,3,2,4,3,2,21,21,0,7,8,8,0,0,0,0,0,0].map(bucket);
+        // Credit-only buckets lead into a clean green quota phase through
+        // one stacked transition, then return to credit-only activity through
+        // a second stacked transition after quota exhaustion.
+        a._snapshot.history.windows[0].activity24h=[0,0,0,0,0,1,3,5,3,2,4,3,2,21,21,0,7,8,8,0,0,0,0,0].map(bucket);
+        a._snapshot.history.creditActivity24h=creditValues.map(creditBucket);
         a._snapshot.history.windows.slice(1).forEach(function(w){w.activity24h=w.activity24h.map(function(){return bucket(0);});});
     }
     var alertMode=GLib.getenv("QA_PANEL_ALERTS");
@@ -237,6 +241,8 @@ JSON.stringify((function(){
     }
     if(GLib.getenv("QA_MODEL_SPECIFIC_LIMITS")==="off")a.showModelSpecificLimits=false;
     a._lastError=null;a._authenticationRequired=false;a._resetConsumeBusy=false;a._resetFeedback=null;a.showModelLimitsInPanel=true;
+    var creditsMode=GLib.getenv("QA_SHOW_CREDITS_IN_PANEL");
+    if(creditsMode==="1"||creditsMode==="0")a.showCreditsInPanel=creditsMode==="1";
     if("VARIANT"==="install-chatgpt")a._chatGptAppInfo=function(){return null;};
     if("VARIANT"==="install-codex")a._codexTerminalCommand=function(){return null;};
     a._rebuildPanel();a._rebuildMenu();
@@ -246,6 +252,15 @@ JSON.stringify((function(){
 JSEOF
 setup_code=${setup_code//VARIANT/$variant}
 eval_cinnamon "$setup_code" >/dev/null
+
+if [[ "${QA_SHOW_CREDITS_IN_PANEL:-}" == 1 ]]; then
+    credits_panel=$(eval_cinnamon 'String((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0];return a._root.get_children().some(function(child){return child.get_children&&child.get_children().some(function(grandchild){return grandchild.text==="AIC";});});})())')
+    if [[ "$credits_panel" != *true* ]]; then
+        printf 'Credits panel setting did not render an AIC block\n' >&2
+        exit 1
+    fi
+    printf 'credits-panel=true\n'
+fi
 
 if [[ "${QA_NOTIFICATION_RETENTION:-0}" == 1 ]]; then
     # shellcheck source=tests/ui/check-notifications.sh
@@ -273,7 +288,7 @@ elif [[ "$variant" == install-* ]]; then
     else
         eval_cinnamon 'Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0]._codexButton.emit("clicked", 1)' >/dev/null
     fi
-elif [[ "$variant" == "panel" || "$variant" == "panel-codex-two" || "$variant" == "panel-tooltip" ]]; then
+elif [[ "$variant" == "panel" || "$variant" == "panel-codex-two" || "$variant" == "credits-panel" || "$variant" == "panel-tooltip" ]]; then
     :
 elif [[ "$variant" == "reset" ]]; then
     eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0];if(a.menu.isOpen)a.menu.close(false);a._showResetConfirmation();return {resetDialog:!!a._resetConfirmationDialog};})())' >/dev/null
@@ -327,7 +342,7 @@ if [[ "$variant" == reset && "${QA_RESET_ACKNOWLEDGMENT:-0}" == 1 ]]; then
 fi
 
 case "$variant" in
-    basic|overview|spark|bucket|four|codex-two)
+    basic|overview|spark|bucket|four|codex-two|credits)
         for lifecycle in rebuild reopen; do
             if [[ "$lifecycle" == rebuild ]]; then
                 eval_cinnamon 'Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0]._rebuildMenu()' >/dev/null
@@ -366,7 +381,7 @@ elif [[ "$variant" == install-* ]]; then
     menu_geometry=$(eval_cinnamon 'JSON.stringify((function(){var d=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0]._installHelpDialog.dialogLayout,p=d.get_transformed_position(),s=d.get_transformed_size();return [Math.round(p[0]),Math.round(p[1]),Math.round(s[0]),Math.round(s[1])].join(",");})())' | grep -oE '[0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1)
 elif [[ "$variant" == "panel-tooltip" ]]; then
     menu_geometry=$(eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0],d=a._applet_tooltip._tooltip,p=d.get_transformed_position(),s=d.get_transformed_size();return [Math.round(p[0]),Math.round(p[1]),Math.round(s[0]),Math.round(s[1])].join(",");})())' | grep -oE '[0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1)
-elif [[ "$variant" == "panel" || "$variant" == "panel-codex-two" ]]; then
+elif [[ "$variant" == "panel" || "$variant" == "panel-codex-two" || "$variant" == "credits-panel" ]]; then
     menu_geometry='0,0,0,0'
 elif [[ "$variant" == "reset" ]]; then
     menu_geometry=$(eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("chatgpt-usage@oss-singularity")[0],d=a._resetConfirmationDialog;if(!d||!d.dialogLayout||!d.dialogLayout.visible)throw new Error("reset dialog unavailable");var p=d.dialogLayout.get_transformed_position(),s=d.dialogLayout.get_transformed_size();return [Math.round(p[0]),Math.round(p[1]),Math.round(s[0]),Math.round(s[1])].join(",");})())' | grep -oE '[0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1)

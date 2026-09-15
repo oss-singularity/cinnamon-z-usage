@@ -25,7 +25,7 @@ reproduction commands and release evidence live here.
 ### Current evidence and release records
 
 - [Screenshot inventory](model-limits/inventory.json) — source hashes,
-  geometry, fixture state and output hashes for the 19 public captures.
+  geometry, fixture state and output hashes for the 22 public captures.
 - [Rights inventory](rights-inventory.json) — current raster/vector coverage,
   hashes, licenses and provenance evidence.
 - [Historical release checkpoint](releases/release-checkpoint.json) — the original
@@ -42,6 +42,12 @@ Versioned receipts are kept together under [`releases/`](releases/):
 The receipts and historical checkpoint are immutable evidence records for the
 source commit, package bytes, screenshots, validator and publication gates of
 their respective versions.
+
+### Inactive implementation drafts
+
+- [Limit percentage decimal-display draft](drafts/limit-percent-decimal-display.patch)
+  — inactive until the upstream API exposes reliable fractional
+  `remainingPercent` values; it is not part of the installed package.
 
 ## Installation and backend configuration
 
@@ -113,6 +119,10 @@ remain the responsibility of the selected local app-server backend.
 
 The panel chooses the lowest remaining percentage for each duration; it does
 not add one panel block for every model. The popup shows all visible windows.
+The optional **Show credits in the panel** setting adds the available AIC
+balance as one compact `AIC`/value block after the quota indicators. It is
+disabled by default, uses the configured panel text color and does not change
+the quota selection logic.
 Numeric rolling totals cover `[now - 24h, now]` independently of the chart's
 wall-clock-aligned buckets. All consumption is observed at sample times;
 activity between samples is not recoverable.
@@ -125,7 +135,7 @@ partitioning remains a release-readiness investigation.
 
 ## Compatibility and declared limits
 
-Version 1.0.5 declares Cinnamon **5.8, 6.0, 6.2, 6.4 and 6.6**, following the
+Version 1.0.6 declares Cinnamon **5.8, 6.0, 6.2, 6.4 and 6.6**, following the
 Cinnamon Spices compatibility convention. Native runtime validation on this
 host is Cinnamon 6.6.9; the 5.8 settings-widget API was checked against the
 official Cinnamon source, but no separate 5.8 live desktop is claimed here.
@@ -183,11 +193,13 @@ retains external settings, history and unresolved-reset state.
 
 The [private capture guide](../tests/ui/README.md) is the source of truth for
 the isolated X11 workflow. Public captures use synthetic data, the current
-original project artwork and the reference transparent panel. The 19-image
-inventory covers popup states, settings, native dialogs and three paired panel
-states: common Codex 5h+7d, compact Codex-only 7d, and Codex+Spark. All paired
-panel anchors deliberately keep common context crops (94×40 horizontally and
-40×96 vertically), so they remain directly comparable.
+original project artwork and the reference transparent panel. The 22-image
+inventory covers popup states, settings, native dialogs and four paired panel
+states: the optional AIC + Codex-only 7d view, common Codex 5h+7d,
+compact Codex-only 7d, and Codex+Spark. The AIC pair uses native crops so the
+additional balance remains visible; the other paired panel anchors deliberately
+keep common context crops (94×40 horizontally and 40×96 vertically), so they
+remain directly comparable.
 
 When runtime visuals, schemas or fixture behavior change, regenerate the
 captures and update both [the screenshot inventory](model-limits/inventory.json)

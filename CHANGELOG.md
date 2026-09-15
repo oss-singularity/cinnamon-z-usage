@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.6 — 2026-09-15
+
+- Keep limit remaining percentages at the integer precision exposed by the
+  current API; do not manufacture `.00%` values when a critical threshold is
+  active. Credit balances retain their existing one-decimal display.
+- Retune the primary documentation fixture into a readable chronological
+  story: credit-only activity, a clean quota-usage phase, then credit-only
+  activity again after the quota boundary.
+- Keep the previously considered fractional limit display as an inactive
+  implementation draft for a future API that exposes reliable fractional
+  `remainingPercent` values.
+- Add an opt-in `Show credits in the panel` setting that displays the available
+  AIC balance as a compact, panel-colored value beside the quota indicators.
+
 ## 1.0.5 — 2026-09-09
 
 - Show the peak credit consumption beside the 24-hour activity peak when

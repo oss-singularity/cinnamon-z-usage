@@ -1,0 +1,101 @@
+# INACTIVE DRAFT — do not apply while the API exposes integer-only
+# remainingPercent.
+#
+# This records the previously considered implementation for displaying two
+# decimals below the configured critical threshold. Keep it only as a future
+# starting point if the upstream rate-limit response begins exposing reliable
+# fractional remaining percentages. Credits already have an independent,
+# working decimal formatter and are intentionally not changed by this patch.
+
+diff --git a/usage-format.js b/usage-format.js
+--- a/usage-format.js
++++ b/usage-format.js
+@@ -116,6 +116,15 @@
+-function formatPercent(value) {
++function formatPercent(value, preciseBelow = null) {
+     const number = Number(value);
+     if (!Number.isFinite(number)) return "--";
+     const bounded = clamp(number, 0, 100);
++    const precisionThreshold = Number(preciseBelow);
++    if (
++        bounded > 0 &&
++        Number.isFinite(precisionThreshold) &&
++        precisionThreshold > 0 &&
++        bounded < precisionThreshold
++    ) {
++        return _f("%s%%", bounded.toFixed(2));
++    }
+     return _f("%s%%", Math.round(bounded));
+ }
+@@ -732,5 +740,5 @@
+                 "%s has %s remaining.",
+                 label,
+-                formatPercent(current.window.remainingPercent)
++                formatPercent(current.window.remainingPercent, lowSettings.critical)
+             )
+         });
+diff --git a/applet.js b/applet.js
+--- a/applet.js
++++ b/applet.js
+@@ -734,5 +734,5 @@
+                             "%s%s: %s remaining",
+                             prefix,
+                             duration,
+-                            UsageFormat.formatPercent(window.remainingPercent)
++                            UsageFormat.formatPercent(window.remainingPercent, this.criticalRemaining)
+                         )
+@@ -746,5 +746,5 @@
+                 return _f(
+                     "%s: %s remaining",
+                     duration,
+-                    UsageFormat.formatPercent(summary.remainingPercent)
++                    UsageFormat.formatPercent(summary.remainingPercent, this.criticalRemaining)
+                 );
+@@ -1116,4 +1116,4 @@
+     _addLimitWindowItem(window) {
+         const duration = UsageFormat.formatDuration(window.durationMinutes);
+-        const remaining = UsageFormat.formatPercent(window.remainingPercent);
++        const remaining = UsageFormat.formatPercent(window.remainingPercent, this.criticalRemaining);
+         const reset = UsageFormat.formatTimestamp(
+diff --git a/tests/test-usage-format.js b/tests/test-usage-format.js
+--- a/tests/test-usage-format.js
++++ b/tests/test-usage-format.js
+@@ -147,25 +147,25 @@
+ assertEqual(
+-    UsageFormat.formatPercent(0),
++    UsageFormat.formatPercent(0, 15),
+     "0%",
+-    "Exact zero remains an integer percentage"
++    "Exact zero remains an integer percentage below the critical threshold"
+ );
+ assertEqual(
+-    UsageFormat.formatPercent(0.01),
+-    "0%",
+-    "API-scale fractional percentages round to the reported integer precision"
++    UsageFormat.formatPercent(0.01, 15),
++    "0.01%",
++    "Positive critical percentages keep two decimals"
+ );
+ assertEqual(
+-    UsageFormat.formatPercent(0.49),
+-    "0%",
+-    "Sub-half-percent values remain the API-compatible zero display"
++    UsageFormat.formatPercent(0.49, 15),
++    "0.49%",
++    "Small positive critical percentages remain visible"
+ );
+ assertEqual(
+-    UsageFormat.formatPercent(14.99),
+-    "15%",
+-    "Critical percentages use whole values"
++    UsageFormat.formatPercent(14.99, 15),
++    "14.99%",
++    "Critical percentages keep two decimals below the threshold"
+ );
+ assertEqual(
+-    UsageFormat.formatPercent(15),
++    UsageFormat.formatPercent(15, 15),
+     "15%",
+-    "Critical threshold itself uses normal rounding"
++    "Critical threshold itself keeps normal rounding"
+ );
