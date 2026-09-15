@@ -2,6 +2,11 @@
 
 ## Unreleased — 0.2.0 (planned)
 
+- Root fix for the clipped action rows: the scroll view allocated the popup
+  content at the viewport height, so everything below the fold (the button
+  grid) was cut off entirely. The clamp now pins the content to its natural
+  height measured at the real popup width (wrapping included), which makes
+  the full action area scrollable.
 - Second layout pass: the popup height is clamped before Cinnamon positions
   it so a fully expanded popup stays on screen, a fresh open starts at the
   header (the upstream active-Spark auto-open no longer fires for the new

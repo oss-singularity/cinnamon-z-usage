@@ -3594,19 +3594,30 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _clampPopupHeight(forActor) {
-        if (!this.menu || !this.menu._scroll) return;
+        if (!this.menu || !this.menu._scroll || !this.menu._content) return;
         if (!Main.layoutManager || !Main.layoutManager.findMonitorForActor) return;
         const monitor = Main.layoutManager.findMonitorForActor(forActor || this.menu.actor);
         if (!monitor || !Number.isFinite(monitor.height) || monitor.height <= 0) return;
         this.menu._scroll.set_height(-1);
-        const [, menuNatural] = this.menu.actor.get_preferred_height(-1);
+        this.menu._content.actor.set_height(-1);
+        // Measure at the real popup width: labels wrap at the locked width,
+        // so an unlimited-width measurement undercounts the natural height
+        // and would leave the action rows below the screen edge.
+        let width = this.menu.actor.get_width();
+        if (!(width > 1)) width = this._popupWidth();
+        const [, menuNatural] = this.menu.actor.get_preferred_height(width);
         // Keep the popup inside the monitor: the scroll area takes the
         // remaining height instead of clipping the action rows off-screen.
         const maxHeight = Math.max(240, monitor.height - 96);
         if (!Number.isFinite(menuNatural) || menuNatural <= maxHeight) return;
-        const [, scrollNatural] = this.menu._scroll.get_preferred_height(-1);
+        const [, scrollNatural] = this.menu._scroll.get_preferred_height(width);
         const chrome = Math.max(0, menuNatural - scrollNatural);
         this.menu._scroll.set_height(Math.max(200, maxHeight - chrome));
+        // The scroll view allocates an unfixed content at the viewport height,
+        // which clips the bottom action rows out of existence. Pin the content
+        // to its natural height so scrolling reaches every row.
+        const [, contentNatural] = this.menu._content.actor.get_preferred_height(width);
+        this.menu._content.actor.set_height(Math.max(200, contentNatural));
     }
 
     _ensureActorVisible(actor) {
