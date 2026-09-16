@@ -38,50 +38,40 @@ Git-History (`upstream`-Remote) für Backports.
 - `make check` grün (44 Tests), Audit `EXPECTED=22 VALID=22`, Cinnamon-PID
   stabil über alle Reloads.
 
-## 3. OFFENE BUGS (Live-Applet, noch nicht behoben)
+## 3. GELÖSTE BUGS (2026-09-16, Finale-Runde — beide isoliert bewiesen)
 
-### Bug A — Blaue Header-Ringe wackeln beim Schließen nach links
+### Bug A — Blaue Header-Ringe wackeln beim Schließen nach links — GEFIXT
 
-Beim Schließen des Popups verschieben sich die zwei blauen Header-Ringe
-(5h/7d) kurz nach links. Messungen (isoliert): `hrTx: -13, hrX: 1459` STABIL
-über Section-Toggles — der Drift tritt also nur im **Close-Pfad** auf.
+**Gemessener Mechanismus (isoliert, instrumentierter Close):** Die alte
+`_normalizeRightPanelPopupCloseWidth` (Style-Reset, `set_width(-1)`-Dip,
+`locked-1`-Trim) erzwang ein Close-Re-Layout: Actor 419→418, Header-/Box-
+Allocation 419→418, Teleport +1px (Cinnamons `close()` repositioniert via
+`_calculatePosition()` mit der NEUEN Breite). Zu diesem Zeitpunkt ist
+`isOpen` bereits false → der Ring-Sync (`_syncContentRightEdges`, hängt an
+`notify::allocation` des Footers) lief nicht mehr → die Ringe behielten ihre
+Translation, während sich das Layout unter ihnen verschob.
 
-**Mechanismus-Verdacht:** `close()` (Right-Panel-Pfad) ruft
-`_normalizeRightPanelPopupCloseWidth(1)`:
-1. `menu.actor.style = _rightPanelMenuStyleBase` — wirft `min-width: 419` weg,
-2. `set_width(-1)` → natural,
-3. `set_width(locked - 1)`.
-Der Style-Reset + die Breiten-Änderung triggern ein Re-Layout: die Header-Ringe
-(und ggf. andere rechtsbündige Elemente) springen. **Weiterer Verdacht:**
-`_lockPopupLayoutWidth` erzwingt box=outer(419) während der menu.actor nach
-dem Reset nur 418 hat → 1px+ Overflow.
+**Fix:** Close ist jetzt breitenneutral — der Actor bleibt auf der Locked-
+Width (419), kein Style-Reset, kein Natural-Dip, kein Trim (`POPUP_RIGHT_
+PANEL_CLOSE_WIDTH_TRIM` entfernt); dazu ein letzter Ring-Sync in `close()`,
+solange `isOpen` noch true ist. Beweis (Open → Toggle → Close → Re-Open →
+Close): konstant `aX=1461, aW=419, hA=419`; beim Close-Slide bewegen sich
+Popup/Ringe/Grid gemeinsam +11px (null Relativ-Drift); Re-Open exakt auf
+`1461/63/419`.
 
-**Fix-Ansätze (ungetestet):**
-- In `_normalizeRightPanelPopupCloseWidth` die Locked-Width MINUS dem gleichen
-  Theme-Chrome wie in `_menuInnerWidth` (24px) verwenden.
-- Oder: nach dem Close-Normalize `_lockPopupLayoutWidth()` erneut aufrufen.
-- Oder: den Style-Reset nicht machen (min-width behalten).
+### Bug B — Oberes Panel schneidet den Popup-Header ab — GEFIXT
 
-### Bug B — Oberes Panel schneidet den Popup-Header ab
+**Wurzel (isoliert verifiziert):** `panelPosition` ist ein `PanelLoc`
+(`top=0, bottom=1, left=2, right=3` — /usr/share/cinnamon/js/ui/panel.js).
+Der alte Reserve-Check fragte `panelPosition !== 1` — also BOTTOM-Panels —
+ab; das Top-Panel (0) floss nie ein. Popup 1058px, bottom-clamped bei y=22,
+Top-Panel 0..40 → 18px Header verdeckt (Live-Messung: y1=22, Panel ~30).
 
-Popup `allocation.y1 = 22`; das Top-Panel endet bei ~30 → die ersten ~8px des
-Headers (Titelzeile + obere Ring-Hälfte) sind verdeckt.
-
-**Wurzel:** `_clampPopupHeight` nutzt `maxMenu = monitor.height - 16` — die
-Top-Panel-Höhe (~30) fehlt in der Rechnung. Der bisherige Reserve-Code prüft
-`panel.panelPosition !== 1` — **verifiziere die echte panelPosition des
-Top-Panels live** (kann 0 statt 1 sein!):
-
-```js
-Main.panelManager.panels.map(p => [p.panelPosition, p.actor.get_height(),
-  Math.round(p.actor.get_transformed_position()[1])])
-```
-
-**Fix-Ansatz:** `maxMenu = monitor.height - topPanelBottom - 12` (topPanelBottom
-= Unterkante des obersten Panels im oberen Bereich, gemessen über
-`get_transformed_position()[1] + get_height()`), dann positioniert Cinnamon
-das Popup automatisch darunter. Zusätzlich das Menu-Actor-Höhen-Fixieren
-beibehalten (`menu.actor.set_height(popupFrame)` in `_clampPopupHeight`).
+**Fix:** `_clampPopupHeight` liest jetzt die echten Kanten sichtbarer Panels
+des Monitors (`getPanelsInMonitor` + `get_transformed_position/size`;
+`panelPosition === 0` → topReserve = Unterkante − monitor.y + 16; `=== 1` →
+bottomReserve). Isoliert: Popup `aY=63` (Top-Panel-Unterkante 40 + 16px
+Reserve), Header vollständig sichtbar.
 
 ## 4. Debug-Werkzeuge (erprobt)
 
@@ -95,8 +85,15 @@ bash /home/claudiu/.zcode/skills/cinnamon-isolated-capture/scripts/run-isolated.
 ```
 
 - Beispiel-Treiber: `/tmp/z-arrow-driver.sh` (Stage + Arrow-Diagnose),
-  `/tmp/z-close-rec3.sh` (Staging + Close + 60fps-Recording),
-  `/tmp/z-toggle-driver.sh`-Muster (Toggle-Sequenz + Messung).
+  `/tmp/z-final-verify-driver.sh` (Close-Instrumentierung, 60fps),
+  `/tmp/z-final-scenario-driver.sh` (Toggle → Close → Re-Open-Szenario).
+  Achtung: `--stage-applet` leitet den Zielordner aus dem Verzeichnis-
+  Basename ab — Worktree-Code erst nach `/tmp/stage/z-usage@oss-singularity/`
+  kopieren und von dort stagen.
+- Isolier-Setup für beide Bugs: `panels-enabled "['1:0:top', '3:0:right']"`
+  (Top-Panel: `panelPosition=0`, Höhe 40) + Demo-Snapshot mit ~14
+  ZCode-Plan-Sections, damit der Content den Height-Clamp auslöst
+  (`/tmp/z-final-demo.json`-Muster).
 - 60fps-Recording im isolierten X11: `ffmpeg -y -f x11grab -framerate 60
   -video_size 1920x1080 -i $DISPLAY -c:v libx264rgb -preset ultrafast -crf 0
   out.mp4` (ffmpeg ist installiert).
@@ -106,7 +103,10 @@ bash /home/claudiu/.zcode/skills/cinnamon-isolated-capture/scripts/run-isolated.
 Timing-fest: Öffnen + Cinnamon-seitiger `Mainloop.timeout_add` + Ergebnis in
 `global.zD`, dann zweiter Eval liest `global.zD`. WICHTIG: Eval-Callbacks
 müssen einen String zurückgeben (`return "";`), sonst `(false,'{}')` — das
-sieht aus wie ein Fehler, ist aber nur ein leerer Return. Referenz-Snippets:
+sieht aus wie ein Fehler, ist aber nur ein leerer Return. KEIN `return` auf
+Eval-Top-Level (SyntaxError → `(false,'{}')`); der letzte Statement-Wert ist
+der Rückgabewert — ein abschließender `"";` schluckt das Ergebnis.
+Referenz-Snippets:
 
 ```js
 // Popup-Zustand
@@ -129,6 +129,11 @@ var s=a._limitSections[0]; if(s) s.heading.activate(); "";
   `_menuInnerWidth(outer)` (= outer − 24) klemmen — Theme-Node meldet 0
   Padding, daher fester 24px-Wert.
 - Eval-Callbacks: ohne String-Return seen as failure.
+- `menu.close()` ohne Argument = `animate undefined` = Instant-Hide — für
+  Close-Analysen immer `menu.close(true)`.
+- Allocation-Snapshots sind blind gegen Position-Eases (`actor.x` ändert
+  nicht `allocation.x1` synchron) — Animationen per Opacity-Probe und/oder
+  60fps-Pixelmessung prüfen.
 
 ## 5. Release-Gate (nach User-„lesseegooo")
 

@@ -51,7 +51,6 @@ const POPUP_ACTION_GRID_WIDTH = 352;
 // Cinnamon's one-pixel menu edge brings the visible popup width to 420 px.
 const POPUP_WIDTH = 419;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
-const POPUP_RIGHT_PANEL_CLOSE_WIDTH_TRIM = 1;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
 const POPUP_NESTED_CHART_LEFT_SHIFT = 5;
@@ -202,7 +201,11 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         const owner = this._usageOwner;
         if (owner._isRightPanel && this.isOpen) {
             owner._rightPanelPopupLockedWidth = owner._popupWidth();
-            owner._normalizeRightPanelPopupCloseWidth(POPUP_RIGHT_PANEL_CLOSE_WIDTH_TRIM);
+            // Last ring sync while the menu still counts as open: the close
+            // relayout itself runs with the sync disabled (isOpen is already
+            // false once Cinnamon's close starts).
+            owner._syncContentRightEdges();
+            owner._normalizeRightPanelPopupCloseWidth();
         }
         super.close(animate);
     }
@@ -3660,15 +3663,30 @@ class ZUsageApplet extends Applet.Applet {
         // rest. The frame height is locked once per open - later section
         // toggles only change the scrollbar range, never the popup frame, so
         // nothing drifts, jumps or gets cut while the popup is open.
-        // Reserve for the top panel: the popup must start below it.
+        // Reserve the REAL panel edges: Cinnamon positions the popup inside
+        // the monitor with visible panels excluded (PanelLoc.top = 0,
+        // PanelLoc.bottom = 1), so a too-tall popup bottom-clamps to the
+        // monitor and its header hides under the top panel.
         let topReserve = 16;
+        let bottomReserve = 0;
         try {
-            for (const panel of Main.panelManager.panels) {
-                if (!panel || !panel.actor || panel.panelPosition !== 1) continue;
-                topReserve = Math.max(topReserve, panel.actor.get_height() + 16);
+            const panels = typeof Main.panelManager.getPanelsInMonitor === "function"
+                ? Main.panelManager.getPanelsInMonitor(monitor.index)
+                : (Main.panelManager.panels || []);
+            for (const panel of panels) {
+                if (!panel || !panel.actor) continue;
+                if (panel.getIsVisible && !panel.getIsVisible()) continue;
+                const [, panelY] = panel.actor.get_transformed_position();
+                const [, panelH] = panel.actor.get_transformed_size();
+                if (!Number.isFinite(panelY) || !Number.isFinite(panelH) || panelH <= 0) continue;
+                if (panel.panelPosition === 0) {
+                    topReserve = Math.max(topReserve, Math.ceil(panelY + panelH - monitor.y) + 16);
+                } else if (panel.panelPosition === 1) {
+                    bottomReserve = Math.max(bottomReserve, Math.ceil(monitor.y + monitor.height - panelY) + 8);
+                }
             }
         } catch (error) {}
-        const maxMenu = Math.max(240, monitor.height - topReserve);
+        const maxMenu = Math.max(240, monitor.height - topReserve - bottomReserve);
         if (!this._popupFrameHeight) {
             const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
             this._popupViewport = viewport;
@@ -3706,21 +3724,16 @@ class ZUsageApplet extends Applet.Applet {
         actor.clip_to_allocation = false;
     }
 
-    _normalizeRightPanelPopupCloseWidth(trimPx = 0) {
+    _normalizeRightPanelPopupCloseWidth() {
         if (!this._isRightPanel || !this.menu) return;
+        // Keep the popup at the locked outer width through the close
+        // animation. Renormalizing (style reset, natural-width dip, 1px
+        // trim) re-allocates the pinned header while the ring sync is
+        // already disabled, so the header rings visibly jump; Cinnamon's
+        // close also repositions from the preferred size, so keeping the
+        // locked width makes that reposition a no-op as well.
         const lockedWidth = this._rightPanelPopupLockedWidth;
-        this.menu.actor.style = this._rightPanelMenuStyleBase;
-        this.menu.actor.translation_x = 0;
-        this.menu.actor.set_width(-1);
-
-        const naturalWidth = this.menu.actor.get_preferred_width(-1)[1];
-        const baseWidth = lockedWidth > 0 ? lockedWidth : naturalWidth;
-        const normalizedWidth = Math.max(0, Math.floor(baseWidth - trimPx));
-        if (normalizedWidth > 0) {
-            this.menu.actor.set_width(normalizedWidth);
-            return;
-        }
-        this.menu.actor.set_width(-1);
+        if (lockedWidth > 0) this.menu.actor.set_width(lockedWidth);
     }
 
     _orientationIsVertical(orientation) {
