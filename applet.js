@@ -171,6 +171,12 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
     open(animate) {
         const owner = this._usageOwner;
         const freshOpen = !this.isOpen;
+        if (this._closePositionFrozen) {
+            // A leftover close freeze (the close animation was interrupted):
+            // drop it so this open positions from the live geometry again.
+            delete this._calculatePosition;
+            this._closePositionFrozen = null;
+        }
         owner._applyPopupWidth();
         if (freshOpen) {
             // The default expansion on open must not yank the scroll position
@@ -513,6 +519,10 @@ class ZUsageApplet extends Applet.Applet {
             this.menu.actor.translation_x = 0;
             this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
             this._applyPopupWidth();
+            if (this.menu._closePositionFrozen) {
+                delete this.menu._calculatePosition;
+                this.menu._closePositionFrozen = null;
+            }
         });
         this._rebuildMenu();
     }
@@ -3756,14 +3766,16 @@ class ZUsageApplet extends Applet.Applet {
 
     _normalizeRightPanelPopupCloseWidth() {
         if (!this._isRightPanel || !this.menu) return;
-        // Keep the popup at the locked outer width through the close
-        // animation. Renormalizing (style reset, natural-width dip, 1px
-        // trim) re-allocates the pinned header while the ring sync is
-        // already disabled, so the header rings visibly jump; Cinnamon's
-        // close also repositions from the preferred size, so keeping the
-        // locked width makes that reposition a no-op as well.
         const lockedWidth = this._rightPanelPopupLockedWidth;
         if (lockedWidth > 0) this.menu.actor.set_width(lockedWidth);
+        // Freeze the popup position across the close: Cinnamon's close()
+        // repositions the actor from its preferred size, and theme margins
+        // can make that land a few pixels off the open position - the whole
+        // content incl. the rings then reads as squeezed sideways before the
+        // slide starts. The slide ease keeps running from the frozen spot.
+        const menu = this.menu;
+        menu._closePositionFrozen = [Math.round(menu.actor.x), Math.round(menu.actor.y)];
+        menu._calculatePosition = () => menu._closePositionFrozen;
     }
 
     _orientationIsVertical(orientation) {

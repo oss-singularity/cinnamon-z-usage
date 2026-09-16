@@ -118,6 +118,20 @@ Refresh-Labels), erzeugte trotzdem einen Scrollbalken — live exakt
 `viewport = min(contentNat + 8, budget - 2)`. Live nach Deploy:
 `viewport=796, scrollOver=0` bei `aY=112`.
 
+### Rest-Squeeze (~3px) beim Close — GEFIXT (Positions-Freeze)
+
+Claudius Final-Check: beim Schließen rückt der gesamte Bereich inkl. Ringe
+~3px nach links. Ursache: Cinnamons `close()` setzt die Position VOR dem
+Slide neu (`set_position(_calculatePosition())`) — das Ergebnis hängt von
+Preferred-Size und Theme-Margins ab und kann abweichen vom Open-Platz
+(isoliert mit Default-Theme nicht reproduzierbar, live Theme-abhängig).
+Fix: `_normalizeRightPanelPopupCloseWidth` friert die Position ein
+(`menu._calculatePosition` wird für die Close-Dauer auf die aktuelle
+[x, y] gepatcht; Restore im `menu-animated-closed`-Handler und sicherheitshalber
+in `open()`). Der Slide-Ease läuft unverändert von der eingefrorenen Stelle.
+Isoliert: Close jetzt exakt +12px starrer Slide, Re-Open exakt auf die
+Open-Position.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 
