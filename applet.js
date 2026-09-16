@@ -242,6 +242,8 @@ class ZUsageApplet extends Applet.Applet {
         this._activityCharts = [];
         this._creditsAlignRows = [];
         this._creditsFit = null;
+        this._lastChartWidths = [];
+        this._lastCreditsTx = 0;
         this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
@@ -615,15 +617,18 @@ class ZUsageApplet extends Applet.Applet {
             actor.translation_x += delta;
         }
         const chartLimit = this._popupWidth() + 96;
-        for (const { chart } of this._activityCharts || []) {
+        (this._activityCharts || []).forEach(({ chart }, index) => {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
             const width = Math.max(1, Math.round(right - x + padding));
             // Charts span from their row to the grid edge; anything wider is
             // a stale read (mid-scroll or mid-relayout), never a real width.
-            if (width > chartLimit) continue;
-            if (!chart.min_width_set || chart.min_width !== width) this._forceActorWidth(chart, width);
-        }
+            if (width > chartLimit) return;
+            if (!chart.min_width_set || chart.min_width !== width) {
+                this._forceActorWidth(chart, width);
+                this._lastChartWidths[index] = width;
+            }
+        });
         // The credits consumption line ends flush with the grid edge, same
         // anchor, same convergence rules as the rings: shift the whole label
         // block by translating its row so the last label's right edge meets
@@ -640,6 +645,7 @@ class ZUsageApplet extends Applet.Applet {
             const delta = right - Math.round(current);
             if (Math.abs(delta) > POPUP_WIDTH) continue;
             row.translation_x += delta;
+            this._lastCreditsTx = row.translation_x;
         }
     }
 
@@ -2854,6 +2860,9 @@ class ZUsageApplet extends Applet.Applet {
                     expiresLabel,
                     expiryDateLabel
                 };
+                // Carry the previous menu's alignment across rebuilds so the
+                // line does not start unaligned and visibly slide over.
+                row.translation_x = this._lastCreditsTx || 0;
                 this._creditsAlignRows.push({ row, tail: expiryDateLabel });
             }
         }
@@ -3220,6 +3229,11 @@ class ZUsageApplet extends Applet.Applet {
         const chart = new St.BoxLayout({ vertical: true, x_align: Clutter.ActorAlign.START });
         const nested = menu !== this.menu;
         chart.style = this._activityChartStyle(nested, false);
+        // Carry the previous menu's aligned width across rebuilds: a fresh
+        // chart starts at its natural width and the graph would visibly
+        // jump on every data refresh until the sync re-forces it.
+        const widthHint = (this._lastChartWidths || [])[this._activityCharts.length];
+        if (widthHint > 0) this._forceActorWidth(chart, widthHint);
         this._activityCharts.push({
             chart,
             nested
