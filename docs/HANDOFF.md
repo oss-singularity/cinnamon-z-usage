@@ -111,6 +111,13 @@ heran; die 16px-Luft unter dem Top-Panel bleiben erhalten (Frame bleibt
 ≤ maxMenu). Messung: `viewport == contentNat` → `upper - page_size == 0`
 (kein Scrollbalken), Overflow-Fälle klappen weiter.
 
+**Nachschub (live befunden):** Der Frame-Lock friert den Viewport pro Open
+ein; Content, der NACH dem Lock ein paar px wächst (Countdown-Ticks,
+Refresh-Labels), erzeugte trotzdem einen Scrollbalken — live exakt
+`scrollOver=4`. Dafür gibt es jetzt `POPUP_VIEWPORT_PAD = 8`:
+`viewport = min(contentNat + 8, budget - 2)`. Live nach Deploy:
+`viewport=796, scrollOver=0` bei `aY=112`.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 
