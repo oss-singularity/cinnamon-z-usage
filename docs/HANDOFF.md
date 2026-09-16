@@ -209,6 +209,19 @@ Open-Position.
   per-chart allocation-watcher (1b12e6f) live war; beide bekannten
   Trigger (Watcher-Sturm, Close-Einstiegs-Sync) sind entfernt. Live-
   Bestätigung durch Claudius Rapid-Toggle-Test steht aus.
+- **Close-Animation final (16.35.40-Analyse):** Die 12px-Rest-Slide lies
+  die kantennahen Ringe noch unter dem Panel verschwinden. Final: während
+  des Closes wird `menu.actor.ease` gewrappt und x/y aus den
+  Ease-Parametern gestrichen → **reiner Opacity-Fade an der frozen
+  Position** (Restore im animated-closed + Sicherheit in open()). Der
+  Margin-Trick (ml=12) wurde revertiert — der verschob den Inhalt +12px.
+  Isoliert: aX/gR/hX frozen durch den gesamten Close, Reopen exakt.
+- **Hover-Flicker-Fix:** fit() blieb den ganzen Open über armed und
+  feuerte auf jede Allocation (auch Hover-Tooltips) — jeder Pass
+  re-applizierte erst BASE-Font dann shrunk er → sichtbares Text-Pulsieren
+  beim ersten Hovern (mehrere Sekunden, seit den Deferred-Pässen länger).
+  Fix: `converged` gated den fit-Einstieg (`if (!armed || converged ||
+  fitting) return`).
 
 ## 4. Debug-Werkzeuge (erprobt)
 

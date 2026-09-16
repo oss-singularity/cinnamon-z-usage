@@ -50,6 +50,9 @@ const LAUNCH_TOOLTIP_DELAY_MS = 420;
 const POPUP_ACTION_GRID_WIDTH = 352;
 // Cinnamon's one-pixel menu edge brings the visible popup width to 420 px.
 const POPUP_WIDTH = 419;
+// Cancels Cinnamon's MENU_ANIMATION_OFFSET when set as margin_left during
+// the close ease (target x = x - margin_left + OFFSET + margin_right).
+const POPUP_RIGHT_PANEL_CLOSE_SLIDE_CANCEL = 12;
 // Headroom between the locked viewport and the natural content height: the
 // frame is frozen once per open, and content that grows a few pixels after
 // the lock (countdown ticks, refresh labels) must not spawn a scrollbar.
@@ -176,6 +179,10 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             // drop it so this open positions from the live geometry again.
             delete this._calculatePosition;
             this._closePositionFrozen = null;
+        }
+        if (this._closeEaseRestore) {
+            delete this.actor.ease;
+            this._closeEaseRestore = false;
         }
         if (freshOpen && owner._creditsFit) {
             // Re-arm the one-shot credit font fit for this open cycle; the
@@ -520,13 +527,11 @@ class ZUsageApplet extends Applet.Applet {
         );
         this._rightPanelPopupClosedId = this.menu.connect("menu-animated-closed", () => {
             this.menu.actor.translation_x = 0;
-            if (this.menu._closeMarginsRestore) {
-                this.menu.actor.margin_left = this.menu._closeMarginsRestore[0];
-                this.menu.actor.margin_right = this.menu._closeMarginsRestore[1];
-                this.menu._closeMarginsRestore = null;
-            } else {
-                this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
+            if (this.menu._closeEaseRestore) {
+                delete this.menu.actor.ease;
+                this.menu._closeEaseRestore = false;
             }
+            this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
             this._applyPopupWidth();
             if (this.menu._closePositionFrozen) {
                 delete this.menu._calculatePosition;
@@ -2657,7 +2662,10 @@ class ZUsageApplet extends Applet.Applet {
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {
-            if (!armed || fitting) return;
+            // Converged means done for this open: every further allocation
+            // (hover tooltips, scroll churn) would re-apply the base font
+            // and visibly pulse the line.
+            if (!armed || converged || fitting) return;
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return;
             fitting = true;
@@ -3896,9 +3904,19 @@ class ZUsageApplet extends Applet.Applet {
         // abruptly and the blue rings get clipped from the right. Zero the
         // margins for the close so the slide is the subtle 12px nudge; the
         // animated-closed handler restores them.
-        menu._closeMarginsRestore = [menu.actor.margin_left, menu.actor.margin_right];
-        menu.actor.margin_left = 0;
-        menu.actor.margin_right = 0;
+        // Strip x/y from the close ease: Cinnamon animates the actor
+        // MENU_ANIMATION_OFFSET (+ theme margins) toward the panel, which
+        // visibly shoved the rings under it. With the position frozen and
+        // the ease reduced to opacity, the close is a pure fade with zero
+        // movement for every element.
+        const actor = menu.actor;
+        menu._closeEaseRestore = true;
+        actor.ease = function (params) {
+            const fadeParams = Object.assign({}, params);
+            delete fadeParams.x;
+            delete fadeParams.y;
+            Clutter.Actor.prototype.ease.call(this, fadeParams);
+        };
     }
 
     _orientationIsVertical(orientation) {
