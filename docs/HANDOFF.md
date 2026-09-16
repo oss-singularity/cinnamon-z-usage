@@ -208,6 +208,7 @@ Open-Position.
   Sync (driftet nicht mehr; sichtbare Kante 386 konstant über Ticks).
   Zusätzlich Ring-Translation-Carry-over über Rebuilds
   (`_carriedRingTranslations`/`_carriedHeaderTx`).
+- **Nachschub 8 (Version 1.0.0 + Buttons + Credits-Revert + Fokus):** Das Applet ist ein NEUES Applet — die erste Veröffentlichung ist **1.0.0** (metadata.json + CHANGELOG angepasst). Footer-Umbau: [Z.ai Chat] [ZCode] / [Refresh now] [Usage] / [Z.ai] [Docs]; der API-Keys-Button wanderte in den Konfigurationsdialog (settings-schema api-keys-page-button, type button → Applet-Callback on_open_api_keys_page_pressed → ZAI_API_KEYS_URL). ZCode-Icon: icons/zcode.svg (Custom-Artwork, `</>` auf dunklem Rounded-Square, Grün-Gradient + blauer Edge). Credits-Fit-Revert: der Grid-Kanten-Target maß mid-settle stale Werte (Zeile endete vor den Buttons) — der Fit misst wieder bis zur Plot-rechten Kante (Sync aligniert Plots AN die Grid-Kante). API-Key-Feld Fokus: Custom-Widget api_key_settings.py (ApiKeyEntryWidget extends JSONSettingsEntry) mit Gtk.GestureMultiPress (CAPTURE) am Top-Level-Window: Press außerhalb des Entries → window.set_focus(None) — der Mechanismus aus dem Upstream-Fix bbce0d5.
 
 - **Crash-Untersuchung (16.09. ~04:29 + ~04:54):** Zwei Cinnamon-SIGSEGVs
   während Rapid-Toggle-Tests, Stacks jeweils in libmozjs (GC-Sweeping);
