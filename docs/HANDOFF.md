@@ -222,6 +222,12 @@ Open-Position.
   beim ersten Hovern (mehrere Sekunden, seit den Deferred-Pässen länger).
   Fix: `converged` gated den fit-Einstieg (`if (!armed || converged ||
   fitting) return`).
+- **Scroll-Dead-Zone WURZEL gefunden (mock-event-Test):**
+  `_forwardContentWheel` las `this._scroll` — auf dem APPLET undefined
+  (das Scrollview gehört zum Menü: `this.menu._scroll`)! Der Guard
+  returnte immer PROPAGATE → das Forwarding war seit Einführung tot.
+  Fix: `this.menu._scroll`. Verifiziert: Mock-DOWN-Event → Haupt-
+  Adjustment +48/Schritt, three calls = +144, EVENT_STOP.
 
 ## 4. Debug-Werkzeuge (erprobt)
 

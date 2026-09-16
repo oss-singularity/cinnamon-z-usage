@@ -510,6 +510,16 @@ class ZUsageApplet extends Applet.Applet {
     _buildMenu(orientation) {
         this.menuManager = new PopupMenu.PopupMenuManager(this);
         this.menu = new UsagePopupMenu(this, orientation);
+        this.menu._scroll.connect("captured-event", (_actor, event) => {
+            // Capture-phase wheel handling: nested scroll views (accordion
+            // leaves) consume wheel events even when their own adjustment
+            // cannot move, dead-zoning scrolling under the pointer. Handle
+            // every wheel step here instead - uniform scrolling everywhere.
+            if (event.type() === Clutter.EventType.SCROLL) {
+                return this._forwardContentWheel(event);
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
         this.menuManager.addMenu(this.menu);
         this._rightPanelMenuStyleBase = this.menu.actor.get_style() || "";
         this._rightPanelMenuBaseMarginRight = this.menu.actor.margin_right;
@@ -1033,6 +1043,15 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
+        // Carry the aligned ring translations across the rebuild so the
+        // refreshed menu opens pre-aligned instead of visibly jumping when
+        // the deferred sync catches up.
+        const carriedRingTranslations = (this._countdownWidgets || []).map(entry =>
+            entry.actor && !entry.actor.is_finalized() ? entry.actor.translation_x : null);
+        const carriedHeaderTx = this._headerRings && !this._headerRings.is_finalized()
+            ? this._headerRings.translation_x : null;
+        this._carriedRingTranslations = carriedRingTranslations;
+        this._carriedHeaderTx = carriedHeaderTx;
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -1102,6 +1121,8 @@ class ZUsageApplet extends Applet.Applet {
                 return GLib.SOURCE_REMOVE;
             });
         }
+        this._carriedRingTranslations = null;
+        this._carriedHeaderTx = null;
     }
 
     _scheduleMenuRebuild() {
@@ -1199,6 +1220,7 @@ class ZUsageApplet extends Applet.Applet {
             rings.translation_x = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
+            if (typeof this._carriedHeaderTx === "number") rings.translation_x = this._carriedHeaderTx;
             for (const summary of summaries) {
                 rings.add_child(
                     this._createQuotaRing(
@@ -1478,6 +1500,8 @@ class ZUsageApplet extends Applet.Applet {
             window,
             tooltip: this._createPositionedTooltip(actor, tooltipText)
         };
+        const carried = (this._carriedRingTranslations || [])[this._countdownWidgets.length];
+        if (typeof carried === "number") actor.translation_x = carried;
         this._countdownWidgets.push(entry);
         this._updateResetCountdown(entry);
         return actor;
@@ -2927,11 +2951,11 @@ class ZUsageApplet extends Applet.Applet {
         ) || source[0] || null;
     }
 
-    _forwardLeafScroll(event) {
-        if (!this.menu || !this.menu.isOpen || !this._scroll) {
+    _forwardContentWheel(event) {
+        if (!this.menu || !this.menu.isOpen || !this.menu._scroll) {
             return Clutter.EVENT_PROPAGATE;
         }
-        const adjustment = this._scroll.get_vscroll_bar().get_adjustment();
+        const adjustment = this.menu._scroll.get_vscroll_bar().get_adjustment();
         const direction = event.get_scroll_direction();
         const step = 48;
         if (direction === Clutter.ScrollDirection.SMOOTH) {
@@ -2991,6 +3015,13 @@ class ZUsageApplet extends Applet.Applet {
                 // Hide the whole bin; Cinnamon's submenu animation still
                 // rotates the hidden icon harmlessly.
                 submenu._triangleBin.hide();
+                // The leaf never needs its own scrollbar - the main scroll
+                // view scrolls the whole content. An AUTOMATIC policy here
+                // only creates an inert adjustment whose wheel handler
+                // dead-zones scrolling while the pointer is over the leaf.
+                if ("vscrollbar_policy" in submenu.menu.actor) {
+                    submenu.menu.actor.vscrollbar_policy = St.PolicyType.NEVER;
+                }
                 if ("overlay_scrollbars" in submenu.menu.actor) {
                     submenu.menu.actor.overlay_scrollbars = true;
                 }
@@ -3016,13 +3047,6 @@ class ZUsageApplet extends Applet.Applet {
                 submenu.actor.label_actor = submenuLabel;
                 this.menu.addMenuItem(submenu);
                 this._historySubmenus.push({ id: limitId, submenu });
-                submenu.menu.actor.connect("scroll-event", (_actor, event) => {
-                    // The nested scroll view swallows wheel events even when
-                    // its own adjustment cannot move, which dead-zones the
-                    // whole expanded leaf. Forward every wheel step to the
-                    // main scroll view so scrolling works anywhere.
-                    return this._forwardLeafScroll(event);
-                });
                 submenu.menu.connect("open-state-changed", (_menu, open) => {
                     if (open) {
                         // Nested submenu content does not participate in the
