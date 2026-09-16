@@ -627,7 +627,10 @@ class ZUsageApplet extends Applet.Applet {
         // The credits consumption line ends flush with the grid edge, same
         // anchor, same convergence rules as the rings: shift the whole label
         // block by translating its row so the last label's right edge meets
-        // the anchor.
+        // the anchor. Not before the font fit has converged, though - the
+        // fit pass owns the text size until then, and translating a row the
+        // fit is still reshaping starts the align/fight cycle.
+        if (this._creditsFit && !this._creditsFit.isConverged()) return;
         for (const entry of this._creditsAlignRows || []) {
             const { row, tail } = entry;
             if (!tail || tail.is_finalized() || !row.visible) continue;
@@ -637,12 +640,6 @@ class ZUsageApplet extends Applet.Applet {
             const delta = right - Math.round(current);
             if (Math.abs(delta) > POPUP_WIDTH) continue;
             row.translation_x += delta;
-            // Once the end sits on the anchor, stop the fit pass from
-            // reacting to chart allocations - it would shrink the font and
-            // start the align/fight cycle over again.
-            if (this._creditsFit && Math.abs(delta) <= 3) {
-                this._creditsFit.setArmed(false);
-            }
         }
     }
 
@@ -2589,11 +2586,14 @@ class ZUsageApplet extends Applet.Applet {
     ) {
         let fitting = false;
         // The fit pass and the edge sync both position this row; running
-        // both forever makes them fight through chart allocations (the
-        // charts get yanked by the relayout chains). Fit is armed only
-        // until its font size has converged once per open; afterwards the
-        // sync alone owns the placement.
+        // both at once makes them fight through chart allocations (the
+        // charts get yanked by the relayout chains). The fit pass tracks
+        // its own convergence: once two consecutive passes agree on the
+        // font size it reports converged and stops reacting, and only then
+        // does the edge sync translate the row onto the grid anchor.
         let armed = true;
+        let converged = false;
+        let lastFont = null;
         let plotActor = null;
         let plotAllocationId = 0;
 
@@ -2678,6 +2678,12 @@ class ZUsageApplet extends Applet.Applet {
                     );
                     applyFontSize(fontSize);
                 }
+                // Two passes agreeing on the font size means the fit has
+                // settled: from now on the edge sync owns the placement.
+                if (lastFont !== null && Math.abs(lastFont - fontSize) < 0.05) {
+                    converged = true;
+                }
+                lastFont = fontSize;
             } finally {
                 fitting = false;
             }
@@ -2690,8 +2696,14 @@ class ZUsageApplet extends Applet.Applet {
             return GLib.SOURCE_REMOVE;
         });
         return {
-            fit,
-            setArmed: value => { armed = value; }
+            setArmed: value => {
+                armed = value;
+                if (value) {
+                    converged = false;
+                    lastFont = null;
+                }
+            },
+            isConverged: () => converged
         };
     }
 

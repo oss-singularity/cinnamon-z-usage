@@ -177,6 +177,12 @@ Open-Position.
   + deferred Re-Queues (120ms/400ms) am Ende von `_rebuildMenu`. Isoliert:
   Rebuild bei offenem Popup konvergiert in <300ms zurück auf chW=402/
   credR==gR.
+- **Nachschub 4 (live, Screen-Recording 04.41.32):** Das Delta-basierte
+  Disarm war falsch — der Fit konnte NACH dem Disarm die Fontgröße noch
+  ändern (Credits Ende wanderte), und der Sync übersetzte gegen die alte
+  Geometrie. Neu: der Fit trackt seine Konvergenz selbst (zwei Pässe
+  gleicher Fontgröße → `isConverged()`), der Sync übersetzt die
+  Credits-Zeile erst NACH Konvergenz, Re-Arm pro fresh open.
 
 ## 4. Debug-Werkzeuge (erprobt)
 
