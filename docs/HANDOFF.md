@@ -117,7 +117,7 @@ referenziert das Icon weiter); das Sync-Loop für Pfeile ist weg.
 Der Frame-Chrome frass 8px des Viewport-Budgets (`maxMenu - header - footer
 
 - 8`); Content, der nur 3–5px über dem Viewport lag, bekam deshalb einen
-Scrollbalken. Jetzt `- 2`— der Viewport kann bis auf 2px an das Budget
+Scrollbalken. Jetzt `- 2` — der Viewport kann bis auf 2px an das Budget
 heran; die 16px-Luft unter dem Top-Panel bleiben erhalten (Frame bleibt
 ≤ maxMenu). Messung:`viewport == contentNat`→`upper - page_size == 0`
   (kein Scrollbalken), Overflow-Fälle klappen weiter.

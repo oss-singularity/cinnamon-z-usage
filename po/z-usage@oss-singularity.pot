@@ -482,6 +482,10 @@ msgid "Open the Z.ai chat web app"
 msgstr ""
 
 #: applet.js
+msgid "Open the Z.ai coding plan usage statistics"
+msgstr ""
+
+#: applet.js
 msgid "Open the ZCode coding agent"
 msgstr ""
 
@@ -635,7 +639,7 @@ msgstr ""
 msgid "Updating…"
 msgstr ""
 
-#: usage-format.js
+#: applet.js usage-format.js
 msgid "Usage"
 msgstr ""
 

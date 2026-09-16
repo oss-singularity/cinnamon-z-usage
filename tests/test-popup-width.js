@@ -13,12 +13,6 @@ class Actor {
     add_child() {}
 }
 
-class FakeAdjustment {
-    constructor() { this.value = 0; }
-    set_value(v) { this.value = v; }
-    get_value() { return this.value; }
-}
-
 class Scroll extends Actor {
     constructor() {
         super();
