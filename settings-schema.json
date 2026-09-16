@@ -1,21 +1,35 @@
 {
   "layout": {
     "type": "layout",
-    "pages": ["general-page", "colors-page", "notifications-page"],
+    "pages": [
+      "general-page",
+      "colors-page",
+      "notifications-page"
+    ],
     "general-page": {
       "type": "page",
       "title": "General",
-      "sections": ["data-section", "display-section"]
+      "sections": [
+        "data-section",
+        "display-section"
+      ]
     },
     "colors-page": {
       "type": "page",
       "title": "Colors",
-      "sections": ["panel-color-section", "color-section", "threshold-section"]
+      "sections": [
+        "panel-color-section",
+        "color-section",
+        "threshold-section"
+      ]
     },
     "notifications-page": {
       "type": "page",
       "title": "Notifications",
-      "sections": ["reset-notification-section", "low-notification-section"]
+      "sections": [
+        "reset-notification-section",
+        "low-notification-section"
+      ]
     },
     "data-section": {
       "type": "section",
@@ -45,17 +59,28 @@
     "panel-color-section": {
       "type": "section",
       "title": "Panel text",
-      "keys": ["panel-text-color", "show-panel-threshold-colors"]
+      "keys": [
+        "panel-text-color",
+        "show-panel-threshold-colors"
+      ]
     },
     "color-section": {
       "type": "section",
       "title": "Colors",
-      "keys": ["show-colors", "normal-color", "warning-color", "critical-color"]
+      "keys": [
+        "show-colors",
+        "normal-color",
+        "warning-color",
+        "critical-color"
+      ]
     },
     "threshold-section": {
       "type": "section",
       "title": "Remaining usage thresholds",
-      "keys": ["warning-remaining", "critical-remaining"]
+      "keys": [
+        "warning-remaining",
+        "critical-remaining"
+      ]
     },
     "reset-notification-section": {
       "type": "section",
@@ -102,6 +127,12 @@
     "default": "",
     "description": "Z.ai API key (optional)",
     "tooltip": "Leave empty for automatic detection: the applet reuses the Coding Plan API key of the signed-in ZCode app, then falls back to the ZAI_API_KEY environment variable and the ~/.config/cinnamon-z-usage/api-key file."
+  },
+  "api-keys-page-button": {
+    "type": "button",
+    "description": "Open the Z.ai API keys page",
+    "callback": "on_open_api_keys_page_pressed",
+    "tooltip": "Opens the Z.ai API key management page in your browser."
   },
   "show-panel-icon": {
     "type": "switch",
@@ -160,7 +191,7 @@
   },
   "separator": {
     "type": "entry",
-    "default": "\u00b7",
+    "default": "·",
     "description": "Separator in horizontal panels",
     "tooltip": "Separators are hidden automatically in vertical panels."
   },
@@ -334,17 +365,17 @@
     "units": "%",
     "description": "7d warning at or below"
   },
-    "weekly-critical-remaining-control": {
-      "type": "custom",
-      "file": "notification_settings.py",
-      "widget": "NotificationThresholdWidget",
-      "default": "",
-      "setting-key": "weekly-critical-remaining",
-      "dependency-key": "enable-weekly-low-notifications",
-      "min": 0,
-      "max": 99,
-      "step": 1,
-      "units": "%",
-      "description": "7d critical at or below"
-    }
+  "weekly-critical-remaining-control": {
+    "type": "custom",
+    "file": "notification_settings.py",
+    "widget": "NotificationThresholdWidget",
+    "default": "",
+    "setting-key": "weekly-critical-remaining",
+    "dependency-key": "enable-weekly-low-notifications",
+    "min": 0,
+    "max": 99,
+    "step": 1,
+    "units": "%",
+    "description": "7d critical at or below"
   }
+}

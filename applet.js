@@ -2021,6 +2021,10 @@ class ZUsageApplet extends Applet.Applet {
         }
     }
 
+    on_open_api_keys_page_pressed() {
+        Util.spawn(["xdg-open", ZAI_API_KEYS_URL]);
+    }
+
     _addLaunchButtons() {
         const item = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
@@ -2071,12 +2075,12 @@ class ZUsageApplet extends Applet.Applet {
             () => Util.spawn(["xdg-open", ZAI_URL]),
             _("Open the Z.ai chat web app")
         );
-        this._usageButton = this._createLaunchButton(
-            _("Usage"),
-            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true },
+        this._zcodeButton = this._createLaunchButton(
+            _("ZCode"),
+            { fileName: "zcode.svg" },
             true,
-            () => Util.spawn(["xdg-open", ZAI_USAGE_URL]),
-            _("Open the Z.ai coding plan usage statistics")
+            () => Util.spawn(["zcode"]),
+            _("Open the ZCode coding agent")
         );
         const refreshConfirmed = this._refreshConfirmed;
         this._refreshButton = this._createLaunchButton(
@@ -2112,16 +2116,6 @@ class ZUsageApplet extends Applet.Applet {
             0
         );
         this._syncRefreshButtonState();
-        const apiKeysButton = this._createLaunchButton(
-            _("API Keys"),
-            {
-                fileName: "web-browser-symbolic.svg",
-                symbolic: true,
-                compact: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", ZAI_API_KEYS_URL])
-        );
         const zaiWebButton = this._createLaunchButton(
             "Z.ai",
             {
@@ -2145,9 +2139,9 @@ class ZUsageApplet extends Applet.Applet {
             () => Util.spawn(["xdg-open", ZAI_DOCS_URL])
         );
         launchRow.add_child(this._chatButton);
-        launchRow.add_child(this._usageButton);
+        launchRow.add_child(this._zcodeButton);
         utilityRow.add_child(this._refreshButton);
-        utilityRow.add_child(apiKeysButton);
+        utilityRow.add_child(this._usageButton);
         webRow.add_child(zaiWebButton);
         webRow.add_child(docsButton);
         column.add_child(launchRow);
@@ -2685,30 +2679,19 @@ class ZUsageApplet extends Applet.Applet {
             findPlot();
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return 0;
-            // The text starts in the normal left column and should end at
-            // the button grid's right edge - measure that distance and let
-            // the font shrink until the line fits it.
-            let targetRight = null;
-            if (this._actionWidthFrame && !this._actionWidthFrame.is_finalized()) {
-                const gv = this._actionWidthFrame.get_abs_allocation_vertices();
-                targetRight = Math.max(gv[1].x, gv[2].x);
+            if (!plotActor || !(plotActor.get_width() > 0)) {
+                const rowSize = row.get_transformed_size();
+                const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
+                return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
             }
             const [rowX] = row.get_transformed_position();
+            const [plotX] = plotActor.get_transformed_position();
+            const [plotWidth] = plotActor.get_transformed_size();
             const [rowWidthTransformed] = row.get_transformed_size();
             const scale = rowWidthTransformed > 0
                 ? rowWidthTransformed / rowWidth
                 : 1;
-            let width;
-            if (targetRight !== null && Number.isFinite(rowX)) {
-                width = (targetRight - rowX) / scale;
-            } else if (!plotActor || !(plotActor.get_width() > 0)) {
-                const rowSize = row.get_transformed_size();
-                width = rowWidth - POPUP_CHART_RIGHT_INSET / (scale || 1);
-            } else {
-                const [plotX] = plotActor.get_transformed_position();
-                const [plotWidth] = plotActor.get_transformed_size();
-                width = (plotX + plotWidth - rowX) / scale;
-            }
+            const width = (plotX + plotWidth - rowX) / scale;
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {

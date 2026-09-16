@@ -6,7 +6,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Z Usage Monitor 0.1.0\n"
+"Project-Id-Version: Z Usage Monitor 1.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/oss-singularity/cinnamon-z-usage/issues\n"
 "POT-Creation-Date: 2026-09-08 00:00+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -274,10 +274,6 @@ msgid "AIC"
 msgstr ""
 
 #: applet.js
-msgid "API Keys"
-msgstr ""
-
-#: applet.js
 msgid "About..."
 msgstr ""
 
@@ -477,16 +473,24 @@ msgstr ""
 msgid "One reset credit was consumed. Usage limits are refreshing."
 msgstr ""
 
+#: settings-schema.json.js
+msgid "Open the Z.ai API keys page"
+msgstr ""
+
 #: applet.js
 msgid "Open the Z.ai chat web app"
 msgstr ""
 
 #: applet.js
-msgid "Open the Z.ai coding plan usage statistics"
+msgid "Open the ZCode coding agent"
 msgstr ""
 
 #: settings-schema.json.js
 msgid "Open the ZCode plan sections by default whenever the popup is rebuilt. Manual collapsing still works per popup."
+msgstr ""
+
+#: settings-schema.json.js
+msgid "Opens the Z.ai API key management page in your browser."
 msgstr ""
 
 #: z_usage.py
@@ -631,7 +635,7 @@ msgstr ""
 msgid "Updating…"
 msgstr ""
 
-#: applet.js usage-format.js
+#: usage-format.js
 msgid "Usage"
 msgstr ""
 
@@ -720,6 +724,10 @@ msgstr ""
 
 #: z_usage.py
 msgid "Z.ai returned no usage data"
+msgstr ""
+
+#: applet.js
+msgid "ZCode"
 msgstr ""
 
 #: z_usage.py

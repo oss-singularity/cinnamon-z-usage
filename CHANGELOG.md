@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 0.2.0 (planned)
+## Unreleased — 1.0.0 (planned)
 
 - Deterministic popup height: the height clamp computes the header, scroll
   viewport and footer sizes from the real naturals before Cinnamon positions

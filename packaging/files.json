@@ -20,5 +20,7 @@
   "icons/web-browser-symbolic.svg": "icons/web-browser-symbolic.svg",
   "notification_settings.py": "notification_settings.py",
   "z_usage.py": "z_usage.py",
-  "po/z-usage@oss-singularity.pot": "po/z-usage@oss-singularity.pot"
+  "po/z-usage@oss-singularity.pot": "po/z-usage@oss-singularity.pot",
+  "icons/zcode.svg": "icons/zcode.svg",
+  "api_key_settings.py": "api_key_settings.py"
 }

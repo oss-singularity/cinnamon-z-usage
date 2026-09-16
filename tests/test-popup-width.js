@@ -13,10 +13,31 @@ class Actor {
     add_child() {}
 }
 
+class FakeAdjustment {
+    constructor() { this.value = 0; }
+    set_value(v) { this.value = v; }
+    get_value() { return this.value; }
+}
+
+class FakeScrollBar {
+    constructor() { this.adjustment = new FakeAdjustment(); }
+    get_adjustment() { return this.adjustment; }
+}
+
+class Scroll extends Actor {
+    constructor() {
+        super();
+        this.vscrollbar = new Actor();
+    }
+    connect() { return 1; }
+    get_vscroll_bar() { return this.vscrollbar; }
+}
+
 class Menu {
     constructor() {
         this.actor = new Actor();
         this.box = new Actor();
+        this._scroll = new Scroll();
         this.isOpen = false;
     }
     connect() { return 1; }
@@ -43,7 +64,7 @@ const AppletClass = new Function("imports", "require", "global",
         misc: {},
         gi: { St: {
             PolicyType: { AUTOMATIC: 1, NEVER: 0 },
-            ScrollView: class extends Actor { set_policy() {} add_actor() {} },
+            ScrollView: class extends Actor { set_policy() {} add_actor() {} connect() { return 1; } },
             BoxLayout: class extends Actor { add_child() {} remove_all_children() {} get_children() { return []; } }
         } }
     },
