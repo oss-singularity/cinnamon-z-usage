@@ -229,7 +229,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._submenuTriangles = [];
+        this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
         this._rightPanelPopupCloseSeq = 0;
@@ -540,6 +540,7 @@ class ZUsageApplet extends Applet.Applet {
     _syncActionColumnCentering() {
         if (
             !this.menu ||
+            !this.menu.isOpen ||
             !this._actionWidthFrame ||
             !this._actionWidthFrame.get_stage()
         ) return;
@@ -557,11 +558,26 @@ class ZUsageApplet extends Applet.Applet {
         this._syncContentRightEdges();
     }
 
+    // Allocation notifications fire mid-relayout, when the actor tree holds
+    // mixed old/new allocations. Syncing from those reads can latch a bogus
+    // ring/grid offset with no later correction (the wild-scroll ring shift).
+    // Queue the work for an idle instead: one run per frame, only on the
+    // settled layout, coalescing allocation storms.
+    _queueActionEdgeSync() {
+        if (typeof Mainloop === "undefined" || this._actionEdgeSyncQueuedId) return;
+        this._actionEdgeSyncQueuedId = Mainloop.idle_add(() => {
+            this._actionEdgeSyncQueuedId = 0;
+            if (this._destroyed) return GLib.SOURCE_REMOVE;
+            this._syncActionColumnCentering();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
     _syncContentRightEdges() {
         if (!this.menu || !this.menu.isOpen) return;
         if (!this._actionWidthFrame) return;
-        // Anchor: the button grid's right edge - rings, disclosure arrows and
-        // charts close flush with it (the original design).
+        // Anchor: the button grid's right edge - rings and charts close
+        // flush with it (the original design).
         const [gridX] = this._actionWidthFrame.get_transformed_position();
         const [gridWidth] = this._actionWidthFrame.get_transformed_size();
         if (gridWidth <= 0) return;
@@ -573,24 +589,22 @@ class ZUsageApplet extends Applet.Applet {
             if (width <= 0) continue;
             // Per-ring absolute alignment: the painted right edge (the glow
             // ends one pixel inside) goes to the anchor, so repeated syncs
-            // converge instead of drifting.
+            // converge instead of drifting. A delta beyond the popup width
+            // can only come from a mid-relayout read - ignore it instead of
+            // latching a shift that flings the rings toward the panel.
             const current = actor.get_transformed_position()[0] + width - 1;
-            actor.translation_x += right - Math.round(current);
+            const delta = right - Math.round(current);
+            if (Math.abs(delta) > POPUP_WIDTH) continue;
+            actor.translation_x += delta;
         }
-        const arrows = this._submenuTriangles || [];
-        for (const actor of arrows) {
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // The transformed origin is not the bounding-box left edge after
-            // Cinnamon rotates the disclosure. Measure the actual vertices.
-            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
-            const layoutEdge = edge - actor.translation_x;
-            actor.translation_x = Math.round(right - layoutEdge);
-        }
+        const chartLimit = this._popupWidth() * 1.5;
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
             const width = Math.max(1, Math.round(right - x + padding));
+            // Charts span from their row to the grid edge; anything wider is
+            // a stale read (mid-scroll or mid-relayout), never a real width.
+            if (width > chartLimit) continue;
             if (!chart.min_width_set || chart.min_width !== width) this._forceActorWidth(chart, width);
         }
     }
@@ -977,7 +991,6 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._submenuTriangles = [];
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -1342,7 +1355,7 @@ class ZUsageApplet extends Applet.Applet {
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
                 this._clampPopupHeight();
-                this._syncContentRightEdges();
+                this._queueActionEdgeSync();
                 if (open && rows.length > 0 && typeof Mainloop !== "undefined" &&
                     !this._suppressSectionAutoScroll && this.menu && this.menu.isOpen) {
                     Mainloop.idle_add(() => {
@@ -1925,7 +1938,7 @@ class ZUsageApplet extends Applet.Applet {
         this._actionColumn = column;
         actionFrame.connect(
             "notify::allocation",
-            () => this._syncActionColumnCentering()
+            () => this._queueActionEdgeSync()
         );
         if (this._actionColumnWidth > 0) {
             this._setActionColumnWidth(Math.round(this._actionColumnWidth * this._popupWidth() / POPUP_WIDTH));
@@ -2852,7 +2865,12 @@ class ZUsageApplet extends Applet.Applet {
                     ""
                 );
                 submenu.actor.style = `padding-right: ${POPUP_RIGHT_INSET}px;`;
-                this._submenuTriangles.push(submenu._triangle);
+                // The native disclosure arrow flashed on collapse and its
+                // alignment kept fighting the grid (same call as the section
+                // arrows): expand/collapse is communicated by the leaf rows.
+                // Hide the whole bin; Cinnamon's submenu animation still
+                // rotates the hidden icon harmlessly.
+                submenu._triangleBin.hide();
                 if ("overlay_scrollbars" in submenu.menu.actor) {
                     submenu.menu.actor.overlay_scrollbars = true;
                 }
@@ -3279,7 +3297,7 @@ class ZUsageApplet extends Applet.Applet {
                 expandedWithScrollbar
             );
         }
-        this._syncContentRightEdges();
+        this._queueActionEdgeSync();
         if (this.menu.isOpen) {
             this._lockPopupLayoutWidth();
             this._clampPopupHeight();
@@ -3688,7 +3706,11 @@ class ZUsageApplet extends Applet.Applet {
         } catch (error) {}
         const maxMenu = Math.max(240, monitor.height - topReserve - bottomReserve);
         if (!this._popupFrameHeight) {
-            const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 8));
+            // Only 2px of frame chrome: a larger reserve would show the
+            // scrollbar in the default view whenever the natural content
+            // exceeds the viewport by a few pixels. The 16px top-panel
+            // slack absorbs the difference instead.
+            const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 2));
             this._popupViewport = viewport;
             this._popupFrameHeight = headerNat + viewport + footerNat + 2;
         }
@@ -3747,6 +3769,10 @@ class ZUsageApplet extends Applet.Applet {
     on_applet_removed_from_panel() {
         this._destroyed = true;
         if (this.menu && this.menu.isOpen) this.menu.close(false);
+        if (this._actionEdgeSyncQueuedId) {
+            Mainloop.source_remove(this._actionEdgeSyncQueuedId);
+            this._actionEdgeSyncQueuedId = 0;
+        }
         if (this._timeoutId) {
             Mainloop.source_remove(this._timeoutId);
             this._timeoutId = 0;

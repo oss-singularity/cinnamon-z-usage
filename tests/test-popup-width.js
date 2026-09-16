@@ -65,7 +65,6 @@ for (const orientation of ["top", "bottom", "left", "right"]) {
         _limitSections: [],
         _popupRightInsetRows: [],
         _activityCharts: [],
-        _submenuTriangles: [],
         _rebuildMenu() {},
         _openActiveSparkHistory() {}
     });

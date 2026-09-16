@@ -73,7 +73,46 @@ des Monitors (`getPanelsInMonitor` + `get_transformed_position/size`;
 bottomReserve). Isoliert: Popup `aY=63` (Top-Panel-Unterkante 40 + 16px
 Reserve), Header vollständig sichtbar.
 
+## 3b. RUNDE 2 (2026-09-16, Final-Check-Feedback — isoliert bewiesen)
+
+### Scroll-Drift — Ringe springen bei wildem Scrollen unters Panel — GEFIXT
+
+**Mechanismus:** `_syncActionColumnCentering` hing direkt an
+`notify::allocation` des Footers und lief damit MITTEN im Relayout — die
+gelesenen transformed-Positionen sind dann ein Mix aus alten/neuen
+Allocations; ein solcher bogus-Delta wurde in die Ring-Translation
+eingelatcht (und blieb, wenn danach keine Allocation mehr folgte).
+
+**Fix:** Syncs laufen jetzt queued per `Mainloop.idle_add`
+(`_queueActionEdgeSync` — eine Ausführung pro Frame, erst auf der
+konsolidierten Layout-Basis; Sturm-Allocations koaleszieren). Dazu
+`isOpen`-Guard im Centering (kein Re-Centering mehr im Close-Pfad) und
+Delta-Klemmen in `_syncContentRightEdges` (Ring-Deltas > POPUP_WIDTH und
+Chart-Breiten > 1.5×POPUP_WIDTH werden als Stale-Reads ignoriert).
+
+**Beweis (isoliert, Realistik-Demo mit History-Charts + offenem Akkordeon):**
+40 harte Scroll-Sprünge + Section-Toggles im Sturm → Ringe/Grid/Actor
+konstant (`rX=1736..1848, gR=1847, aX=1461`); Close starr +10px gemeinsam;
+Re-Open exakt.
+
+### Weiße Submenu-Pfeile (Recent consumption) — ENTFERNT
+
+Wie bei den Section-Arrows (bdd5c10): Das native Disclosure-Icon blieb beim
+Zuklappen als Blitz stehen und kämpfte gegen das Grid. Das `_triangleBin`
+wird versteckt (`hide()` — nicht destroy: Cinnamons SubMenu-Animation
+referenziert das Icon weiter); das Sync-Loop für Pfeile ist weg.
+
+### 3–5px-Scrollbalken im Default-View — GEFIXT
+
+Der Frame-Chrome frass 8px des Viewport-Budgets (`maxMenu - header - footer
+- 8`); Content, der nur 3–5px über dem Viewport lag, bekam deshalb einen
+Scrollbalken. Jetzt `- 2` — der Viewport kann bis auf 2px an das Budget
+heran; die 16px-Luft unter dem Top-Panel bleiben erhalten (Frame bleibt
+≤ maxMenu). Messung: `viewport == contentNat` → `upper - page_size == 0`
+(kein Scrollbalken), Overflow-Fälle klappen weiter.
+
 ## 4. Debug-Werkzeuge (erprobt)
+
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
 

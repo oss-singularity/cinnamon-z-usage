@@ -26,10 +26,13 @@ for (const menuX of [1461, 900]) {
                 get_transformed_size() { return [352 + error, 122]; }
             };
             const applet = Object.create(AppletClass.prototype);
-            applet.menu = { actor: {
-                get_transformed_position() { return [menuX - error, 0]; },
-                get_transformed_size() { return [menuWidth - error, 665]; }
-            } };
+            applet.menu = {
+                isOpen: true,
+                actor: {
+                    get_transformed_position() { return [menuX - error, 0]; },
+                    get_transformed_size() { return [menuWidth - error, 665]; }
+                }
+            };
             applet._actionWidthFrame = frame;
             const expected = menuWidth === 419 ? -14 : 0;
             for (let refresh = 0; refresh < 3; refresh++) {
@@ -48,33 +51,27 @@ for (const menuX of [1461, 900]) {
 
 print("Action centering regression tests passed.");
 
-// Model visibility changes native column minimums. Rings, disclosure arrows
-// and the plot edge align to the popup's own content right edge (a stable
-// geometric anchor), repeated syncs must be idempotent.
+// Model visibility changes native column minimums. Rings and the plot edge
+// align to the popup's own content right edge (a stable geometric anchor);
+// repeated syncs must be idempotent and stale mid-layout reads are ignored.
+// Every mock lives inside the popup's own coordinate space, like real
+// allocations - offsets wider than the popup cannot be real alignments and
+// are ignored by production (the wild-scroll guard).
 for (const scale of [1, 1.25, 2]) {
     for (const menuX of [1461, 900]) {
         for (const naturalShift of [0, -28, 15]) {
             const ring = {
                 translation_x: -14,
-                get_transformed_position() { return [390 + naturalShift + this.translation_x, 0]; },
+                get_transformed_position() {
+                    return [menuX + 348 + naturalShift + this.translation_x, 0];
+                },
                 get_transformed_size() { return [52, 52]; }
             };
             const chart = {
                 width: 374 + naturalShift,
-                get_transformed_position() { return [110, 0]; },
+                get_transformed_position() { return [menuX + 110, 0]; },
                 get_theme_node() { return { get_padding() { return 39; } }; },
                 set_width(width) { this.width = width; }
-            };
-            const triangle = {
-                translation_x: 0,
-                get_transformed_position() {
-                    return [480 + naturalShift + this.translation_x, 0];
-                },
-                get_abs_allocation_vertices() {
-                    const x = 480 + naturalShift + this.translation_x;
-                    return [{ x }, { x: x + 12 }, { x }, { x: x + 12 }];
-                },
-                get_transformed_size() { return [12, 12]; }
             };
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
@@ -88,25 +85,20 @@ for (const scale of [1, 1.25, 2]) {
                     get_transformed_size() { return [352, 0]; }
                 },
                 _countdownWidgets: [{ actor: ring }],
-                _submenuTriangles: [triangle],
                 _activityCharts: [{ chart }]
             });
             for (let rebuild = 0; rebuild < 3; rebuild++) {
                 applet._syncContentRightEdges();
                 const ringRight = ring.get_transformed_position()[0] + 51;
-                if (ringRight !== right || chart.width !== right - 110 + 39) {
+                if (ringRight !== right || chart.width !== right - (menuX + 110) + 39) {
                     throw new Error(
                         `Content edge drift after model/layout change: scale=${scale}, ` +
                         `menuX=${menuX}, shift=${naturalShift}, ringRight=${ringRight}, ` +
                         `expected=${right}`
                     );
                 }
-                const triEdge = Math.max(...triangle.get_abs_allocation_vertices().map(v => v.x));
-                if (triEdge !== right) {
-                    throw new Error(`Disclosure drift: scale=${scale}, shift=${naturalShift}, edge=${triEdge}`);
-                }
             }
         }
     }
 }
-print("Content alignment: rings and arrows keep their designed positions, the plot edge follows the button grid.");
+print("Content alignment: rings keep their designed positions, the plot edge follows the button grid.");
