@@ -1,5 +1,15 @@
 # HANDOFF — Z Usage Monitor (oss-oo/z-usage-poc)
 
+> **Repo-Migration 16.09. (nachts):** `oss-singularity/cinnamon-z-usage`
+> ist jetzt der ECHTE GitHub-Fork von `cinnamon-chatgpt-usage`
+> (`isFork: true`, Fork-Point = upstream main/1.0.6, Hash ae51b1e —
+> identisch zum alten main). Der POC-Branch oss-oo/z-usage-poc (94efbf6)
+> wurde verifiziert hinübergeschoben; das alte Nicht-Fork-Repo lebt
+> weiter als `cinnamon-z-usage-old` (löschte Claudiu manuell; der
+> `delete_repo`-Scope fehlt der headless gh-Auth). Draft-PR #1 wurde im
+> neuen Repo neu erstellt. Offen manuell: Repo-Description/Topics und
+> Social-Preview-Upload im GitHub-UI (wandern nicht mit).
+
 > **Für die Schwester-Session:** Diese Datei ist der vollständige Kontext.
 > Lies sie VOR allen Änderungen. Sie wird bei jedem Arbeitsstand aktualisiert.
 
