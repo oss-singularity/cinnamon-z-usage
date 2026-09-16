@@ -167,6 +167,16 @@ Open-Position.
   (Credits-Delta ≤ 3px im Sync) bewaffnet, danach besitzt allein der Sync
   die Platzierung; Re-Arm bei jedem fresh open. Isoliert: credR==gR==1847
   konstant über open/settle/wheel/close/reopen, chW konstant 402.
+- **Nachschub 3 (live, Screen-Recording 04.35.52 + Live-Poll):** Der große
+  Graph-Sprung passiert bei DATEN-REFRESH mitten im offenen Popup:
+  `_rebuildMenu` ersetzt alle Charts (min_width_set=false → Naturbreite!),
+  und der eine queued Sync rennte der ersten Allocation der neuen Actors
+  voraus und skipte (width > chartLimit) — danach lief nie wieder etwas
+  (Live-Poll: chW 402 → 0, credTx 59 → 0 innerhalb von 0.4s). Fix: jede
+  Chart-Allocation re-queued den Sync (`chart.connect("notify::allocation")`)
+  + deferred Re-Queues (120ms/400ms) am Ende von `_rebuildMenu`. Isoliert:
+  Rebuild bei offenem Popup konvergiert in <300ms zurück auf chW=402/
+  credR==gR.
 
 ## 4. Debug-Werkzeuge (erprobt)
 

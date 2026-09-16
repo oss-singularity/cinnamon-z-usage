@@ -1083,6 +1083,22 @@ class ZUsageApplet extends Applet.Applet {
             }
             if (this.menu.isOpen) this._clampPopupHeight();
         }
+
+        // A rebuild replaces every aligned actor while the popup may be
+        // open; one queued sync can race ahead of the fresh actors' first
+        // allocation and skip them. Re-queue on deferred passes so rings,
+        // charts and the credits line always converge after a rebuild.
+        if (typeof Mainloop !== "undefined") {
+            this._queueActionEdgeSync();
+            Mainloop.timeout_add(120, () => {
+                if (!this._destroyed) this._queueActionEdgeSync();
+                return GLib.SOURCE_REMOVE;
+            });
+            Mainloop.timeout_add(400, () => {
+                if (!this._destroyed) this._queueActionEdgeSync();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     _scheduleMenuRebuild() {
@@ -3196,6 +3212,11 @@ class ZUsageApplet extends Applet.Applet {
             chart,
             nested
         });
+        // A rebuild mid-open creates fresh charts with no forced width yet;
+        // the queued sync can race ahead of their first allocation and skip
+        // them, leaving the graph at its natural width for good. Every
+        // chart allocation re-queues the sync so the width always converges.
+        chart.connect("notify::allocation", () => this._queueActionEdgeSync());
 
         const plot = new St.Widget({
             layout_manager: new Clutter.BoxLayout({ homogeneous: true }),
