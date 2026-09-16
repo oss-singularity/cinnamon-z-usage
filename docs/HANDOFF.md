@@ -184,6 +184,15 @@ Open-Position.
   gleicher Fontgröße → `isConverged()`), der Sync übersetzt die
   Credits-Zeile erst NACH Konvergenz, Re-Arm pro fresh open.
 
+- **Crash-Untersuchung (16.09. ~04:29 + ~04:54):** Zwei Cinnamon-SIGSEGVs
+  während Rapid-Toggle-Tests, Stacks jeweils in libmozjs (GC-Sweeping);
+  parallel starb nemo in g_signal_emit — nemo führt Applet-Code nie aus,
+  daher System-Event-Wahrscheinlichkeit; applet-seitig wurde der
+  JSAPI-Sturm aus per-chart allocation-watchern als plausibelster Trigger
+  entfernt (Härtung siehe oben). Coredumps liegen unter
+  /var/lib/apport/coredump bzw. via coredumpctl (PIDs 2323/2218084).
+  Rapid-Toggle-Restrisiko weiter beobachten.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 
