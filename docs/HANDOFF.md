@@ -250,6 +250,7 @@ Open-Position.
   returnte immer PROPAGATE → das Forwarding war seit Einführung tot.
   Fix: `this.menu._scroll`. Verifiziert: Mock-DOWN-Event → Haupt-
   Adjustment +48/Schritt, three calls = +144, EVENT_STOP.
+- **Gruen-Fade-Frust (20.27.56/12.40.44 + Isolier-Messung):** Die Countdown-Arcs zeichnen Glow (alpha 58) und Track (alpha 42) — beim Menu-Fade multipliziert das, der Glow kippt bei ~23% des Fades auf null (gruenue Ringe verschwinden frueher). Fix: waehrend des Closes zeichnen die Arcs mit geboosteter Alpha (Glow 174, Track 126 via `this._closing` im Paint). Isoliert: Gruen haelt ~60% des Fades.
 
 ## 4. Debug-Werkzeuge (erprobt)
 

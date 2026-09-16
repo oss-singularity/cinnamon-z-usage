@@ -1570,17 +1570,21 @@ class ZUsageApplet extends Applet.Applet {
         const progressFraction = Math.max(0, Math.min(1, Number(fraction) || 0));
         const context = area.get_context();
         const foreground = this._menuForeground();
+        // During the close fade the menu opacity multiplies these alphas -
+        // the translucent glow/track would vanish in the first third of the
+        // fade while opaque elements linger. Boost them for the farewell.
+        const closeBoost = this._closing ? 3 : 1;
         const track = new Clutter.Color({
             red: foreground.red,
             green: foreground.green,
             blue: foreground.blue,
-            alpha: 42
+            alpha: Math.min(255, 42 * closeBoost)
         });
         const glow = new Clutter.Color({
             red: progressColor.red,
             green: progressColor.green,
             blue: progressColor.blue,
-            alpha: 58
+            alpha: Math.min(255, 58 * closeBoost)
         });
         const progress = new Clutter.Color({
             red: progressColor.red,
