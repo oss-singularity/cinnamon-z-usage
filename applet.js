@@ -19,6 +19,7 @@ const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const St = imports.gi.St;
 const Clutter = imports.gi.Clutter;
+const Meta = imports.gi.Meta;
 const Pango = imports.gi.Pango;
 const GdkPixbuf = imports.gi.GdkPixbuf;
 const Cairo = imports.cairo;
@@ -184,6 +185,7 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             delete this.actor.ease;
             this._closeEaseRestore = false;
         }
+        owner._closing = false;
         if (freshOpen && owner._creditsFit) {
             // Re-arm the one-shot credit font fit for this open cycle; the
             // edge sync disarms it again once the alignment converges.
@@ -225,6 +227,10 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             owner._rightPanelPopupLockedWidth = owner._popupWidth();
             owner._normalizeRightPanelPopupCloseWidth();
         }
+        // Freeze every deferred alignment for the fade: the close is a pure
+        // opacity fade at the frozen position, and any post-rebuild
+        // re-alignment landing mid-fade would read as the rings jumping.
+        owner._closing = true;
         super.close(animate);
     }
 }
@@ -248,6 +254,7 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
+        this._closing = false;
         this._lastChartWidths = [];
         this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
@@ -607,7 +614,7 @@ class ZUsageApplet extends Applet.Applet {
         if (typeof Mainloop === "undefined" || this._actionEdgeSyncQueuedId) return;
         this._actionEdgeSyncQueuedId = Mainloop.idle_add(() => {
             this._actionEdgeSyncQueuedId = 0;
-            if (this._destroyed) return GLib.SOURCE_REMOVE;
+            if (this._destroyed || this._closing) return GLib.SOURCE_REMOVE;
             this._syncActionColumnCentering();
             return GLib.SOURCE_REMOVE;
         });
@@ -1037,21 +1044,21 @@ class ZUsageApplet extends Applet.Applet {
         this._actionFrame = null;
         this._actionWidthFrame = null;
         this._actionColumn = null;
-        this._countdownWidgets = [];
-        this._quotaWidgets = [];
-        this._activityTooltips = [];
-        this._popupRightInsetRows = [];
-        this._activityCharts = [];
-        this._creditsFit = null;
         // Carry the aligned ring translations across the rebuild so the
         // refreshed menu opens pre-aligned instead of visibly jumping when
-        // the deferred sync catches up.
+        // the deferred sync catches up. Capture BEFORE resetting anything.
         const carriedRingTranslations = (this._countdownWidgets || []).map(entry =>
             entry.actor && !entry.actor.is_finalized() ? entry.actor.translation_x : null);
         const carriedHeaderTx = this._headerRings && !this._headerRings.is_finalized()
             ? this._headerRings.translation_x : null;
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
+        this._countdownWidgets = [];
+        this._quotaWidgets = [];
+        this._activityTooltips = [];
+        this._popupRightInsetRows = [];
+        this._activityCharts = [];
+        this._creditsFit = null;
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -1123,6 +1130,17 @@ class ZUsageApplet extends Applet.Applet {
         }
         this._carriedRingTranslations = null;
         this._carriedHeaderTx = null;
+        // Align before the next frame paints: a rebuild while the popup is
+        // open must not show even one frame of unaligned rings. The
+        // deferred idle/timeout passes stay as backup for late allocators.
+        if (typeof Meta !== "undefined" && Meta.later_add) {
+            Meta.later_add(Meta.LaterType.BEFORE_REDRAW, () => {
+                if (!this._destroyed && this.menu && this.menu.isOpen) {
+                    this._syncActionColumnCentering();
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        }
     }
 
     _scheduleMenuRebuild() {
