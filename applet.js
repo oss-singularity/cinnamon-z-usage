@@ -240,10 +240,8 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._creditsAlignRows = [];
         this._creditsFit = null;
         this._lastChartWidths = [];
-        this._lastCreditsTx = 0;
         this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
@@ -561,6 +559,8 @@ class ZUsageApplet extends Applet.Applet {
             !this.menu ||
             !this.menu.isOpen ||
             !this._actionWidthFrame ||
+            this._actionWidthFrame.is_finalized() ||
+            this.menu.actor.is_finalized() ||
             !this._actionWidthFrame.get_stage()
         ) return;
         this._actionWidthFrame.translation_x = 0;
@@ -595,6 +595,7 @@ class ZUsageApplet extends Applet.Applet {
     _syncContentRightEdges() {
         if (!this.menu || !this.menu.isOpen) return;
         if (!this._actionWidthFrame) return;
+        if (this._actionWidthFrame.is_finalized() || this.menu.actor.is_finalized()) return;
         // Anchor: the button grid's right edge - rings and charts close
         // flush with it (the original design).
         const [gridX] = this._actionWidthFrame.get_transformed_position();
@@ -604,6 +605,7 @@ class ZUsageApplet extends Applet.Applet {
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {
+            if (actor.is_finalized()) continue;
             const [width] = actor.get_transformed_size();
             if (width <= 0) continue;
             // Per-ring absolute alignment: the painted right edge (the glow
@@ -618,6 +620,7 @@ class ZUsageApplet extends Applet.Applet {
         }
         const chartLimit = this._popupWidth() + 96;
         (this._activityCharts || []).forEach(({ chart }, index) => {
+            if (chart.is_finalized()) return;
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
             const width = Math.max(1, Math.round(right - x + padding));
@@ -629,24 +632,11 @@ class ZUsageApplet extends Applet.Applet {
                 this._lastChartWidths[index] = width;
             }
         });
-        // The credits consumption line ends flush with the grid edge, same
-        // anchor, same convergence rules as the rings: shift the whole label
-        // block by translating its row so the last label's right edge meets
-        // the anchor. Not before the font fit has converged, though - the
-        // fit pass owns the text size until then, and translating a row the
-        // fit is still reshaping starts the align/fight cycle.
-        if (this._creditsFit && !this._creditsFit.isConverged()) return;
-        for (const entry of this._creditsAlignRows || []) {
-            const { row, tail } = entry;
-            if (!tail || tail.is_finalized() || !row.visible) continue;
-            const [tailWidth] = tail.get_transformed_size();
-            if (tailWidth <= 0) continue;
-            const current = tail.get_transformed_position()[0] + tailWidth;
-            const delta = right - Math.round(current);
-            if (Math.abs(delta) > POPUP_WIDTH) continue;
-            row.translation_x += delta;
-            this._lastCreditsTx = row.translation_x;
-        }
+        // The credits consumption line is placed by its own font-fit pass
+        // (_fitCreditConsumptionRow): the text starts in the normal column
+        // and the font shrinks until the line ends at the grid anchor. No
+        // translation here - translating the row moved its start off the
+        // text column and fought the fit pass.
     }
 
     _rebuildPanel() {
@@ -1031,7 +1021,6 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._creditsAlignRows = [];
         this._creditsFit = null;
         this.menu.removeAll();
         if (this.menu._footer) {
@@ -2635,22 +2624,30 @@ class ZUsageApplet extends Applet.Applet {
             findPlot();
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return 0;
-            if (!plotActor || !(plotActor.get_width() > 0)) {
-                const rowSize = row.get_transformed_size();
-                const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
-                return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
+            // The text starts in the normal left column and should end at
+            // the button grid's right edge - measure that distance and let
+            // the font shrink until the line fits it.
+            let targetRight = null;
+            if (this._actionWidthFrame && !this._actionWidthFrame.is_finalized()) {
+                const gv = this._actionWidthFrame.get_abs_allocation_vertices();
+                targetRight = Math.max(gv[1].x, gv[2].x);
             }
-            // Measure without this row's own translation: the edge sync
-            // shifts the row to land its end on the grid anchor, and the
-            // fit pass must not feed that shift back into the font math.
             const [rowX] = row.get_transformed_position();
-            const [plotX] = plotActor.get_transformed_position();
-            const [plotWidth] = plotActor.get_transformed_size();
             const [rowWidthTransformed] = row.get_transformed_size();
             const scale = rowWidthTransformed > 0
                 ? rowWidthTransformed / rowWidth
                 : 1;
-            const width = (plotX + plotWidth - (rowX - (row.translation_x || 0))) / scale;
+            let width;
+            if (targetRight !== null && Number.isFinite(rowX)) {
+                width = (targetRight - rowX) / scale;
+            } else if (!plotActor || !(plotActor.get_width() > 0)) {
+                const rowSize = row.get_transformed_size();
+                width = rowWidth - POPUP_CHART_RIGHT_INSET / (scale || 1);
+            } else {
+                const [plotX] = plotActor.get_transformed_position();
+                const [plotWidth] = plotActor.get_transformed_size();
+                width = (plotX + plotWidth - rowX) / scale;
+            }
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {
@@ -2860,10 +2857,6 @@ class ZUsageApplet extends Applet.Applet {
                     expiresLabel,
                     expiryDateLabel
                 };
-                // Carry the previous menu's alignment across rebuilds so the
-                // line does not start unaligned and visibly slide over.
-                row.translation_x = this._lastCreditsTx || 0;
-                this._creditsAlignRows.push({ row, tail: expiryDateLabel });
             }
         }
         row.x_expand = true;
@@ -3238,11 +3231,10 @@ class ZUsageApplet extends Applet.Applet {
             chart,
             nested
         });
-        // A rebuild mid-open creates fresh charts with no forced width yet;
-        // the queued sync can race ahead of their first allocation and skip
-        // them, leaving the graph at its natural width for good. Every
-        // chart allocation re-queues the sync so the width always converges.
-        chart.connect("notify::allocation", () => this._queueActionEdgeSync());
+        // The width hint above plus the deferred rebuild re-queues keep
+        // fresh charts converged; per-chart allocation watchers were
+        // deliberately avoided - they storm the JS engine with callbacks
+        // during rapid toggling and destabilize the shell.
 
         const plot = new St.Widget({
             layout_manager: new Clutter.BoxLayout({ homogeneous: true }),

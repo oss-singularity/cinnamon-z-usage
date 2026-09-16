@@ -19,6 +19,7 @@ for (const menuX of [1461, 900]) {
         for (const error of [-0.0001220703125, 0, 0.0001220703125]) {
             const frame = {
                 translation_x: 37,
+                is_finalized() { return false; },
                 get_stage() { return true; },
                 get_transformed_position() {
                     return [menuX + 48 + error + this.translation_x, 0];
@@ -29,6 +30,7 @@ for (const menuX of [1461, 900]) {
             applet.menu = {
                 isOpen: true,
                 actor: {
+                    is_finalized() { return false; },
                     get_transformed_position() { return [menuX - error, 0]; },
                     get_transformed_size() { return [menuWidth - error, 665]; }
                 }
@@ -62,6 +64,7 @@ for (const scale of [1, 1.25, 2]) {
         for (const naturalShift of [0, -28, 15]) {
             const ring = {
                 translation_x: -14,
+                is_finalized() { return false; },
                 get_transformed_position() {
                     return [menuX + 348 + naturalShift + this.translation_x, 0];
                 },
@@ -69,22 +72,28 @@ for (const scale of [1, 1.25, 2]) {
             };
             const chart = {
                 width: 374 + naturalShift,
+                is_finalized() { return false; },
                 get_transformed_position() { return [menuX + 110, 0]; },
                 get_theme_node() { return { get_padding() { return 39; } }; },
                 set_width(width) { this.width = width; }
             };
             const applet = Object.create(AppletClass.prototype);
             applet.menu = {
-                actor: { allocation: { x1: menuX + 48 } },
+                actor: {
+                    allocation: { x1: menuX + 48 },
+                    is_finalized() { return false; }
+                },
                 isOpen: true
             };
             const right = menuX + 48 + 352;
             Object.assign(applet, {
                 _actionWidthFrame: {
+                    is_finalized() { return false; },
                     get_transformed_position() { return [menuX + 48, 0]; },
                     get_transformed_size() { return [352, 0]; }
                 },
                 _countdownWidgets: [{ actor: ring }],
+                _lastChartWidths: [],
                 _activityCharts: [{ chart }]
             });
             for (let rebuild = 0; rebuild < 3; rebuild++) {
