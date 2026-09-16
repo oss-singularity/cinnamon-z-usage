@@ -2080,7 +2080,7 @@ class ZUsageApplet extends Applet.Applet {
         );
         this._usageButton = this._createLaunchButton(
             _("Usage"),
-            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true },
+            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true, compact: true },
             true,
             () => Util.spawn(["xdg-open", ZAI_USAGE_URL]),
             _("Open the Z.ai coding plan usage statistics")
