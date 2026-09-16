@@ -132,6 +132,28 @@ in `open()`). Der Slide-Ease läuft unverändert von der eingefrorenen Stelle.
 Isoliert: Close jetzt exakt +12px starrer Slide, Re-Open exakt auf die
 Open-Position.
 
+### Runde 4 (2026-09-16, 60fps-Video-Analyse von IMG_8831.MOV + Feedback)
+
+- **Grüne Ringe stabil, Graphen zogen noch nach links:** Ursache war der
+  Close-Einstiegs-Sync selbst (`_syncContentRightEdges()` in close()) —
+  live trug ein versteckter Countdown-Widget-Träger eine -94px-Alt-Translation
+  (Live-Beweis: Snapshot A `c0Tx=-94` → B `+8` direkt nach close()). Der Sync
+  ist aus close() entfernt: **der Close berührt jetzt gar nichts mehr**,
+  der nächste Open re-synced. Isoliert: Chart-Breite konstant 402, alles
+  bewegt sich nur noch gemeinsam +9..12px mit dem Slide.
+- **Credits-Zeile:** `Credits: ... · Consumed: ...` endet jetzt bündig auf
+  der Button-Grid-Kante — `_creditsAlignRows` (row + tail-Label) wird im
+  Idle-Sync wie die Ringe ausgerichtet. Isoliert: `credR == gR == 1847`.
+- **Scrollen über aufgeklappten Akkordeon-Bereichen:** Das Leaf-StScrollView
+  schluckt Wheel-Events (St-eigener Handler returnt true), auch wenn sein
+  eigenes Adjustment inert ist. Fix: `_forwardLeafScroll` connected auf dem
+  Leaf-Actor und setzt das HAUPT-Adjustment (step 48px, SMOOTH-Deltas
+  unterstützt), returnt EVENT_STOP.
+- Video-Analyse-Notiz: Handy-Video (IMG_8831.MOV, 60fps) — der Fade macht
+  präzise Einzel-Element-Messung ab Frame ~3 der 9 Fade-Frames unmöglich
+  (Background blutet durch); Allocation-Snapshots im Live-System sind die
+  schärfere Quelle.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 

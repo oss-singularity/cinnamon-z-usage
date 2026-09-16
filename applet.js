@@ -211,10 +211,6 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         const owner = this._usageOwner;
         if (owner._isRightPanel && this.isOpen) {
             owner._rightPanelPopupLockedWidth = owner._popupWidth();
-            // Last ring sync while the menu still counts as open: the close
-            // relayout itself runs with the sync disabled (isOpen is already
-            // false once Cinnamon's close starts).
-            owner._syncContentRightEdges();
             owner._normalizeRightPanelPopupCloseWidth();
         }
         super.close(animate);
@@ -239,6 +235,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
+        this._creditsAlignRows = [];
         this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
@@ -620,6 +617,20 @@ class ZUsageApplet extends Applet.Applet {
             // a stale read (mid-scroll or mid-relayout), never a real width.
             if (width > chartLimit) continue;
             if (!chart.min_width_set || chart.min_width !== width) this._forceActorWidth(chart, width);
+        }
+        // The credits consumption line ends flush with the grid edge, same
+        // anchor, same convergence rules as the rings: shift the whole label
+        // block by translating its row so the last label's right edge meets
+        // the anchor.
+        for (const entry of this._creditsAlignRows || []) {
+            const { row, tail } = entry;
+            if (!tail || tail.is_finalized() || !row.visible) continue;
+            const [tailWidth] = tail.get_transformed_size();
+            if (tailWidth <= 0) continue;
+            const current = tail.get_transformed_position()[0] + tailWidth;
+            const delta = right - Math.round(current);
+            if (Math.abs(delta) > POPUP_WIDTH) continue;
+            row.translation_x += delta;
         }
     }
 
@@ -1005,6 +1016,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
+        this._creditsAlignRows = [];
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -2788,6 +2800,7 @@ class ZUsageApplet extends Applet.Applet {
                     expiresLabel,
                     expiryDateLabel
                 };
+                this._creditsAlignRows.push({ row, tail: expiryDateLabel });
             }
         }
         row.x_expand = true;
@@ -2842,6 +2855,29 @@ class ZUsageApplet extends Applet.Applet {
         ) || source.find(window =>
             Number(window.durationMinutes) === 10080
         ) || source[0] || null;
+    }
+
+    _forwardLeafScroll(event) {
+        if (!this.menu || !this.menu.isOpen || !this._scroll) {
+            return Clutter.EVENT_PROPAGATE;
+        }
+        const adjustment = this._scroll.get_vscroll_bar().get_adjustment();
+        const direction = event.get_scroll_direction();
+        const step = 48;
+        if (direction === Clutter.ScrollDirection.SMOOTH) {
+            const [, deltaY] = event.get_scroll_delta();
+            if (!deltaY) return Clutter.EVENT_PROPAGATE;
+            adjustment.set_value(adjustment.get_value() + deltaY * step);
+            return Clutter.EVENT_STOP;
+        }
+        if (direction === Clutter.ScrollDirection.UP) {
+            adjustment.set_value(adjustment.get_value() - step);
+        } else if (direction === Clutter.ScrollDirection.DOWN) {
+            adjustment.set_value(adjustment.get_value() + step);
+        } else {
+            return Clutter.EVENT_PROPAGATE;
+        }
+        return Clutter.EVENT_STOP;
     }
 
     _addHistoryItems() {
@@ -2910,6 +2946,13 @@ class ZUsageApplet extends Applet.Applet {
                 submenu.actor.label_actor = submenuLabel;
                 this.menu.addMenuItem(submenu);
                 this._historySubmenus.push({ id: limitId, submenu });
+                submenu.menu.actor.connect("scroll-event", (_actor, event) => {
+                    // The nested scroll view swallows wheel events even when
+                    // its own adjustment cannot move, which dead-zones the
+                    // whole expanded leaf. Forward every wheel step to the
+                    // main scroll view so scrolling works anywhere.
+                    return this._forwardLeafScroll(event);
+                });
                 submenu.menu.connect("open-state-changed", (_menu, open) => {
                     if (open) {
                         // Nested submenu content does not participate in the
