@@ -177,6 +177,11 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             delete this._calculatePosition;
             this._closePositionFrozen = null;
         }
+        if (freshOpen && owner._creditsFit) {
+            // Re-arm the one-shot credit font fit for this open cycle; the
+            // edge sync disarms it again once the alignment converges.
+            owner._creditsFit.setArmed(true);
+        }
         owner._applyPopupWidth();
         if (freshOpen) {
             // The default expansion on open must not yank the scroll position
@@ -236,6 +241,7 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsAlignRows = [];
+        this._creditsFit = null;
         this._actionEdgeSyncQueuedId = 0;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
@@ -631,6 +637,12 @@ class ZUsageApplet extends Applet.Applet {
             const delta = right - Math.round(current);
             if (Math.abs(delta) > POPUP_WIDTH) continue;
             row.translation_x += delta;
+            // Once the end sits on the anchor, stop the fit pass from
+            // reacting to chart allocations - it would shrink the font and
+            // start the align/fight cycle over again.
+            if (this._creditsFit && Math.abs(delta) <= 3) {
+                this._creditsFit.setArmed(false);
+            }
         }
     }
 
@@ -1017,6 +1029,7 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsAlignRows = [];
+        this._creditsFit = null;
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -2559,6 +2572,12 @@ class ZUsageApplet extends Applet.Applet {
         suffixEmphasized
     ) {
         let fitting = false;
+        // The fit pass and the edge sync both position this row; running
+        // both forever makes them fight through chart allocations (the
+        // charts get yanked by the relayout chains). Fit is armed only
+        // until its font size has converged once per open; afterwards the
+        // sync alone owns the placement.
+        let armed = true;
         let plotActor = null;
         let plotAllocationId = 0;
 
@@ -2613,7 +2632,7 @@ class ZUsageApplet extends Applet.Applet {
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {
-            if (fitting) return;
+            if (!armed || fitting) return;
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return;
             fitting = true;
@@ -2654,6 +2673,10 @@ class ZUsageApplet extends Applet.Applet {
             fit();
             return GLib.SOURCE_REMOVE;
         });
+        return {
+            fit,
+            setArmed: value => { armed = value; }
+        };
     }
 
     _addCreditItems() {
@@ -2810,7 +2833,7 @@ class ZUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
-            this._fitCreditConsumptionRow(
+            this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
                 labelActor,

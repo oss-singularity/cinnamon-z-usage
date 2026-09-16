@@ -160,6 +160,13 @@ Open-Position.
   zerrten an den Charts. Fix: availableWidth rechnet die eigene
   row.translation_x heraus (übersetzungs-blind) und chartLimit auf
   POPUP_WIDTH + 96 gestrafft.
+- **Nachschub 2 (live: Oszillation blieb):** fit() und Edge-Sync kämpften
+  weiter um die Credits-Zeile (fit reagiert auf JEDE Chart-Allocation,
+  zerrt via Re-Layout-Ketten an den Graphen). Fix: `_fitCreditConsumptionRow`
+  liefert jetzt `{ fit, setArmed }`; der Fit ist nur bis zur Konvergenz
+  (Credits-Delta ≤ 3px im Sync) bewaffnet, danach besitzt allein der Sync
+  die Platzierung; Re-Arm bei jedem fresh open. Isoliert: credR==gR==1847
+  konstant über open/settle/wheel/close/reopen, chW konstant 402.
 
 ## 4. Debug-Werkzeuge (erprobt)
 
