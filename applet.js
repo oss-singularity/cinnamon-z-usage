@@ -3447,6 +3447,10 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _syncPopupRightInsets() {
+        // While the popup is closing, open leaves collapse and flip the
+        // inset styles - a row re-layout that shifts the aligned rings
+        // mid-fade. Freeze the current insets through the close.
+        if (this.menu && !this.menu.isOpen && this.menu.animating) return;
         const expandedWithScrollbar = this._historySubmenus.some(
             entry => entry.submenu.menu.isOpen &&
                 entry.submenu.menu.actor.vscrollbar_policy === St.PolicyType.AUTOMATIC
