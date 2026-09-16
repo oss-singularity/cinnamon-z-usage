@@ -520,7 +520,13 @@ class ZUsageApplet extends Applet.Applet {
         );
         this._rightPanelPopupClosedId = this.menu.connect("menu-animated-closed", () => {
             this.menu.actor.translation_x = 0;
-            this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
+            if (this.menu._closeMarginsRestore) {
+                this.menu.actor.margin_left = this.menu._closeMarginsRestore[0];
+                this.menu.actor.margin_right = this.menu._closeMarginsRestore[1];
+                this.menu._closeMarginsRestore = null;
+            } else {
+                this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
+            }
             this._applyPopupWidth();
             if (this.menu._closePositionFrozen) {
                 delete this.menu._calculatePosition;
@@ -3884,6 +3890,15 @@ class ZUsageApplet extends Applet.Applet {
         const menu = this.menu;
         menu._closePositionFrozen = [Math.round(menu.actor.x), Math.round(menu.actor.y)];
         menu._calculatePosition = () => menu._closePositionFrozen;
+        // Cinnamon eases the close by MENU_ANIMATION_OFFSET plus the actor
+        // margins. The right-panel margins add ~110px, sliding the whole
+        // popup under the panel: the green rings (right edge) vanish
+        // abruptly and the blue rings get clipped from the right. Zero the
+        // margins for the close so the slide is the subtle 12px nudge; the
+        // animated-closed handler restores them.
+        menu._closeMarginsRestore = [menu.actor.margin_left, menu.actor.margin_right];
+        menu.actor.margin_left = 0;
+        menu.actor.margin_right = 0;
     }
 
     _orientationIsVertical(orientation) {
