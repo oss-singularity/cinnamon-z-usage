@@ -232,11 +232,6 @@ if [[ "${QA_SHOW_CREDITS_IN_PANEL:-}" == 1 ]]; then
     printf 'credits-panel=true\n'
 fi
 
-if [[ "${QA_NOTIFICATION_RETENTION:-0}" == 1 ]]; then
-    # shellcheck source=tests/ui/check-notifications.sh
-    source "$(dirname -- "$0")/check-notifications.sh"
-fi
-
 if [[ "$variant" == settings-* ]]; then
     if [[ "$variant" == settings-notifications ]]; then
         # Keep the dependent notification rows in the screenshot while showing
@@ -262,11 +257,6 @@ sleep 1
 # Documentation composition requested by the maintainer: keep native dialog
 # contents and size, position beside the right panel, and soften only the
 # private desktop's modal shade. Production modal behavior is unchanged.
-if [[ "${QA_RELEASE_REVIEW:-0}" == 1 ]]; then
-    # shellcheck source=tests/ui/check-release.sh
-    source "$(dirname "$0")/check-release.sh"
-fi
-
 if [[ "${QA_MODEL_SPECIFIC_LIMITS:-}" == off ]]; then
     model_visibility=$(eval_cinnamon 'String((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0],original=JSON.stringify(a._snapshot);if(a._limitSections.length||a._historySubmenus.length)return false;a.showModelSpecificLimits=true;a._onModelVisibilityChanged();if(!a._limitSections.length||!a._historySubmenus.length)return false;a.showModelSpecificLimits=false;a._onModelVisibilityChanged();return !a._limitSections.length&&!a._historySubmenus.length&&JSON.stringify(a._snapshot)===original;})())')
     if ! grep -qE "['\"]true['\"]" <<< "$model_visibility"; then

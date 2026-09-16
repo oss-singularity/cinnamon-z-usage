@@ -10,9 +10,6 @@ const PopupMenu = imports.ui.popupMenu;
 const Tooltips = imports.ui.tooltips;
 const Main = imports.ui.main;
 const MessageTray = imports.ui.messageTray;
-const ModalDialog = imports.ui.modalDialog;
-const Dialog = imports.ui.dialog;
-const CheckBox = imports.ui.checkBox;
 const Mainloop = imports.mainloop;
 const Util = imports.misc.util;
 const Gio = imports.gi.Gio;
@@ -53,7 +50,6 @@ const POPUP_ACTION_GRID_WIDTH = 352;
 const POPUP_WIDTH = 419;
 // Cancels Cinnamon's MENU_ANIMATION_OFFSET when set as margin_left during
 // the close ease (target x = x - margin_left + OFFSET + margin_right).
-const POPUP_RIGHT_PANEL_CLOSE_SLIDE_CANCEL = 12;
 // Headroom between the locked viewport and the natural content height: the
 // frame is frozen once per open, and content that grows a few pixels after
 // the lock (countdown ticks, refresh labels) must not spawn a scrollbar.
@@ -3883,7 +3879,7 @@ class ZUsageApplet extends Applet.Applet {
                     bottomReserve = Math.max(bottomReserve, Math.ceil(monitor.y + monitor.height - panelY) + 8);
                 }
             }
-        } catch (error) {}
+        } catch { /* best effort */ }
         const maxMenu = Math.max(240, monitor.height - topReserve - bottomReserve);
         if (!this._popupFrameHeight) {
             // Only 2px of frame chrome plus a small headroom pad: a larger
@@ -3908,9 +3904,9 @@ class ZUsageApplet extends Applet.Applet {
         if (!this.menu || !this.menu.isOpen || !this.menu._scroll) return;
         const scroll = this.menu._scroll;
         if (!actor || actor.is_finalized() || !actor.mapped) return;
-        const [scrollX, scrollY] = scroll.get_transformed_position();
+        const [, scrollY] = scroll.get_transformed_position();
         const [, scrollH] = scroll.get_transformed_size();
-        const [actorX, actorY] = actor.get_transformed_position();
+        const [, actorY] = actor.get_transformed_position();
         const [, actorH] = actor.get_transformed_size();
         if (!Number.isFinite(actorY) || !Number.isFinite(actorH) || actorH <= 0) return;
         const adjustment = scroll.get_vscroll_bar().get_adjustment();

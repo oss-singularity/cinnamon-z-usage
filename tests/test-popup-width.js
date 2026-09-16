@@ -19,11 +19,6 @@ class FakeAdjustment {
     get_value() { return this.value; }
 }
 
-class FakeScrollBar {
-    constructor() { this.adjustment = new FakeAdjustment(); }
-    get_adjustment() { return this.adjustment; }
-}
-
 class Scroll extends Actor {
     constructor() {
         super();

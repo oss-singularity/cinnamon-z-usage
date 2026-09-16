@@ -15,7 +15,6 @@ from z_usage import (
     ACCOUNT_LIMIT_ID,
     ZCODE_PLAN_SOURCE,
     build_usage_history,
-    config_key_path,
     is_authentication_error,
     normalise_plan_balances,
     normalise_quota_limits,
@@ -23,7 +22,6 @@ from z_usage import (
     update_usage_history,
     zcode_provider_key,
 )
-from z_usage import AuthenticationRequired, UsageError
 
 
 def quota_entry(**overrides):
@@ -46,7 +44,9 @@ class NormaliseQuotaLimitsTests(unittest.TestCase):
         data = {
             "limits": [
                 quota_entry(),
-                quota_entry(unit=6, number=1, usage=140000, remaining=137927, percentage=1, nextResetTime=1790064603989),
+                quota_entry(
+                    unit=6, number=1, usage=140000, remaining=137927, percentage=1, nextResetTime=1790064603989
+                ),
             ],
             "level": "max",
         }
@@ -84,9 +84,7 @@ class NormaliseQuotaLimitsTests(unittest.TestCase):
 class WindowDurationTests(unittest.TestCase):
     def test_known_units_map_to_coding_plan_windows(self) -> None:
         five_hour = normalise_quota_limits({"limits": [quota_entry()]}, now=1789474928)
-        weekly = normalise_quota_limits(
-            {"limits": [quota_entry(unit=6, number=1)]}, now=1789474928
-        )
+        weekly = normalise_quota_limits({"limits": [quota_entry(unit=6, number=1)]}, now=1789474928)
         self.assertEqual(five_hour["limits"][0]["windows"][0]["durationMinutes"], 300)
         self.assertEqual(weekly["limits"][0]["windows"][0]["durationMinutes"], 10080)
 
@@ -147,7 +145,6 @@ class ApiKeyResolutionTests(unittest.TestCase):
             with patch.dict(os.environ, {"ZAI_API_KEY": "", "XDG_CONFIG_HOME": directory}, clear=False):
                 with patch("z_usage.Path.home", return_value=Path(directory)):
                     self.assertEqual(resolve_api_key("  "), "")
-
 
 
 class AuthenticationErrorTests(unittest.TestCase):
@@ -457,11 +454,15 @@ class ZcodePlanBalanceTests(unittest.TestCase):
         self.assertEqual(limits, [])
 
     def test_merged_snapshot_keeps_account_limit_first(self):
-        with patch("z_usage.fetch_plan_balances", return_value=self.payload()), \
-                patch("z_usage.zcode_plan_token", return_value="tok"), \
-                patch("z_usage.fetch_quota_limits", return_value={"limits": [quota_entry()], "level": "max"}):
+        with (
+            patch("z_usage.fetch_plan_balances", return_value=self.payload()),
+            patch("z_usage.zcode_plan_token", return_value="tok"),
+            patch("z_usage.fetch_quota_limits", return_value={"limits": [quota_entry()], "level": "max"}),
+        ):
             # main() is exercised indirectly; here just assert the merge order rule
             snapshot = normalise_quota_limits({"limits": [quota_entry()], "level": "max"})
             snapshot["limits"].extend(normalise_plan_balances(self.payload(), now=1))
         self.assertEqual(snapshot["limits"][0]["id"], ACCOUNT_LIMIT_ID)
-        self.assertEqual(snapshot["limits"][0]["source"] if "source" in snapshot["limits"][0] else "coding-plan", "coding-plan")
+        self.assertEqual(
+            snapshot["limits"][0]["source"] if "source" in snapshot["limits"][0] else "coding-plan", "coding-plan"
+        )
