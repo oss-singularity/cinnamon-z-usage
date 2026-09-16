@@ -193,6 +193,14 @@ Open-Position.
   Geometrie. Neu: der Fit trackt seine Konvergenz selbst (zwei Pässe
   gleicher Fontgröße → `isConverged()`), der Sync übersetzt die
   Credits-Zeile erst NACH Konvergenz, Re-Arm pro fresh open.
+- **Nachschub 7 (Close mit offenem Leaf — 12.40.44/20.27.56-Befund):** Beim
+  Close schließen sich offene Akkordeon-Blaätter → `_syncPopupRightInsets`
+  flippte die Row-Paddings (Expanded-Extra weg) → Re-Layout → die
+  rechtsbündigen grünen Ringe sprangen ~+17px nach rechts, während der
+  Pure-Fade schon lief (Sync isOpen-gated). Fix: Insets-Freeze während des
+  Closes (`_syncPopupRightInsets` returnt bei `!isOpen && animating`).
+  Isoliert mit offenem Leaf: tx/edge/chart-width frozen durch mid-close
+  und LATE.
 - **Grüne Ringe Wandern (20.27.56 + Isolier-Beweis):** Countdown-Label-
   Breite ändert sich pro Tick → Row re-layoutet → Ring-Layout-Position
   driftet, ohne dass der Sync läuft (kein Action-Frame-Alloc). Fix:
