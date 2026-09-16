@@ -25,7 +25,7 @@
 
 - **Everything at a glance** — 5-hour and weekly quota windows as rings in the
   panel and the popup, with live reset countdowns.
-- **All your plans, stacked** — the personal Coding Plan *plus* the ZCode Start
+- **All your plans, stacked** — the personal Coding Plan _plus_ the ZCode Start
   Plan and Global Build token buckets, each with its own collapsible section.
 - **API-key-less by default** — no setup: the applet reuses the credentials of
   your signed-in ZCode app. It only performs read-only GET requests against
@@ -42,23 +42,23 @@
 ./install.sh
 ```
 
-Then enable *Z Usage Monitor* via *System Settings → Applets* and add it to a
+Then enable _Z Usage Monitor_ via _System Settings → Applets_ and add it to a
 panel. Requires Python 3.10+ and Cinnamon 5.8 or newer.
 
 **Credentials:** nothing to configure if the ZCode app is signed in — the
 applet picks up its Coding Plan API key automatically. Optional overrides:
-the *Z.ai API key* setting, the `ZAI_API_KEY` environment variable, or the
+the _Z.ai API key_ setting, the `ZAI_API_KEY` environment variable, or the
 file `~/.config/cinnamon-z-usage/api-key`.
 
 ## The popup
 
-| Zone | What you get |
-| --- | --- |
-| Header (pinned) | Title, last-update stamp and the 5h / 7d quota rings |
-| Usage limits | Coding Plan 5h/7d plus ZCode Start Plan and Global Build sections, each with reset countdowns |
-| Recent consumption | 1h/4h/12h/24h observed consumption and a 24-hour activity chart |
-| Plan / Credits | Plan level, remaining credits and observed credit consumption |
-| Footer (pinned) | Z.ai Chat, Usage dashboard, Refresh, API Keys, Z.ai and Docs |
+| Zone               | What you get                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Header (pinned)    | Title, last-update stamp and the 5h / 7d quota rings                                          |
+| Usage limits       | Coding Plan 5h/7d plus ZCode Start Plan and Global Build sections, each with reset countdowns |
+| Recent consumption | 1h/4h/12h/24h observed consumption and a 24-hour activity chart                               |
+| Plan / Credits     | Plan level, remaining credits and observed credit consumption                                 |
+| Footer (pinned)    | Z.ai Chat, Usage dashboard, Refresh, API Keys, Z.ai and Docs                                  |
 
 ## Links
 

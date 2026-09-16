@@ -5,14 +5,14 @@ The human-facing overview lives in the [root README](../README.md).
 
 ## Architecture
 
-| File | Role |
-| --- | --- |
-| `applet.js` | Applet UI: panel anchor, popup (pinned header/footer + scrollable content), settings bindings, notifications, screenshot copy |
-| `z_usage.py` | Backend: reads the Z.ai usage monitor API and the ZCode plan balance endpoint, builds the applet snapshot JSON |
-| `usage-format.js` | Shared formatting/layout helpers (rings, countdowns, charts, notifications) |
-| `settings-schema.json` | Cinnamon settings schema |
-| `scripts/package.py` | Allowlisted user installation and deterministic Spices export |
-| `.github/social-preview-src/` | Deterministic social-preview renderer (see its [README](../.github/social-preview-src/README.md)) |
+| File                          | Role                                                                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `applet.js`                   | Applet UI: panel anchor, popup (pinned header/footer + scrollable content), settings bindings, notifications, screenshot copy |
+| `z_usage.py`                  | Backend: reads the Z.ai usage monitor API and the ZCode plan balance endpoint, builds the applet snapshot JSON                |
+| `usage-format.js`             | Shared formatting/layout helpers (rings, countdowns, charts, notifications)                                                   |
+| `settings-schema.json`        | Cinnamon settings schema                                                                                                      |
+| `scripts/package.py`          | Allowlisted user installation and deterministic Spices export                                                                 |
+| `.github/social-preview-src/` | Deterministic social-preview renderer (see its [README](../.github/social-preview-src/README.md))                             |
 
 ### Data sources
 
@@ -21,7 +21,7 @@ The human-facing overview lives in the [root README](../README.md).
    to the 5h/weekly windows (`unit` 3 = hours, 6 = weeks), `percentage` is the
    used share, `nextResetTime` (ms) the reset timestamp, `level` the plan name.
 2. **ZCode plan buckets** — `GET
-   https://zcode.z.ai/api/v1/zcode-plan/billing/balance` via the
+https://zcode.z.ai/api/v1/zcode-plan/billing/balance` via the
    ZCode backend (`Bearer` start-plan key plus ZCode's client header set),
    returning `plans[]` and `balances[]` per model with `total/used/remaining_units`
    and the bucket period. Mapped as one limit per plan-model pair
@@ -29,7 +29,7 @@ The human-facing overview lives in the [root README](../README.md).
 
 ### Credential resolution (API-key-less)
 
-1. the *Z.ai API key* applet setting,
+1. the _Z.ai API key_ applet setting,
 2. the `ZAI_API_KEY` environment variable,
 3. `~/.config/cinnamon-z-usage/api-key`,
 4. the Coding Plan API key cached by the signed-in ZCode app
@@ -52,14 +52,14 @@ git merge upstream/main
 
 Divergence map, to keep conflicts small:
 
-| Area | Z-specific state |
-| --- | --- |
-| Backend | `z_usage.py` talks to the Z.ai monitor API and the ZCode plan balance endpoint; the Codex app-server transport is gone |
-| Identity | UUID `z-usage@oss-singularity`, gettext domain, metadata and icons |
-| Launch buttons | Z.ai chat, usage statistics, API keys, docs |
-| Reset credits | Dropped — Z.ai coding plans expose no reset-credit redemption yet (ZCode hints at `/api/v1/coding-plan/reset`; porting that is roadmap) |
-| Path settings | Dropped — there is no local Z.ai backend binary |
-| Neutral code | History, activity charts, notifications, popup layout and the settings widget classes stay byte-identical to upstream for clean merges |
+| Area           | Z-specific state                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend        | `z_usage.py` talks to the Z.ai monitor API and the ZCode plan balance endpoint; the Codex app-server transport is gone                  |
+| Identity       | UUID `z-usage@oss-singularity`, gettext domain, metadata and icons                                                                      |
+| Launch buttons | Z.ai chat, usage statistics, API keys, docs                                                                                             |
+| Reset credits  | Dropped — Z.ai coding plans expose no reset-credit redemption yet (ZCode hints at `/api/v1/coding-plan/reset`; porting that is roadmap) |
+| Path settings  | Dropped — there is no local Z.ai backend binary                                                                                         |
+| Neutral code   | History, activity charts, notifications, popup layout and the settings widget classes stay byte-identical to upstream for clean merges  |
 
 The account-level limit uses the id `zai` (constants `ACCOUNT_LIMIT_ID` in
 `applet.js`/`usage-format.js`, `ACCOUNT_LIMIT_ID` in `z_usage.py`).

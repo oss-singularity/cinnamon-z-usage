@@ -58,7 +58,7 @@
   rendered as collapsible per-model limits with G/S badges below the coding
   plan limits. A new "Show ZCode plan quotas" switch controls them.
 - Reverse-engineered the exact client header set ZCode sends
-  (User-Agent, X-Title, X-Platform, X-Os-Category, X-Client-*,
+  (User-Agent, X-Title, X-Platform, X-Os-Category, X-Client-\*,
   X-Device-Mid) so the applet reads the same data keylessly; the balance
   endpoint stays optional and never breaks the coding plan snapshot.
 
