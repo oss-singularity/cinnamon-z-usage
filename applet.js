@@ -1217,6 +1217,7 @@ class ZUsageApplet extends Applet.Applet {
             });
             rings.style = `spacing: ${compact ? 2 : 8}px;`;
             this._headerRings = rings;
+            rings.connect("notify::allocation", () => this._queueActionEdgeSync());
             rings.translation_x = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
@@ -1502,6 +1503,9 @@ class ZUsageApplet extends Applet.Applet {
         };
         const carried = (this._carriedRingTranslations || [])[this._countdownWidgets.length];
         if (typeof carried === "number") actor.translation_x = carried;
+        // Countdown label text changes width every tick, shifting the ring's
+        // layout position. Re-align on allocation or the ring drifts.
+        actor.connect("notify::allocation", () => this._queueActionEdgeSync());
         this._countdownWidgets.push(entry);
         this._updateResetCountdown(entry);
         return actor;

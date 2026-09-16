@@ -193,6 +193,13 @@ Open-Position.
   Geometrie. Neu: der Fit trackt seine Konvergenz selbst (zwei Pässe
   gleicher Fontgröße → `isConverged()`), der Sync übersetzt die
   Credits-Zeile erst NACH Konvergenz, Re-Arm pro fresh open.
+- **Grüne Ringe Wandern (20.27.56 + Isolier-Beweis):** Countdown-Label-
+  Breite ändert sich pro Tick → Row re-layoutet → Ring-Layout-Position
+  driftet, ohne dass der Sync läuft (kein Action-Frame-Alloc). Fix:
+  Countdown-Actor + Header-Rings connecten `notify::allocation` → queued
+  Sync (driftet nicht mehr; sichtbare Kante 386 konstant über Ticks).
+  Zusätzlich Ring-Translation-Carry-over über Rebuilds
+  (`_carriedRingTranslations`/`_carriedHeaderTx`).
 
 - **Crash-Untersuchung (16.09. ~04:29 + ~04:54):** Zwei Cinnamon-SIGSEGVs
   während Rapid-Toggle-Tests, Stacks jeweils in libmozjs (GC-Sweeping);
