@@ -202,6 +202,13 @@ Open-Position.
   entfernt (Härtung siehe oben). Coredumps liegen unter
   /var/lib/apport/coredump bzw. via coredumpctl (PIDs 2323/2218084).
   Rapid-Toggle-Restrisiko weiter beobachten.
+- **Rapid-Toggle-Stresstest (isoliert, 16.09.):** 400× `on_applet_clicked`
+  (rebuild+toggle, volle Animationen) auf dem gehärteten Stand — Cinnamon
+  überlebt ohne Crash, Popup-State konsistent. Timeline der Live-Crashes:
+  der 10:13-Crash von Claudiu fiel in das Fenster, in dem der
+  per-chart allocation-watcher (1b12e6f) live war; beide bekannten
+  Trigger (Watcher-Sturm, Close-Einstiegs-Sync) sind entfernt. Live-
+  Bestätigung durch Claudius Rapid-Toggle-Test steht aus.
 
 ## 4. Debug-Werkzeuge (erprobt)
 
