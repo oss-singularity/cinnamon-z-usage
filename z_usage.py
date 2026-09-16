@@ -521,9 +521,7 @@ def zcode_provider_key() -> str:
 def zcode_plan_token() -> str:
     """Return the token ZCode uses for its own plan billing endpoints."""
 
-    candidates = (
-        str(os.environ.get("ZAI_START_PLAN_TOKEN") or "").strip(),
-    )
+    candidates = (str(os.environ.get("ZAI_START_PLAN_TOKEN") or "").strip(),)
     for candidate in candidates:
         if candidate:
             return candidate
@@ -607,7 +605,9 @@ def fetch_quota_limits(api_key: str, base_url: str, timeout: float) -> dict[str,
             pass
         if error.code in (401, 403):
             raise AuthenticationRequired(AUTH_REQUIRED_MESSAGE) from error
-        raise UsageError(_("Z.ai rejected the request: HTTP %(code)s %(detail)s") % {"code": error.code, "detail": detail})
+        raise UsageError(
+            _("Z.ai rejected the request: HTTP %(code)s %(detail)s") % {"code": error.code, "detail": detail}
+        )
     except (urllib.error.URLError, OSError, TimeoutError) as error:
         raise UsageError(_("Could not reach the Z.ai usage API: %(error)s") % {"error": error}) from error
 
@@ -648,9 +648,7 @@ def zcode_source_headers(origin: str) -> dict[str, str]:
         "X-Os-Version": os.uname().release,
     }
     try:
-        telemetry = json.loads(
-            (Path.home() / ".zcode" / "v2" / "telemetry-state.json").read_text(encoding="utf-8")
-        )
+        telemetry = json.loads((Path.home() / ".zcode" / "v2" / "telemetry-state.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         telemetry = None
     device_mid = telemetry.get("deviceMid") if isinstance(telemetry, dict) else None
@@ -682,9 +680,7 @@ def fetch_plan_balances(token: str, base_url: str, timeout: float) -> dict[str, 
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
-        raise UsageError(
-            _("ZCode plan balance request failed: HTTP %(code)s") % {"code": error.code}
-        ) from error
+        raise UsageError(_("ZCode plan balance request failed: HTTP %(code)s") % {"code": error.code}) from error
     except (urllib.error.URLError, OSError, TimeoutError) as error:
         raise UsageError(_("Could not reach the ZCode plan balance API: %(error)s") % {"error": error}) from error
     try:

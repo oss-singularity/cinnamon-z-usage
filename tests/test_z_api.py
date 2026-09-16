@@ -55,7 +55,11 @@ class TransportTests(unittest.TestCase):
         self.base_url = f"http://127.0.0.1:{self.server.server_port}"
 
     def test_quota_payload_and_raw_authorization_header(self):
-        _FixtureHandler.response_body = {"code": 200, "success": True, "data": {"limits": [{"percentage": 7}], "level": "max"}}
+        _FixtureHandler.response_body = {
+            "code": 200,
+            "success": True,
+            "data": {"limits": [{"percentage": 7}], "level": "max"},
+        }
         data = fetch_quota_limits("good-key", self.base_url, 5)
         self.assertEqual(data["level"], "max")
         self.assertEqual(data["limits"][0]["percentage"], 7)

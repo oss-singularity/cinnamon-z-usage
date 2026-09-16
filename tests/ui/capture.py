@@ -168,9 +168,7 @@ def main():
         if is_popup and actor_geometry[2] != 419:
             raise RuntimeError(f"{name}: expected 419 px popup actor plus 1 px edge, got {actor_geometry[2]}")
         manifest[name + ".png"] = {
-            "surface": (
-                "popup" if is_popup else "panel" if variant in {"panel", "credits-panel"} else "popup"
-            ),
+            "surface": ("popup" if is_popup else "panel" if variant in {"panel", "credits-panel"} else "popup"),
             "actorGeometry": actor_geometry,
             "panelGeometry": panel_geometry,
             "cropGeometry": crop_geometry,
@@ -178,8 +176,7 @@ def main():
             "variant": variant,
             "panelScope": (
                 "credits-only"
-                if variant in {"credits", "credits-panel"}
-                or capture_env.get("QA_MODEL_SPECIFIC_LIMITS") == "off"
+                if variant in {"credits", "credits-panel"} or capture_env.get("QA_MODEL_SPECIFIC_LIMITS") == "off"
                 else "all-visible-models"
             ),
             "panelCrop": panel_crop,
