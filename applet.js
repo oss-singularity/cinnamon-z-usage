@@ -608,7 +608,7 @@ class ZUsageApplet extends Applet.Applet {
             if (Math.abs(delta) > POPUP_WIDTH) continue;
             actor.translation_x += delta;
         }
-        const chartLimit = this._popupWidth() * 1.5;
+        const chartLimit = this._popupWidth() + 96;
         for (const { chart } of this._activityCharts || []) {
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
@@ -2599,6 +2599,9 @@ class ZUsageApplet extends Applet.Applet {
                 const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
                 return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
             }
+            // Measure without this row's own translation: the edge sync
+            // shifts the row to land its end on the grid anchor, and the
+            // fit pass must not feed that shift back into the font math.
             const [rowX] = row.get_transformed_position();
             const [plotX] = plotActor.get_transformed_position();
             const [plotWidth] = plotActor.get_transformed_size();
@@ -2606,7 +2609,7 @@ class ZUsageApplet extends Applet.Applet {
             const scale = rowWidthTransformed > 0
                 ? rowWidthTransformed / rowWidth
                 : 1;
-            const width = (plotX + plotWidth - rowX) / scale;
+            const width = (plotX + plotWidth - (rowX - (row.translation_x || 0))) / scale;
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {

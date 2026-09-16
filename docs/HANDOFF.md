@@ -153,6 +153,13 @@ Open-Position.
   präzise Einzel-Element-Messung ab Frame ~3 der 9 Fade-Frames unmöglich
   (Background blutet durch); Allocation-Snapshots im Live-System sind die
   schärfere Quelle.
+- **Nachschub (live: Graph sprang hunderte px):** Die Credits-Ausrichtung
+  (row-Translation +73) koppelte in `_fitCreditConsumptionRow.availableWidth()`
+  — die misst mit transformed-Koordinaten und sah die eigene Zeilen-
+  Translation als schmaleres Budget → Font-Fit-Laufaway → Re-Layout-Ketten
+  zerrten an den Charts. Fix: availableWidth rechnet die eigene
+  row.translation_x heraus (übersetzungs-blind) und chartLimit auf
+  POPUP_WIDTH + 96 gestrafft.
 
 ## 4. Debug-Werkzeuge (erprobt)
 
