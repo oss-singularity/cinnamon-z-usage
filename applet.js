@@ -2082,6 +2082,13 @@ class ZUsageApplet extends Applet.Applet {
             () => Util.spawn(["zcode"]),
             _("Open the ZCode coding agent")
         );
+        this._usageButton = this._createLaunchButton(
+            _("Usage"),
+            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true },
+            true,
+            () => Util.spawn(["xdg-open", ZAI_USAGE_URL]),
+            _("Open the Z.ai coding plan usage statistics")
+        );
         const refreshConfirmed = this._refreshConfirmed;
         this._refreshButton = this._createLaunchButton(
             refreshConfirmed ? _("Updated") : _("Refresh now"),
