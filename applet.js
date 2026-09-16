@@ -3937,6 +3937,13 @@ class ZUsageApplet extends Applet.Applet {
         // visibly shoved the rings under it. With the position frozen and
         // the ease reduced to opacity, the close is a pure fade with zero
         // movement for every element.
+        // Dimmed rings (S/G badges with no quota usage render at half
+        // opacity) would hit visual zero halfway through the fade. The
+        // farewell fade shows every ring at full strength; the next rebuild
+        // restores the per-window dim states.
+        for (const entry of this._countdownWidgets || []) {
+            if (entry.area && !entry.area.is_finalized()) entry.area.set_opacity(255);
+        }
         const actor = menu.actor;
         menu._closeEaseRestore = true;
         actor.ease = function (params) {

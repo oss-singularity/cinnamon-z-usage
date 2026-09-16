@@ -229,6 +229,13 @@ Open-Position.
   beim ersten Hovern (mehrere Sekunden, seit den Deferred-Pässen länger).
   Fix: `converged` gated den fit-Einstieg (`if (!armed || converged ||
   fitting) return`).
+- **Grüne Ringe „verschwinden früher beim Close" (20.27.56):** Kein
+  Positions-Bug — `_quotaRingOpacity` rendert S/G-Ringe ohne Quota-Usage
+  mit opacity 128 (Halbtransparent als „nichts verbraucht"-Signal). Im
+  Fade multipliziert sich das → visuelles Null bei ~50% des Fades.
+  Fix: Close boostet alle Countdown-Areas auf opacity 255 (Farewell-Fade
+  in voller Deckkraft); der nächste Rebuild stellt die Dim-Stufen wieder
+  her.
 - **Scroll-Dead-Zone WURZEL gefunden (mock-event-Test):**
   `_forwardContentWheel` las `this._scroll` — auf dem APPLET undefined
   (das Scrollview gehört zum Menü: `this.menu._scroll`)! Der Guard
