@@ -50,6 +50,10 @@ const LAUNCH_TOOLTIP_DELAY_MS = 420;
 const POPUP_ACTION_GRID_WIDTH = 352;
 // Cinnamon's one-pixel menu edge brings the visible popup width to 420 px.
 const POPUP_WIDTH = 419;
+// Headroom between the locked viewport and the natural content height: the
+// frame is frozen once per open, and content that grows a few pixels after
+// the lock (countdown ticks, refresh labels) must not spawn a scrollbar.
+const POPUP_VIEWPORT_PAD = 8;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
@@ -3706,11 +3710,15 @@ class ZUsageApplet extends Applet.Applet {
         } catch (error) {}
         const maxMenu = Math.max(240, monitor.height - topReserve - bottomReserve);
         if (!this._popupFrameHeight) {
-            // Only 2px of frame chrome: a larger reserve would show the
-            // scrollbar in the default view whenever the natural content
-            // exceeds the viewport by a few pixels. The 16px top-panel
+            // Only 2px of frame chrome plus a small headroom pad: a larger
+            // reserve would show the scrollbar in the default view whenever
+            // the natural content exceeds the viewport by a few pixels, and
+            // the pad absorbs post-lock content growth. The 16px top-panel
             // slack absorbs the difference instead.
-            const viewport = Math.max(200, Math.min(contentNat, maxMenu - headerNat - footerNat - 2));
+            const viewport = Math.max(200, Math.min(
+                contentNat + POPUP_VIEWPORT_PAD,
+                maxMenu - headerNat - footerNat - 2
+            ));
             this._popupViewport = viewport;
             this._popupFrameHeight = headerNat + viewport + footerNat + 2;
         }
