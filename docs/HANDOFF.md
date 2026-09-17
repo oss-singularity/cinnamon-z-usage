@@ -370,6 +370,38 @@ ALT Track 57.7 → 69.2 → 81.7 über die ersten Fade-Frames (grüne Arc-Pixel
 613→855 = heller); NEU 57.7 → 54.5 → 52.6, Arc monoton ab — nur die Menu-
 Opacity ändert sich. `make check` grün.
 
+## 3f. RUNDE 6 (2026-09-17 Nacht, Update-Transient + Credits-Ende — 043af8c)
+
+### „Updated"-Moment: Ringe/Graphen vergrößern sich nach außen, Credits-Ende bleibt zu weit rechts — GEFIXT
+
+**Claudius drittes Video (22.59.28):** Beim Refresh-Abschluss stoßen Ringe und
+Graphen kurz nach außen und zurück; der „Consumed:"-Ende sitzt danach
+dauerhaft rechts neben der Button-Grid-Kante. Upstream-Referenz: Während
+eines Updates ist das gesamte UI absolut stabil.
+
+**Wurzel (isoliert vermessen):** Dieselbe wie der Close-Shift — der
+Rebuild nach der Fetch-Completion erzeugt frische Rows, deren ERSTE
+Allokation mit aufgeblähter Natural-Breite läuft (23..458 statt
+23..396). Bei offem Popup korrigieren die Syncs das nach 1–2 Frames =
+der sichtbare Bump (Tall-Staging: Color-Extent 1865 gegen Settle-Anker
+1845), und der Credits-Font-Fit konvergiert auf die Transient-Geometrie
+(zu breite Plots → zu großer Font → Ende dauerhaft zu weit rechts, Fit
+disarmed). Upstream rebuilt identisch (Flow gelesen) — die Stabilität
+kommt von der Geometrie, nicht vom Flow.
+
+**Fix (043af8c):** `_captureCarriedRowWidths` + `_applyCarriedRowWidths`:
+Der Rebuild erfasst die gesetzten Breiten der alten Inset-Rows und pinnt
+jede frische Row auf die Vorgänger-Breite (min/natural/width via
+`_forceActorWidth`); nach der ersten Allokation der Row wird entpinnt
+(set_width(-1), Flags frei), damit spätere Reflows unbehindert bleiben.
+Erste Allokation = korrekte Geometrie → Ringe/Charts malen ab Frame 1
+ausgerichtet, der Fit konvergiert auf Settled-Maße.
+
+**Beweis (isolierte 60fps-Refresh-Aufnahmen, Tall-Staging = Bump-Bedingung):**
+OLD Color-Extent 1865 > 1845 Anker beim Rebuild; NEW nie darüber
+(1825 mid-rebuild, 1845 settled). Credits-Ende persistent konstant.
+`make check` grün inkl. Row-Carry-Tests (Capture-Filter, Pin, Unpin-once).
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
