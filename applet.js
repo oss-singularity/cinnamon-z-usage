@@ -1664,21 +1664,20 @@ class ZUsageApplet extends Applet.Applet {
         const progressFraction = Math.max(0, Math.min(1, Number(fraction) || 0));
         const context = area.get_context();
         const foreground = this._menuForeground();
-        // During the close fade the menu opacity multiplies these alphas -
-        // the translucent glow/track would vanish in the first third of the
-        // fade while opaque elements linger. Boost them for the farewell.
-        const closeBoost = this._closing ? 3 : 1;
+        // The close fade must be a pure opacity multiplier on the open-state
+        // colors (upstream behavior): boosting the translucent alphas for the
+        // farewell turned the grey track almost white in the first frames.
         const track = new Clutter.Color({
             red: foreground.red,
             green: foreground.green,
             blue: foreground.blue,
-            alpha: Math.min(255, 42 * closeBoost)
+            alpha: 42
         });
         const glow = new Clutter.Color({
             red: progressColor.red,
             green: progressColor.green,
             blue: progressColor.blue,
-            alpha: Math.min(255, 58 * closeBoost)
+            alpha: 58
         });
         const progress = new Clutter.Color({
             red: progressColor.red,
@@ -4057,13 +4056,10 @@ class ZUsageApplet extends Applet.Applet {
         // visibly shoved the rings under it. With the position frozen and
         // the ease reduced to opacity, the close is a pure fade with zero
         // movement for every element.
-        // Dimmed rings (S/G badges with no quota usage render at half
-        // opacity) would hit visual zero halfway through the fade. The
-        // farewell fade shows every ring at full strength; the next rebuild
-        // restores the per-window dim states.
-        for (const entry of this._countdownWidgets || []) {
-            if (entry.area && !entry.area.is_finalized()) entry.area.set_opacity(255);
-        }
+        // The close fade is a pure opacity multiplier on the open-state
+        // colors - no farewell repaint, no per-area opacity flips. Dimmed
+        // S/G rings keep their designed 128 dim through the fade, exactly
+        // like upstream.
         const actor = menu.actor;
         menu._closeEaseRestore = true;
         actor.ease = function (params) {
