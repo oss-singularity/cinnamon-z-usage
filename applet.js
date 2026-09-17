@@ -1123,6 +1123,7 @@ class ZUsageApplet extends Applet.Applet {
         const carriedHeaderTx = this._captureCarriedHeaderTranslation();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
+        const carriedRowWidths = this._captureCarriedRowWidths();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
         this._countdownWidgets = [];
@@ -1185,6 +1186,8 @@ class ZUsageApplet extends Applet.Applet {
             if (this.menu.isOpen) this._clampPopupHeight();
         }
 
+        this._applyCarriedRowWidths(carriedRowWidths);
+
         // A rebuild replaces every aligned actor while the popup may be
         // open; one queued sync can race ahead of the fresh actors' first
         // allocation and skip them. Re-queue on deferred passes so rings,
@@ -1222,10 +1225,44 @@ class ZUsageApplet extends Applet.Applet {
                 ? entry.actor.translation_x : null);
     }
 
+    _captureCarriedRowWidths() {
+        return (this._popupRightInsetRows || []).map(row =>
+            row && !row.is_finalized() && row.get_width() > 0
+                ? Math.round(row.get_width()) : null);
+    }
+
     _captureCarriedHeaderTranslation() {
         return this._headerRings && !this._headerRings.is_finalized() &&
             Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
             ? this._headerRings.translation_x : null;
+    }
+
+    _applyCarriedRowWidths(widths) {
+        // Fresh rows take their first allocation at their inflated natural
+        // width: the label minimums overflow the clamped item (rows measured
+        // 23..458 instead of 23..396), shoving the rings and charts outward
+        // until a sync corrects them, and letting the credits font fit
+        // converge on the wrong geometry. Pin each fresh row to the width
+        // its predecessor settled at, then unpin after that first allocation
+        // so later reflows stay free.
+        const rows = this._popupRightInsetRows || [];
+        for (let index = 0; index < rows.length; index++) {
+            const row = rows[index];
+            const width = widths ? widths[index] : null;
+            if (!row || row.is_finalized() || typeof width !== "number" || width <= 0) {
+                continue;
+            }
+            this._forceActorWidth(row, width);
+            let pinned = true;
+            row.connect("notify::allocation", () => {
+                if (!pinned || row.is_finalized()) return;
+                pinned = false;
+                row.set_width(-1);
+                row.min_width_set = false;
+                row.natural_width_set = false;
+                row.clip_to_allocation = false;
+            });
+        }
     }
 
     _scheduleMenuRebuild() {

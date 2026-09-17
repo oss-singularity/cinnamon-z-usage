@@ -359,3 +359,81 @@ print("Two-pass voting: single-pass garbage deltas are never applied.");
     }
 }
 print("Click-close: toggling closed never rebuilds (no fade-time transient).");
+
+// The 22.59.28 update video: a rebuild while open gave the fresh rows a
+// first allocation at their inflated natural width (~458px vs the clamped
+// 373px), which shoved the rings and charts outward for a frame or two and
+// let the credits font fit converge on the wrong geometry (the "Consumed:"
+// end stayed right of the button grid). The row widths now carry across
+// rebuilds: fresh rows are pinned to the settled width and unpinned after
+// their first allocation.
+{
+    const finalizedRow = {
+        width: 373,
+        is_finalized() { return true; },
+        get_width() { return this.width; }
+    };
+    const liveRow = {
+        width: 373,
+        is_finalized() { return false; },
+        get_width() { return this.width; }
+    };
+    const zeroRow = {
+        width: 0,
+        is_finalized() { return false; },
+        get_width() { return this.width; }
+    };
+    const applet = Object.create(AppletClass.prototype);
+    applet._popupRightInsetRows = [liveRow, finalizedRow, zeroRow];
+    const carried = applet._captureCarriedRowWidths();
+    if (JSON.stringify(carried) !== JSON.stringify([373, null, null])) {
+        throw new Error(`row width capture failed: ${JSON.stringify(carried)}`);
+    }
+
+    const fresh = [];
+    const makeRow = () => {
+        const row = {
+            width: -1,
+            min_width: 0,
+            natural_width: 0,
+            min_width_set: false,
+            natural_width_set: false,
+            clip_to_allocation: false,
+            handlers: [],
+            is_finalized() { return false; },
+            set_width(value) { this.width = value; },
+            connect(_signal, callback) { this.handlers.push(callback); return this.handlers.length; }
+        };
+        fresh.push(row);
+        return row;
+    };
+    applet._popupRightInsetRows = [makeRow(), makeRow(), makeRow(), makeRow()];
+    applet._forceActorWidth = function (actor, width) {
+        actor.min_width = width;
+        actor.natural_width = width;
+        actor.min_width_set = true;
+        actor.natural_width_set = true;
+        actor.set_width(width);
+        actor.clip_to_allocation = true;
+    };
+    applet._applyCarriedRowWidths([373, 373, null, 373]);
+
+    const [pinned, pinned2, unpinned, pinned3] = fresh;
+    for (const row of [pinned, pinned2, pinned3]) {
+        if (row.width !== 373 || !row.min_width_set || !row.natural_width_set || !row.clip_to_allocation) {
+            throw new Error("row width was not pinned to the carried value");
+        }
+    }
+    if (unpinned.width !== -1 || unpinned.min_width_set) {
+        throw new Error("row without a carried width must not be pinned");
+    }
+
+    // The first allocation unpins the row exactly once.
+    pinned.handlers.forEach(callback => callback());
+    if (pinned.width !== -1 || pinned.min_width_set || pinned.natural_width_set || pinned.clip_to_allocation) {
+        throw new Error("row was not unpinned after its first allocation");
+    }
+    // Unpinning after the first allocation must not raise.
+    pinned.handlers.forEach(callback => callback());
+}
+print("Row width carry: fresh rows allocate settled, then unpin.");
