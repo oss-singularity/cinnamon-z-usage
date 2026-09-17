@@ -58,10 +58,12 @@ const POPUP_VIEWPORT_PAD = 8;
 // distance from the popup's own right edge: slides move both together and
 // the centering compensates footer label changes. A sync pass that reads a
 // different distance happened mid-relayout and must not write alignments.
-const POPUP_RELATIVE_ANCHOR_TOLERANCE = 48;
+// Honest deviations are ±2px (label widths); anything beyond 24px was a
+// garbage read that put the rings flush against the popup edge.
+const POPUP_RELATIVE_ANCHOR_TOLERANCE = 24;
 // Ring corrections beyond this size need two agreeing passes before they
 // are applied: honest layout changes repeat, stale reads do not.
-const POPUP_RING_DELTA_TRUST = 64;
+const POPUP_RING_DELTA_TRUST = 32;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
@@ -597,7 +599,8 @@ class ZUsageApplet extends Applet.Applet {
             !this._actionWidthFrame ||
             this._actionWidthFrame.is_finalized() ||
             this.menu.actor.is_finalized() ||
-            !this._actionWidthFrame.get_stage()
+            !this._actionWidthFrame.get_stage() ||
+            this._closing
         ) return;
         const [menuX] = this.menu.actor.get_transformed_position();
         const [menuWidth] = this.menu.actor.get_transformed_size();
@@ -650,7 +653,7 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _syncContentRightEdges() {
-        if (!this.menu || !this.menu.isOpen) return;
+        if (!this.menu || !this.menu.isOpen || this._closing) return;
         if (!this._actionWidthFrame) return;
         if (this._actionWidthFrame.is_finalized() || this.menu.actor.is_finalized()) return;
         // Anchor: the button grid's right edge - rings and charts close
@@ -1204,7 +1207,7 @@ class ZUsageApplet extends Applet.Applet {
         // deferred idle/timeout passes stay as backup for late allocators.
         if (typeof Meta !== "undefined" && Meta.later_add) {
             Meta.later_add(Meta.LaterType.BEFORE_REDRAW, () => {
-                if (!this._destroyed && this.menu && this.menu.isOpen) {
+                if (!this._destroyed && !this._closing && this.menu && this.menu.isOpen) {
                     this._syncActionColumnCentering();
                 }
                 return GLib.SOURCE_REMOVE;
@@ -1233,6 +1236,13 @@ class ZUsageApplet extends Applet.Applet {
                 return GLib.SOURCE_CONTINUE;
             }
             this._menuRebuildTimeoutId = 0;
+            // A rebuild landing mid-fade has the same problem as a
+            // rebuild-before-close: fresh rows allocate at their inflated
+            // natural width and the close-gated syncs never correct them.
+            // The next open rebuilds anyway.
+            if (this.menu && !this.menu.isOpen && this.menu.animating) {
+                return GLib.SOURCE_REMOVE;
+            }
             this._rebuildMenu();
             return GLib.SOURCE_REMOVE;
         });
@@ -3812,6 +3822,16 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     on_applet_clicked() {
+        if (this.menu && this.menu.isOpen) {
+            // A click that closes must not rebuild: the fresh rows take
+            // their first allocation at their inflated natural width (the
+            // ring rows overflow to ~458px), and the close gates every sync
+            // that would correct them - the rings would ride the whole
+            // farewell fade ~60px off, flush against the popup edge. The
+            // fade shows the settled actors; the next open rebuilds anyway.
+            this.menu.toggle();
+            return;
+        }
         this._rebuildMenu();
         this.menu.toggle();
     }

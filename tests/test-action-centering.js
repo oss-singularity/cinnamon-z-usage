@@ -98,8 +98,11 @@ for (const scale of [1, 1.25, 2]) {
                 _lastChartWidths: [],
                 _activityCharts: [{ chart }]
             });
-            for (let rebuild = 0; rebuild < 3; rebuild++) {
+            for (let rebuild = 0; rebuild < 4; rebuild++) {
                 applet._syncContentRightEdges();
+                // A first delta beyond the 32px trust threshold waits for a
+                // second agreeing pass; assert from the second pass on.
+                if (rebuild === 0) continue;
                 const ringRight = ring.get_transformed_position()[0] + 51;
                 if (ringRight !== right || chart.width !== right - (menuX + 110) + 39) {
                     throw new Error(
@@ -176,8 +179,20 @@ print("Content alignment: rings keep their designed positions, the plot edge fol
         );
     }
 
+    // The 22.10.14 close video: a garbage anchor read 33px toward the popup
+    // edge used to slip under the old 48px tolerance and rode the whole
+    // farewell fade. 24px tolerance rejects it.
+    grid.x += 33;
+    applet._syncContentRightEdges();
+    if (ring.translation_x !== 1 || chart.width !== 329) {
+        throw new Error(
+            `33px anchor garbage was applied: tx=${ring.translation_x}, ` +
+            `chartWidth=${chart.width}`
+        );
+    }
+
     // Recovery: with the anchor back, alignment stays exact (idempotent).
-    grid.x -= 200;
+    grid.x -= 233;
     applet._syncContentRightEdges();
     if (ring.translation_x !== 1 || chart.width !== 329) {
         throw new Error(
@@ -320,3 +335,27 @@ print("Carry-over validation: poisoned translations are dropped.");
     }
 }
 print("Two-pass voting: single-pass garbage deltas are never applied.");
+
+// The 22.10.14 close video, root cause: a click that closes rebuilt the
+// menu first, and the fresh rows took their first allocation at their
+// inflated natural width (~458px vs the clamped 373px). The close gates
+// every sync, so the rings rode the whole fade ~60px off. A closing click
+// must toggle without rebuilding.
+{
+    const applet = Object.create(AppletClass.prototype);
+    let rebuilds = 0, toggles = 0;
+    applet._rebuildMenu = function () { rebuilds++; };
+    applet.menu = {
+        isOpen: true,
+        toggle() { this.isOpen = !this.isOpen; toggles++; }
+    };
+    applet.on_applet_clicked();
+    if (rebuilds !== 0 || toggles !== 1 || applet.menu.isOpen !== false) {
+        throw new Error(`closing click rebuilt: rebuilds=${rebuilds}, toggles=${toggles}`);
+    }
+    applet.on_applet_clicked();
+    if (rebuilds !== 1 || toggles !== 2 || applet.menu.isOpen !== true) {
+        throw new Error(`opening click did not rebuild: rebuilds=${rebuilds}, toggles=${toggles}`);
+    }
+}
+print("Click-close: toggling closed never rebuilds (no fade-time transient).");
