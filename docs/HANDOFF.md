@@ -254,6 +254,61 @@ fitting) return`).
   Adjustment +48/Schritt, three calls = +144, EVENT_STOP.
 - **Gruen-Fade-Frust (20.27.56/12.40.44 + Isolier-Messung):** Die Countdown-Arcs zeichnen Glow (alpha 58) und Track (alpha 42) — beim Menu-Fade multipliziert das, der Glow kippt bei ~23% des Fades auf null (gruenue Ringe verschwinden frueher). Fix: waehrend des Closes zeichnen die Arcs mit geboosteter Alpha (Glow 174, Track 126 via `this._closing` im Paint). Isoliert: Gruen haelt ~60% des Fades.
 
+## 3c. RUNDE 3 (2026-09-17, Refresh-Jump + Ring-Vanish — fd67671, isoliert bewiesen)
+
+### Refresh-Satz + Verschwindende grüne Ringe — GEFIXT (drei Schichten)
+
+**Claudius Befund:** Refresh-Button → Graphen+grüne Ringe machen einen Satz
+zur Seite und zurück; manchmal (1. bis n-ter Refresh) verschwinden die
+grünen Ringe komplett und kehren nie zurück.
+
+**Wurzeln:** (1) Stale Sync-Pässe während der Rebuild-Allokations-Wellen
+laschen bogus Anchor-/Ring-Deltas → der sichtbare Satz. (2) Wiederholte
+bogus Writes akkumulieren über den ±POPUP_WIDTH-Guard — dessen Skip fror
+die Ringe dann dauerhaft außerhalb ein; der Rebuild-Carry schleifte das
+Gift weiter. (3) `z_usage.py` ließ bei Balance-Fetch-Fehlern (Rate-Limit
+bei Rapid-Clicks!) die ZCode-Plan-Limits komplett weg → datenseitiges
+Verschwinden ganzer Sektionen.
+
+**Fixes (applet.js):**
+
+- Menü-relativer Anker-Baseline-Guard (`_stableRelativeAnchor`, pro Open
+  resettet): Die Grid-Kante fährt eine konstante Distanz zur Popup-Kante.
+  Ein Pass, der eine andere Distanz liest, ist Mid-Relayout und wird
+  KOMPLETT verworfen — inklusive Centering, das jetzt VOR dem Write
+  gegen die Baseline validiert wird (kein Zero-then-Write-Flicker mehr).
+- Two-Pass-Voting für Ring-Korrekturen > 64px (`POPUP_RING_DELTA_TRUST`):
+  ehrliche Layout-Änderungen wiederholen ihr Delta im nächsten Pass,
+  Garbage nicht. Tötet die Ein-Poll-Ganz-Block-Blitze (isoliert ±392px).
+- Guard-Trip (|delta| > POPUP_WIDTH) snappt den Ring auf sein Design-Offset
+  (`_usageHomeTx`: Header −13/−7, Countdown 0) statt ewig zu skippen —
+  Self-Healing; vergiftete Translationen (> POPUP_WIDTH) wandern nicht
+  mehr in den Rebuild-Carry.
+- Zusage-Fail-Safe: `Math.abs(centering) > menuWidth` → Pass verwerfen.
+
+**Fixes (z_usage.py):** Plan-Balance-Cache (`~/.local/state/cinnamon-z-usage/
+plan-balances-cache.json`, 10min Grace, nur zukünftige Resets) — ein
+fehlgeschlagener Balance-Fetch replayed die letzten bekannten Buckets,
+statt die Sektionen zu leeren.
+
+**Beweis (isoliertes Refresh-Protokoll, 8 echte Zyklen @150ms-Polling):**
+ALT: Ganz-Block-Shift −65px bei Rebuild, nie korrigiert + Ring-Count-Drop.
+NEU: Anker-Baseline konstant 33 (Grid-Kante 1847 = historischer Wert),
+Ringe exakt drauf (bemalte Kante 1847), Null Blitze, Header konstant.
+`make check` grün (49 Python-Tests + alle cjs-Suiten inkl. Refresh-Guard-,
+Voting- und Carry-Tests). Live: Audit 24/24, PID unverändert.
+
+**Werkzeug-Lektionen (Eval/Harness):** Im Cinnamon-Eval-Scope ist
+`Mainloop` UNDEFINED — `imports.mainloop.timeout_add(ms, cb)` mit
+true/false-Rückgaben nutzen; `GLib.timeout_add(0, …)` aus Eval friert die
+Xvfb-Shell ein. Die 120ms-Spinner-Textanimation stanniert LLVMpipe/Xvfb
+(Shell-Live-Lock; auf echter GPU unkritisch) — für Headless-Protokolle
+auf der Instanz stubben. Wiederverwendbares Mini-Harness:
+`/tmp/z-refresh-mini.sh` + `z-mini-inner.sh` + `z-mini-watcher.js`
+(privater HOME, DCONF_PROFILE=Datei nötig, Applet nach
+`$XDG_DATA_HOME/cinnamon/applets` stagen — XDG übersteuert ~/.local —,
+ibus-daemon vor cinnamon starten, sonst inputMethod-TypeError).
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
