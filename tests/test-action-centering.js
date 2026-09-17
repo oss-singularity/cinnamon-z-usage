@@ -360,80 +360,61 @@ print("Two-pass voting: single-pass garbage deltas are never applied.");
 }
 print("Click-close: toggling closed never rebuilds (no fade-time transient).");
 
-// The 22.59.28 update video: a rebuild while open gave the fresh rows a
-// first allocation at their inflated natural width (~458px vs the clamped
-// 373px), which shoved the rings and charts outward for a frame or two and
-// let the credits font fit converge on the wrong geometry (the "Consumed:"
-// end stayed right of the button grid). The row widths now carry across
-// rebuilds: fresh rows are pinned to the settled width and unpinned after
-// their first allocation.
+
+// The credits consumption suffix is right-anchored at the grid edge: its
+// end must always sit flush with the buttons (the 23.34.06 video - the red
+// text ended short of the buttons at rest and jumped during updates). The
+// sync translates the whole suffix group rigidly.
 {
-    const finalizedRow = {
-        width: 373,
-        is_finalized() { return true; },
-        get_width() { return this.width; }
-    };
-    const liveRow = {
-        width: 373,
+    const menuX = 1461;
+    const makeLabel = x => ({
+        x,
+        translation_x: 0,
         is_finalized() { return false; },
-        get_width() { return this.width; }
-    };
-    const zeroRow = {
-        width: 0,
-        is_finalized() { return false; },
-        get_width() { return this.width; }
-    };
+        get_transformed_position() { return [this.x + this.translation_x, 0]; },
+        get_transformed_size() { return [60, 20]; }
+    });
+    const separator = makeLabel(menuX + 250);
+    const expires = makeLabel(menuX + 270);
+    const expiry = makeLabel(menuX + 330);
     const applet = Object.create(AppletClass.prototype);
-    applet._popupRightInsetRows = [liveRow, finalizedRow, zeroRow];
-    const carried = applet._captureCarriedRowWidths();
-    if (JSON.stringify(carried) !== JSON.stringify([373, null, null])) {
-        throw new Error(`row width capture failed: ${JSON.stringify(carried)}`);
-    }
-
-    const fresh = [];
-    const makeRow = () => {
-        const row = {
-            width: -1,
-            min_width: 0,
-            natural_width: 0,
-            min_width_set: false,
-            natural_width_set: false,
-            clip_to_allocation: false,
-            handlers: [],
+    applet.menu = {
+        actor: {
             is_finalized() { return false; },
-            set_width(value) { this.width = value; },
-            connect(_signal, callback) { this.handlers.push(callback); return this.handlers.length; }
-        };
-        fresh.push(row);
-        return row;
+            get_transformed_position() { return [menuX, 0]; },
+            get_transformed_size() { return [419, 0]; }
+        },
+        isOpen: true
     };
-    applet._popupRightInsetRows = [makeRow(), makeRow(), makeRow(), makeRow()];
-    applet._forceActorWidth = function (actor, width) {
-        actor.min_width = width;
-        actor.natural_width = width;
-        actor.min_width_set = true;
-        actor.natural_width_set = true;
-        actor.set_width(width);
-        actor.clip_to_allocation = true;
-    };
-    applet._applyCarriedRowWidths([373, 373, null, 373]);
+    Object.assign(applet, {
+        _actionWidthFrame: {
+            is_finalized() { return false; },
+            get_transformed_position() { return [menuX + 48, 0]; },
+            get_transformed_size() { return [352, 0]; }
+        },
+        _countdownWidgets: [],
+        _creditsSuffixLabels: [separator, expires, expiry],
+        _lastChartWidths: [],
+        _activityCharts: []
+    });
+    const right = menuX + 400;
 
-    const [pinned, pinned2, unpinned, pinned3] = fresh;
-    for (const row of [pinned, pinned2, pinned3]) {
-        if (row.width !== 373 || !row.min_width_set || !row.natural_width_set || !row.clip_to_allocation) {
-            throw new Error("row width was not pinned to the carried value");
-        }
+    // The suffix ends 20px short of the grid edge: the sync must move the
+    // whole group rigidly so the end lands flush.
+    applet._syncContentRightEdges();
+    const endAfter = expiry.get_transformed_position()[0] + 60;
+    if (endAfter !== right) {
+        throw new Error(`suffix not flush: end=${endAfter}, expected=${right}`);
     }
-    if (unpinned.width !== -1 || unpinned.min_width_set) {
-        throw new Error("row without a carried width must not be pinned");
+    const moved = [separator, expires, expiry].map(label => label.translation_x);
+    if (moved[0] !== moved[1] || moved[1] !== moved[2]) {
+        throw new Error(`suffix group did not move rigidly: ${moved}`);
     }
 
-    // The first allocation unpins the row exactly once.
-    pinned.handlers.forEach(callback => callback());
-    if (pinned.width !== -1 || pinned.min_width_set || pinned.natural_width_set || pinned.clip_to_allocation) {
-        throw new Error("row was not unpinned after its first allocation");
+    // Idempotent: a second pass must not move anything.
+    applet._syncContentRightEdges();
+    if ([separator, expires, expiry].some(label => label.translation_x !== moved[0])) {
+        throw new Error("suffix anchor is not idempotent");
     }
-    // Unpinning after the first allocation must not raise.
-    pinned.handlers.forEach(callback => callback());
 }
-print("Row width carry: fresh rows allocate settled, then unpin.");
+print("Credits suffix: the red text end always rides the button grid edge.");

@@ -263,6 +263,8 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
+        this._creditsSuffixLabels = null;
+        this._lastCreditFontSize = null;
         this._closing = false;
         this._lastChartWidths = [];
         this._actionEdgeSyncQueuedId = 0;
@@ -730,11 +732,28 @@ class ZUsageApplet extends Applet.Applet {
                 this._lastChartWidths[index] = width;
             }
         });
-        // The credits consumption line is placed by its own font-fit pass
-        // (_fitCreditConsumptionRow): the text starts in the normal column
-        // and the font shrinks until the line ends at the grid anchor. No
-        // translation here - translating the row moved its start off the
-        // text column and fought the fit pass.
+        // The credits consumption suffix is right-anchored at the grid
+        // edge: its end must always sit flush with the buttons. The font
+        // fit owns the size; the sync owns the position. Translating the
+        // three suffix labels as a rigid group cannot feed back into the
+        // fit - a translation never affects the layout widths it measures.
+        const suffixLabels = this._creditsSuffixLabels;
+        if (suffixLabels && suffixLabels.length) {
+            const last = suffixLabels[suffixLabels.length - 1];
+            if (!last.is_finalized()) {
+                const [suffixX] = last.get_transformed_position();
+                const [suffixWidth] = last.get_transformed_size();
+                if (suffixWidth > 0) {
+                    const delta =
+                        right - (Math.round(suffixX) + Math.round(suffixWidth));
+                    if (Math.abs(delta) <= POPUP_WIDTH) {
+                        for (const label of suffixLabels) {
+                            if (!label.is_finalized()) label.translation_x += delta;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     _rebuildPanel() {
@@ -1123,7 +1142,7 @@ class ZUsageApplet extends Applet.Applet {
         const carriedHeaderTx = this._captureCarriedHeaderTranslation();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
-        const carriedRowWidths = this._captureCarriedRowWidths();
+        this._carriedSuffixTx = this._captureCarriedSuffixTranslation();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
         this._countdownWidgets = [];
@@ -1132,6 +1151,7 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
+        this._creditsSuffixLabels = null;
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -1185,8 +1205,15 @@ class ZUsageApplet extends Applet.Applet {
             }
             if (this.menu.isOpen) this._clampPopupHeight();
         }
+        // Fresh items must be width-locked BEFORE their first allocation:
+        // without the lock they allocate at their inflated natural width
+        // (ring rows measured 458px instead of 373) and nothing ever
+        // re-allocates them while the popup stays open - the rings, charts
+        // and the credits fit all measure the overflow geometry.
+        if (wasOpen && this.menu.isOpen && this.menu.actor) {
+            this._lockPopupLayoutWidth();
+        }
 
-        this._applyCarriedRowWidths(carriedRowWidths);
 
         // A rebuild replaces every aligned actor while the popup may be
         // open; one queued sync can race ahead of the fresh actors' first
@@ -1225,10 +1252,18 @@ class ZUsageApplet extends Applet.Applet {
                 ? entry.actor.translation_x : null);
     }
 
-    _captureCarriedRowWidths() {
-        return (this._popupRightInsetRows || []).map(row =>
-            row && !row.is_finalized() && row.get_width() > 0
-                ? Math.round(row.get_width()) : null);
+    _captureCarriedSuffixTranslation() {
+        const labels = this._creditsSuffixLabels || [];
+        if (!labels.length) return null;
+        let value = null;
+        for (const label of labels) {
+            if (!label || label.is_finalized()) return null;
+            const tx = label.translation_x;
+            if (typeof tx !== "number" || Math.abs(tx) > POPUP_WIDTH) return null;
+            if (value === null) value = tx;
+            else if (Math.abs(value - tx) > 1) return null;
+        }
+        return value;
     }
 
     _captureCarriedHeaderTranslation() {
@@ -1493,6 +1528,12 @@ class ZUsageApplet extends Applet.Applet {
             text: _f("  %s usage", duration)
         });
         durationLabel.style = "font-weight: bold;";
+        // Ellipsize the row labels: their inflated minimum widths used to
+        // overflow the clamped item on the first allocation after a rebuild
+        // (rows measured 23..458 instead of 23..396), shoving the rings and
+        // charts outward and letting the credits font fit converge on the
+        // wrong geometry.
+        durationLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         const remainingLabel = new St.Label({
             text: _f("%s remaining", remaining)
         });
@@ -1500,6 +1541,7 @@ class ZUsageApplet extends Applet.Applet {
             this._remainingColor(window.remainingPercent),
             12
         );
+        remainingLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         remainingLabel.opacity = this.showColors &&
             Number.isFinite(window.remainingPercent) &&
             window.remainingPercent <= this.criticalRemaining ? 255 : 195;
@@ -1508,6 +1550,7 @@ class ZUsageApplet extends Applet.Applet {
         const resetLabel = new St.Label({
             text: _f("  Resets %s", reset)
         });
+        resetLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         resetLabel.style = `padding-top: 3px; font-size: 90%; color: ${this._menuColor(0.68)};`;
         text.add_child(headline);
         text.add_child(resetLabel);
@@ -2840,19 +2883,32 @@ class ZUsageApplet extends Applet.Applet {
             if (!(rowWidth > 0)) return;
             fitting = true;
             try {
-                applyFontSize(CREDIT_CONSUMPTION_BASE_FONT_SIZE);
+                // Start from the size the previous build converged to:
+                // restarting at the base size made the red text visibly
+                // jump on every update.
+                const startFont = this._lastCreditFontSize ||
+                    CREDIT_CONSUMPTION_BASE_FONT_SIZE;
+                applyFontSize(startFont);
                 const fixedWidth = preferredWidth(labelActor) +
                     preferredWidth(valueLabel) + preferredWidth(separatorLabel);
                 const suffixWidth = preferredWidth(expiresLabel) +
                     preferredWidth(expiryDateLabel);
                 const targetWidth = availableWidth();
                 const availableSuffixWidth = Math.max(0, targetWidth - fixedWidth);
+                // Widths scale linearly with the font size, so the ratio
+                // applies to the font the widths were measured at (the
+                // carried size), bounded by the base size - the line may
+                // grow back toward the base font when the new text is
+                // shorter.
                 const ratio = suffixWidth > 0
-                    ? Math.min(1, availableSuffixWidth / suffixWidth)
+                    ? availableSuffixWidth / suffixWidth
                     : 1;
-                let fontSize = Math.max(
-                    CREDIT_CONSUMPTION_MIN_FONT_SIZE,
-                    Math.floor(CREDIT_CONSUMPTION_BASE_FONT_SIZE * ratio * 10) / 10
+                let fontSize = Math.min(
+                    CREDIT_CONSUMPTION_BASE_FONT_SIZE,
+                    Math.max(
+                        CREDIT_CONSUMPTION_MIN_FONT_SIZE,
+                        Math.floor(startFont * ratio * 10) / 10
+                    )
                 );
                 applyFontSize(fontSize);
                 while (
@@ -2871,6 +2927,10 @@ class ZUsageApplet extends Applet.Applet {
                     converged = true;
                 }
                 lastFont = fontSize;
+                this._lastCreditFontSize = fontSize;
+                // The font change re-wraps the suffix; the edge sync owns
+                // its position and needs to run on the new geometry.
+                this._queueActionEdgeSync();
             } finally {
                 fitting = false;
             }
@@ -2890,7 +2950,8 @@ class ZUsageApplet extends Applet.Applet {
                     lastFont = null;
                 }
             },
-            isConverged: () => converged
+            isConverged: () => converged,
+            getFontSize: () => lastFont
         };
     }
 
@@ -3047,6 +3108,18 @@ class ZUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
+            this._creditsSuffixLabels = [
+                fitTargets.separatorLabel,
+                fitTargets.expiresLabel,
+                fitTargets.expiryDateLabel
+            ];
+            // The edge sync right-anchors this group; carrying its aligned
+            // translation keeps the very first paint flush too.
+            if (typeof this._carriedSuffixTx === "number") {
+                for (const label of this._creditsSuffixLabels) {
+                    label.translation_x = this._carriedSuffixTx;
+                }
+            }
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
