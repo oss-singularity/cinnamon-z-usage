@@ -309,6 +309,40 @@ auf der Instanz stubben. Wiederverwendbares Mini-Harness:
 `$XDG_DATA_HOME/cinnamon/applets` stagen — XDG übersteuert ~/.local —,
 ibus-daemon vor cinnamon starten, sonst inputMethod-TypeError).
 
+## 3d. RUNDE 4 (2026-09-17 Abend, Close-Ringe wandern „voreilig" — fcd5709)
+
+### Click-Close: grüne Ringe +40..62px zur Panel-Kante während des Fades — GEFIXT
+
+**Claudius 60fps-Video (vid-2026-09-17_22.10.14.mp4, 65 Frames ausgewertet):**
+Beim Schließen springt der grüne Countdown-Ring im ERSTEN Fade-Frame ~40px
+nach rechts (bemalte Kante 1847 → ~1909, flush an die Popup-Außenkante) und
+bleibt da; Titel/Text/blaue Ringe/Footer-Buttons bleiben +0px (Template-
+Tracking über alle Frames).
+
+**Wurzel (isoliert per Click-Pfad-Instrumentierung reproduziert):**
+`on_applet_clicked` rebuilt VOR dem Toggle — auch beim SCHLIESSEN. Die
+frischen Rows nehmen ihre erste Allokation mit aufgeblähter Natural-Breite
+(Ring-Reihen 23..458 statt geclampter 23..396 — die bekannte Min-Width-
+Inflation), und der Close gated ALLE Syncs, die das korrigieren würden →
+die Overflow-Allokation ritt den ganzen Farewell-Fade mit. Die früheren
+Repro-Versuche mit direktem `menu.close(true)` mussten leer laufen — der
+Rebuild-davor ist der Punkt.
+
+**Fixes (fcd5709):**
+
+- Ein Klick, der schließt, tut NUR noch togglen — kein Rebuild. Das Fade
+  zeigt die settle-outgerichteten Actors; der nächste Open rebuilt eh.
+  (`_scheduleMenuRebuild` überspringt ebenfalls, wenn der Rebuild mitten
+  in einen Fade landen würde — Refresh-Button + schnelles Schließen.)
+- Härtung vom gleichen Fund: Anker-Toleranz 48→24px (ein Müll-Anker-Read
+  33px zur Popup-Kante rutschte durch die alte Toleranz), Ring-Delta-
+  Trust 64→32px, BEFORE_REDRAW-Alignment gated jetzt auf `_closing`.
+
+**Beweis (isolierter Click-Close, 11 Snapshots):** ALT alloc 304..356 →
+366..418 bei t8, starr verschoben durch den Fade; NEU konstant
+304..356 / px 1796 / tx 8 — reiner Opacity-Fade 255→45, null Bewegung.
+`make check` grün inkl. Click-Close-Regressions-Test + 33px-Anker-Reject.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
