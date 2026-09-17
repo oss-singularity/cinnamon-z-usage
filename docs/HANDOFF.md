@@ -402,6 +402,44 @@ OLD Color-Extent 1865 > 1845 Anker beim Rebuild; NEW nie darüber
 (1825 mid-rebuild, 1845 settled). Credits-Ende persistent konstant.
 `make check` grün inkl. Row-Carry-Tests (Capture-Filter, Pin, Unpin-once).
 
+## 3g. RUNDE 7 (2026-09-18 Nacht, Credits-Zeile springt beim Update — b08877b)
+
+### „Consumed:" startet zu kurz / wächst nach dem Update — Ende jetzt IMMER flush
+
+**Claudius viertes Video (23.34.06):** Der rote Consumed-Text startet zu
+kurz, ist nach dem Update zu lang; das Ende soll IMMER bündig mit dem
+Button-Grid-Ende sein. Messung: Ende ruhte 23px links der Kante (der Fit
+kann nur schrumpfen, nie dehnen) und sprang beim Update (Base-Font-Neu-
+start + Konvergenz auf Transient-Geometrie; Doppeltext-Frame = Font-/
+Positions-Sprung mid-repaint).
+
+**Wurzelkette (instrumentierte Rebuilds):** (1) Der Rebuild-while-open
+lief NIE `_lockPopupLayoutWidth` — frische Items allozierten ungeclampt,
+die Rows wuchsen auf 422px und BLIEBEN dort (nichts re-alloziert sie).
+(2) Der Row-Breiten-Pin aus 043af8c entpinnt nach der ersten Allokation →
+die Natural-Min-Inflation gewann zurück (373 → 422) → (3) der Credits-
+Fit konvergierte auf die breite Row: Font 73.1 → 86.2 = „zu lang",
+Start rückt links = „zu kurz".
+
+**Fix (b08877b, vier Hebel):**
+
+- `_lockPopupLayoutWidth` läuft jetzt IM Rebuild (vor der ersten
+  Allokation der frischen Items) — Rows allozieren 373 und bleiben dort.
+- Die Limit-Row-Labels sind ellipsized (EllipsizeMode.END) — deren
+  Min-Breite kann das geclampte Item nicht mehr überlaufen.
+- Der Credits-Font-Fit startet bei der konvergierten Größe des
+  Vorgänger-Builds (`_lastCreditFontSize`, Ratio linear relativ, nach
+  oben bis Base begrenzt) — kein Font-Sprung mehr beim Update.
+- Der Edge-Sync right-anchored die Suffix-Gruppe (Separator+Consumed+
+  Werte) rigid an die Grid-Kante; die Suffix-Translation wird über
+  Rebuilds carryet — selbst der erste Paint nach einem Update ist flush.
+
+**Beweis (instrumentierte Same-Data-Rebuilds):** ALT rowW 373/422/422 +
+Font 73.1→86.2; NEU rowW konstant 373/373/373, Font 73.1→70.7 (einmalige
+Anpassung, Anker kompensiert tx 39→45, Ende flush), danach stabil. Ende
+1846 = Anker 1847 ±1 vor/nach dem Rebuild. `make check` grün inkl.
+Suffix-Anchor-Tests (flush, rigid, idempotent).
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
