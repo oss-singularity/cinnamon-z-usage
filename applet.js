@@ -263,7 +263,6 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
-        this._creditsSuffixLabels = null;
         this._lastCreditFontSize = null;
         this._closing = false;
         this._lastChartWidths = [];
@@ -732,28 +731,10 @@ class ZUsageApplet extends Applet.Applet {
                 this._lastChartWidths[index] = width;
             }
         });
-        // The credits consumption suffix is right-anchored at the grid
-        // edge: its end must always sit flush with the buttons. The font
-        // fit owns the size; the sync owns the position. Translating the
-        // three suffix labels as a rigid group cannot feed back into the
-        // fit - a translation never affects the layout widths it measures.
-        const suffixLabels = this._creditsSuffixLabels;
-        if (suffixLabels && suffixLabels.length) {
-            const last = suffixLabels[suffixLabels.length - 1];
-            if (!last.is_finalized()) {
-                const [suffixX] = last.get_transformed_position();
-                const [suffixWidth] = last.get_transformed_size();
-                if (suffixWidth > 0) {
-                    const delta =
-                        right - (Math.round(suffixX) + Math.round(suffixWidth));
-                    if (Math.abs(delta) <= POPUP_WIDTH) {
-                        for (const label of suffixLabels) {
-                            if (!label.is_finalized()) label.translation_x += delta;
-                        }
-                    }
-                }
-            }
-        }
+        // The credits consumption line flows naturally like upstream: the
+        // font fit owns its size (shrinking only when the text would
+        // overflow the grid anchor), and its end lands wherever the fitted
+        // text ends - no right-anchoring, no gap after the balance value.
     }
 
     _rebuildPanel() {
@@ -1142,7 +1123,6 @@ class ZUsageApplet extends Applet.Applet {
         const carriedHeaderTx = this._captureCarriedHeaderTranslation();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
-        this._carriedSuffixTx = this._captureCarriedSuffixTranslation();
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
         this._countdownWidgets = [];
@@ -1151,7 +1131,6 @@ class ZUsageApplet extends Applet.Applet {
         this._popupRightInsetRows = [];
         this._activityCharts = [];
         this._creditsFit = null;
-        this._creditsSuffixLabels = null;
         this.menu.removeAll();
         if (this.menu._footer) {
             this.menu._footer.remove_all_children();
@@ -1205,6 +1184,7 @@ class ZUsageApplet extends Applet.Applet {
             }
             if (this.menu.isOpen) this._clampPopupHeight();
         }
+        this._builtMenuSignature = this._menuSignature(this._snapshot);
         // Fresh items must be width-locked BEFORE their first allocation:
         // without the lock they allocate at their inflated natural width
         // (ring rows measured 458px instead of 373) and nothing ever
@@ -1252,20 +1232,6 @@ class ZUsageApplet extends Applet.Applet {
                 ? entry.actor.translation_x : null);
     }
 
-    _captureCarriedSuffixTranslation() {
-        const labels = this._creditsSuffixLabels || [];
-        if (!labels.length) return null;
-        let value = null;
-        for (const label of labels) {
-            if (!label || label.is_finalized()) return null;
-            const tx = label.translation_x;
-            if (typeof tx !== "number" || Math.abs(tx) > POPUP_WIDTH) return null;
-            if (value === null) value = tx;
-            else if (Math.abs(value - tx) > 1) return null;
-        }
-        return value;
-    }
-
     _captureCarriedHeaderTranslation() {
         return this._headerRings && !this._headerRings.is_finalized() &&
             Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
@@ -1300,6 +1266,27 @@ class ZUsageApplet extends Applet.Applet {
         }
     }
 
+    _menuSignature(snapshot) {
+        // A refresh returns a fresh snapshot every time even when nothing
+        // visible changed; rebuilding the open menu for it blanks the
+        // content for a few frames (the flicker on rapid refresh clicks).
+        // Compare exactly what the menu renders.
+        if (!snapshot) return "none";
+        return JSON.stringify({
+            limits: (snapshot.limits || []).map(limit => ({
+                id: limit.id,
+                windows: (limit.windows || []).map(window => [
+                    window.remainingPercent,
+                    window.usedPercent,
+                    window.resetsAt
+                ])
+            })),
+            credits: snapshot.credits || null,
+            consumption: snapshot.history ? snapshot.history.creditPeriods || null : null,
+            activity: snapshot.history ? snapshot.history.creditActivity24h || null : null
+        });
+    }
+
     _scheduleMenuRebuild() {
         if (this._destroyed || this._menuRebuildTimeoutId) return;
         this._menuRebuildTimeoutId = Mainloop.timeout_add(60, () => {
@@ -1313,6 +1300,12 @@ class ZUsageApplet extends Applet.Applet {
             // natural width and the close-gated syncs never correct them.
             // The next open rebuilds anyway.
             if (this.menu && !this.menu.isOpen && this.menu.animating) {
+                return GLib.SOURCE_REMOVE;
+            }
+            // Identical data renders an identical menu - skip the rebuild
+            // and the content flicker that comes with it.
+            const signature = this._menuSignature(this._snapshot);
+            if (signature === this._builtMenuSignature) {
                 return GLib.SOURCE_REMOVE;
             }
             this._rebuildMenu();
@@ -3108,18 +3101,6 @@ class ZUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
-            this._creditsSuffixLabels = [
-                fitTargets.separatorLabel,
-                fitTargets.expiresLabel,
-                fitTargets.expiryDateLabel
-            ];
-            // The edge sync right-anchors this group; carrying its aligned
-            // translation keeps the very first paint flush too.
-            if (typeof this._carriedSuffixTx === "number") {
-                for (const label of this._creditsSuffixLabels) {
-                    label.translation_x = this._carriedSuffixTx;
-                }
-            }
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
