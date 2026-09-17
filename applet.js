@@ -54,6 +54,14 @@ const POPUP_WIDTH = 419;
 // frame is frozen once per open, and content that grows a few pixels after
 // the lock (countdown ticks, refresh labels) must not spawn a scrollbar.
 const POPUP_VIEWPORT_PAD = 8;
+// While the popup is open the button grid's right edge rides a constant
+// distance from the popup's own right edge: slides move both together and
+// the centering compensates footer label changes. A sync pass that reads a
+// different distance happened mid-relayout and must not write alignments.
+const POPUP_RELATIVE_ANCHOR_TOLERANCE = 48;
+// Ring corrections beyond this size need two agreeing passes before they
+// are applied: honest layout changes repeat, stale reads do not.
+const POPUP_RING_DELTA_TRUST = 64;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
@@ -205,6 +213,9 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         // from its preferred height, so a late clamp would leave the top of
         // a taller-than-monitor popup off-screen.
         owner._popupFrameHeight = 0;
+        // The anchor-stability baseline is per open: the first sync pass of
+        // this open establishes where the grid edge rides.
+        owner._stableRelativeAnchor = null;
         owner._clampPopupHeight(owner.actor);
         super.open(animate);
         owner._lockPopupLayoutWidth();
@@ -253,6 +264,7 @@ class ZUsageApplet extends Applet.Applet {
         this._closing = false;
         this._lastChartWidths = [];
         this._actionEdgeSyncQueuedId = 0;
+        this._stableRelativeAnchor = null;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
         this._rightPanelPopupCloseSeq = 0;
@@ -587,7 +599,6 @@ class ZUsageApplet extends Applet.Applet {
             this.menu.actor.is_finalized() ||
             !this._actionWidthFrame.get_stage()
         ) return;
-        this._actionWidthFrame.translation_x = 0;
         const [menuX] = this.menu.actor.get_transformed_position();
         const [menuWidth] = this.menu.actor.get_transformed_size();
         const [gridX] = this._actionWidthFrame.get_transformed_position();
@@ -595,9 +606,31 @@ class ZUsageApplet extends Applet.Applet {
         // Transformed coordinates can differ by tiny float errors between
         // opening and rebuilding. Snap to pixels before the half-width math
         // so an odd popup width cannot flip the translation by one pixel.
+        // The current translation is subtracted so the math is independent
+        // of what earlier passes wrote (no zero-then-write flicker).
         const menuCenter = Math.round(menuX) + Math.round(menuWidth) / 2;
-        const gridCenter = Math.round(gridX) + Math.round(gridWidth) / 2;
-        this._actionWidthFrame.translation_x = Math.round(menuCenter - gridCenter);
+        const gridCenter =
+            Math.round(gridX) + Math.round(gridWidth) / 2 - this._actionWidthFrame.translation_x;
+        const centering = Math.round(menuCenter - gridCenter);
+        // The grid always lives inside the menu, so its centering offset
+        // cannot exceed the menu width. Anything larger is a mid-relayout
+        // read; writing it would fling the anchor and every ring with it.
+        if (Math.abs(centering) > menuWidth) return;
+        // Validate the RESULTING anchor distance before writing anything:
+        // a centering computed from a mid-relayout read shifts the grid and
+        // every ring glued to it by that error, and later passes find no
+        // reason to correct it (the stable-anchor baseline is per open).
+        const resultingRight =
+            Math.round(gridX) + Math.round(gridWidth) - this._actionWidthFrame.translation_x + centering;
+        const relative = Math.round(menuX + menuWidth) - resultingRight;
+        if (this._stableRelativeAnchor === null || this._stableRelativeAnchor === undefined) {
+            this._stableRelativeAnchor = relative;
+        } else if (
+            Math.abs(relative - this._stableRelativeAnchor) > POPUP_RELATIVE_ANCHOR_TOLERANCE
+        ) {
+            return;
+        }
+        this._actionWidthFrame.translation_x = centering;
         this._syncContentRightEdges();
     }
 
@@ -622,10 +655,27 @@ class ZUsageApplet extends Applet.Applet {
         if (this._actionWidthFrame.is_finalized() || this.menu.actor.is_finalized()) return;
         // Anchor: the button grid's right edge - rings and charts close
         // flush with it (the original design).
+        const [menuX] = this.menu.actor.get_transformed_position();
+        const [menuWidth] = this.menu.actor.get_transformed_size();
         const [gridX] = this._actionWidthFrame.get_transformed_position();
         const [gridWidth] = this._actionWidthFrame.get_transformed_size();
-        if (gridWidth <= 0) return;
+        if (gridWidth <= 0 || menuWidth <= 0) return;
         const right = Math.round(gridX + gridWidth);
+        // While open, the grid edge rides a constant distance from the
+        // popup's own right edge: slides move both together and the
+        // centering compensates footer label changes. A pass reading a
+        // different distance is mid-relayout - writing its deltas shifts
+        // every ring toward the panel (the refresh jump), and repeated
+        // shifts accumulate past the per-ring guard, whose skip then
+        // leaves the rings invisible for good (the vanished rings).
+        const relative = Math.round(menuX + menuWidth) - right;
+        if (this._stableRelativeAnchor === null || this._stableRelativeAnchor === undefined) {
+            this._stableRelativeAnchor = relative;
+        } else if (
+            Math.abs(relative - this._stableRelativeAnchor) > POPUP_RELATIVE_ANCHOR_TOLERANCE
+        ) {
+            return;
+        }
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {
@@ -635,12 +685,33 @@ class ZUsageApplet extends Applet.Applet {
             // Per-ring absolute alignment: the painted right edge (the glow
             // ends one pixel inside) goes to the anchor, so repeated syncs
             // converge instead of drifting. A delta beyond the popup width
-            // can only come from a mid-relayout read - ignore it instead of
-            // latching a shift that flings the rings toward the panel.
+            // cannot come from an honest layout - the ring was flung out by
+            // earlier stale passes. Snap it to its designed offset instead
+            // of skipping: a skip left it invisible forever.
             const current = actor.get_transformed_position()[0] + width - 1;
             const delta = right - Math.round(current);
-            if (Math.abs(delta) > POPUP_WIDTH) continue;
-            actor.translation_x += delta;
+            if (Math.abs(delta) > POPUP_WIDTH) {
+                if (actor._usageHomeTx !== undefined) actor.translation_x = actor._usageHomeTx;
+                actor._usagePendingDelta = null;
+                continue;
+            }
+            if (Math.abs(delta) <= POPUP_RING_DELTA_TRUST) {
+                actor._usagePendingDelta = null;
+                actor.translation_x += delta;
+                continue;
+            }
+            // One pass can read a garbage transformed position while the
+            // rebuild's allocation waves are still in flight; writing that
+            // delta WAS the visible refresh jump (a whole-poll flash of the
+            // rings hundreds of pixels off). An honest layout change shows
+            // the same delta again on the next pass - apply only then.
+            const pending = actor._usagePendingDelta;
+            if (pending !== null && pending !== undefined && Math.abs(pending - delta) <= 4) {
+                actor._usagePendingDelta = null;
+                actor.translation_x += delta;
+            } else {
+                actor._usagePendingDelta = delta;
+            }
         }
         const chartLimit = this._popupWidth() + 96;
         (this._activityCharts || []).forEach(({ chart }, index) => {
@@ -1042,11 +1113,13 @@ class ZUsageApplet extends Applet.Applet {
         this._actionColumn = null;
         // Carry the aligned ring translations across the rebuild so the
         // refreshed menu opens pre-aligned instead of visibly jumping when
-        // the deferred sync catches up. Capture BEFORE resetting anything.
-        const carriedRingTranslations = (this._countdownWidgets || []).map(entry =>
-            entry.actor && !entry.actor.is_finalized() ? entry.actor.translation_x : null);
-        const carriedHeaderTx = this._headerRings && !this._headerRings.is_finalized()
-            ? this._headerRings.translation_x : null;
+        // the deferred sync catches up. Captured BEFORE resetting anything;
+        // translations beyond the popup width are poison from earlier stale
+        // passes and are dropped so they cannot haunt the fresh build.
+        const carriedRingTranslations = this._captureCarriedRingTranslations();
+        const carriedHeaderTx = this._captureCarriedHeaderTranslation();
+        this._carriedRingTranslations = carriedRingTranslations;
+        this._carriedHeaderTx = carriedHeaderTx;
         this._carriedRingTranslations = carriedRingTranslations;
         this._carriedHeaderTx = carriedHeaderTx;
         this._countdownWidgets = [];
@@ -1137,6 +1210,19 @@ class ZUsageApplet extends Applet.Applet {
                 return GLib.SOURCE_REMOVE;
             });
         }
+    }
+
+    _captureCarriedRingTranslations() {
+        return (this._countdownWidgets || []).map(entry =>
+            entry.actor && !entry.actor.is_finalized() &&
+            Math.abs(entry.actor.translation_x) <= POPUP_WIDTH
+                ? entry.actor.translation_x : null);
+    }
+
+    _captureCarriedHeaderTranslation() {
+        return this._headerRings && !this._headerRings.is_finalized() &&
+            Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
+            ? this._headerRings.translation_x : null;
     }
 
     _scheduleMenuRebuild() {
@@ -1232,9 +1318,10 @@ class ZUsageApplet extends Applet.Applet {
             rings.style = `spacing: ${compact ? 2 : 8}px;`;
             this._headerRings = rings;
             rings.connect("notify::allocation", () => this._queueActionEdgeSync());
-            rings.translation_x = compact
+            rings._usageHomeTx = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
+            rings.translation_x = rings._usageHomeTx;
             if (typeof this._carriedHeaderTx === "number") rings.translation_x = this._carriedHeaderTx;
             for (const summary of summaries) {
                 rings.add_child(
@@ -1516,6 +1603,7 @@ class ZUsageApplet extends Applet.Applet {
             tooltip: this._createPositionedTooltip(actor, tooltipText)
         };
         const carried = (this._carriedRingTranslations || [])[this._countdownWidgets.length];
+        actor._usageHomeTx = 0;
         if (typeof carried === "number") actor.translation_x = carried;
         // Countdown label text changes width every tick, shifting the ring's
         // layout position. Re-align on allocation or the ring drifts.

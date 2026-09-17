@@ -186,6 +186,73 @@ def default_history_path() -> Path:
     return Path(state_root) / "cinnamon-z-usage" / "history.json"
 
 
+# Rapid manual refreshes can trip the ZCode plan balance endpoint even while
+# the primary quota API stays healthy. Without a fallback the plan sections
+# and their rings vanish from the applet for that refresh, so the last known
+# buckets are replayed for a short grace window instead.
+PLAN_BALANCE_CACHE_TTL = 600
+PLAN_BALANCE_CACHE_VERSION = 1
+
+
+def plan_balance_cache_path() -> Path:
+    """Return the XDG state path for the last known plan bucket snapshot."""
+
+    state_root = os.environ.get("XDG_STATE_HOME")
+    if not state_root:
+        state_root = os.path.expanduser("~/.local/state")
+    return Path(state_root) / "cinnamon-z-usage" / "plan-balances-cache.json"
+
+
+def save_plan_balance_cache(limits: list[dict[str, Any]], now: int | None = None) -> None:
+    """Persist the normalised plan limits; failures never break the snapshot."""
+
+    try:
+        path = plan_balance_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": PLAN_BALANCE_CACHE_VERSION,
+            "fetchedAt": int(time.time()) if now is None else int(now),
+            "limits": limits,
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def load_plan_balance_cache(now: int | None = None) -> list[dict[str, Any]]:
+    """Return cached plan limits within the grace window and unexpired resets.
+
+    Entries whose reset moment already passed are dropped: replaying an
+    expired window would render a countdown that is over, not stale.
+    """
+
+    now = int(time.time()) if now is None else int(now)
+    try:
+        payload = json.loads(plan_balance_cache_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, dict) or payload.get("version") != PLAN_BALANCE_CACHE_VERSION:
+        return []
+    fetched_at = _number(payload.get("fetchedAt"), -1)
+    if fetched_at < 0 or now - int(fetched_at) > PLAN_BALANCE_CACHE_TTL:
+        return []
+    limits = payload.get("limits")
+    if not isinstance(limits, list):
+        return []
+    fresh: list[dict[str, Any]] = []
+    for limit in limits:
+        if not isinstance(limit, dict):
+            continue
+        windows = [
+            window
+            for window in limit.get("windows", [])
+            if isinstance(window, dict) and int(_number(window.get("resetsAt"), 0)) > now
+        ]
+        if windows:
+            fresh.append({**limit, "windows": windows})
+    return fresh
+
+
 def _history_window_key(limit_id: str, duration: int) -> str:
     return f"{limit_id}:{duration}"
 
@@ -812,12 +879,23 @@ def main() -> int:
                     os.environ.get("ZCODE_PLAN_BASE") or ZCODE_PLAN_BASE,
                     max(1.0, args.timeout),
                 )
-                snapshot["limits"].extend(normalise_plan_balances(plan_data))
+                plan_limits = normalise_plan_balances(plan_data)
+                snapshot["limits"].extend(plan_limits)
+                save_plan_balance_cache(plan_limits)
         except (OSError, UsageError) as plan_error:
-            print(
-                _("ZCode plan quotas unavailable: %(error)s") % {"error": plan_error},
-                file=sys.stderr,
-            )
+            cached_limits = load_plan_balance_cache()
+            if cached_limits:
+                snapshot["limits"].extend(cached_limits)
+                print(
+                    _("ZCode plan quotas unavailable, showing recent values: %(error)s")
+                    % {"error": plan_error},
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    _("ZCode plan quotas unavailable: %(error)s") % {"error": plan_error},
+                    file=sys.stderr,
+                )
         if not args.no_history:
             try:
                 update_usage_history(

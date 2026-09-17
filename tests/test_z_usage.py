@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import io
 import json
 import os
+import time
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -16,9 +19,12 @@ from z_usage import (
     ZCODE_PLAN_SOURCE,
     build_usage_history,
     is_authentication_error,
+    load_plan_balance_cache,
     normalise_plan_balances,
     normalise_quota_limits,
+    plan_balance_cache_path,
     resolve_api_key,
+    save_plan_balance_cache,
     update_usage_history,
     zcode_provider_key,
 )
@@ -466,3 +472,93 @@ class ZcodePlanBalanceTests(unittest.TestCase):
         self.assertEqual(
             snapshot["limits"][0]["source"] if "source" in snapshot["limits"][0] else "coding-plan", "coding-plan"
         )
+
+
+def cached_plan_limit(resets_at: int, plan_id: str = "zai-start-plan-glm") -> dict:
+    return {
+        "id": plan_id,
+        "label": "Start Plan · GLM",
+        "planType": "Start Plan",
+        "source": ZCODE_PLAN_SOURCE,
+        "windows": [
+            {
+                "durationMinutes": 1440,
+                "usedPercent": 12.5,
+                "remainingPercent": 87.5,
+                "resetsAt": resets_at,
+                "lastResetAt": resets_at - 86400,
+                "usedCredits": 125,
+                "totalCredits": 1000,
+                "unit": "token",
+            }
+        ],
+    }
+
+
+class PlanBalanceCacheTests(unittest.TestCase):
+    def test_round_trip_and_grace_window(self):
+        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_STATE_HOME": tmp}):
+            save_plan_balance_cache([cached_plan_limit(resets_at=2000)], now=1000)
+            self.assertTrue(plan_balance_cache_path().exists())
+            self.assertEqual(load_plan_balance_cache(now=1599), [cached_plan_limit(resets_at=2000)])
+            # Past the grace window the cache is not replayed.
+            self.assertEqual(load_plan_balance_cache(now=1601), [])
+
+    def test_missing_or_broken_cache_is_empty(self):
+        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_STATE_HOME": tmp}):
+            self.assertEqual(load_plan_balance_cache(now=1), [])
+            path = plan_balance_cache_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("{not json", encoding="utf-8")
+            self.assertEqual(load_plan_balance_cache(now=1), [])
+            path.write_text(json.dumps({"version": 99, "fetchedAt": 0, "limits": []}), encoding="utf-8")
+            self.assertEqual(load_plan_balance_cache(now=1), [])
+
+    def test_expired_reset_windows_are_dropped(self):
+        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_STATE_HOME": tmp}):
+            limits = [
+                cached_plan_limit(resets_at=500, plan_id="zai-expired"),
+                cached_plan_limit(resets_at=5000, plan_id="zai-live"),
+            ]
+            save_plan_balance_cache(limits, now=1000)
+            loaded = load_plan_balance_cache(now=1500)
+            self.assertEqual([item["id"] for item in loaded], ["zai-live"])
+
+    def test_failed_balance_fetch_replays_the_cache(self):
+        from z_usage import UsageError, main
+
+        real_now = int(time.time())
+        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_STATE_HOME": tmp}):
+            save_plan_balance_cache([cached_plan_limit(resets_at=real_now + 86400)], now=real_now)
+            with (
+                patch("sys.argv", ["z_usage.py", "--no-history"]),
+                patch("z_usage.resolve_api_key", return_value="key"),
+                patch("z_usage.fetch_quota_limits", return_value={"limits": [quota_entry()], "level": "max"}),
+                patch("z_usage.zcode_plan_token", return_value="tok"),
+                patch("z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")),
+            ):
+                captured = io.StringIO()
+                with redirect_stdout(captured):
+                    self.assertEqual(main(), 0)
+            snapshot = json.loads(captured.getvalue())
+            ids = [limit["id"] for limit in snapshot["limits"]]
+            self.assertIn(ACCOUNT_LIMIT_ID, ids)
+            self.assertIn("zai-start-plan-glm", ids)
+
+    def test_failed_balance_fetch_without_cache_stays_clean(self):
+        from z_usage import UsageError, main
+
+        with TemporaryDirectory() as tmp, patch.dict(os.environ, {"XDG_STATE_HOME": tmp}):
+            with (
+                patch("sys.argv", ["z_usage.py", "--no-history"]),
+                patch("z_usage.resolve_api_key", return_value="key"),
+                patch("z_usage.fetch_quota_limits", return_value={"limits": [quota_entry()], "level": "max"}),
+                patch("z_usage.zcode_plan_token", return_value="tok"),
+                patch("z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")),
+            ):
+                captured = io.StringIO()
+                with redirect_stdout(captured):
+                    self.assertEqual(main(), 0)
+            snapshot = json.loads(captured.getvalue())
+            ids = [limit["id"] for limit in snapshot["limits"]]
+            self.assertEqual(ids, [ACCOUNT_LIMIT_ID])

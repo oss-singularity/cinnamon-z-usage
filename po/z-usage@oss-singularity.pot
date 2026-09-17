@@ -741,6 +741,11 @@ msgstr ""
 
 #: z_usage.py
 #, python-format
+msgid "ZCode plan quotas unavailable, showing recent values: %(error)s"
+msgstr ""
+
+#: z_usage.py
+#, python-format
 msgid "ZCode plan quotas unavailable: %(error)s"
 msgstr ""
 
