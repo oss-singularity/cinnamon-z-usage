@@ -440,6 +440,30 @@ Anpassung, Anker kompensiert tx 39→45, Ende flush), danach stabil. Ende
 1846 = Anker 1847 ±1 vor/nach dem Rebuild. `make check` grün inkl.
 Suffix-Anchor-Tests (flush, rigid, idempotent).
 
+## 3h. RUNDE 8 (2026-09-18 Nacht, Rest-Springen + Credits-Look — 85e54d6/2bf7c57)
+
+### Zwei Restbefunde aus Claudius Doppel-Video + Referenz-Screenshots
+
+**1) „Springt manchmal immer noch, 1. Versuch oft sauber":** Das Frame-
+Diffing beider Videos zeigte KEINEN Positions-Sprung — was springt, ist
+der **Content-Blink**: `removeAll()` leert das Popup für ~5 Frames, die
+frischen Rows malen erst danach. Und der „1. Versuch sauber" passt exakt:
+direkt nach dem Öffnen sind die Daten identisch zum angezeigten Stand —
+der Rebuild ist dann rein waste. Fix: **Signature-Gate** —
+`_menuSignature` (limits/credits/consumption/activity) wird gebaut und
+mit `_builtMenuSignature` verglichen; `_scheduleMenuRebuild` skippt bei
+Gleichheit. Beweis (isolierter Doppel-Refresh): Refresh 1 (Demo→Real)
+rebuilt 1×, Refresh 2 (identisch) → Zähler bleibt 1, Popup bleibt offen.
+
+**2) Credits-Zeile upstream-look:** Der Right-Anchor aus Runde 7 erzeugte
+einen Gap nach dem Balance-Wert und der Suffix-Fit bottomete am Min-Font
+(54%) aus — gequetscht statt natürlich. Per Referenz-Screenshot entfernt:
+kein Right-Anchor, kein Suffix-TX-Carry — natürlicher Fluss. Stattdessen
+skaliert der Fit jetzt die GANZE Zeile uniform (Base-Styles werden beim
+Fit erfasst, nur der font-size-Anteil wird appended; die Ratio rechnet
+über die Gesamt-Breite, Base-Cap). Live verifiziert: uniforme Schrift,
+Separator sichtbar, kein Gap, Ende natürlich wie upstream.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
