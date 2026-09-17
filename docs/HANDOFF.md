@@ -343,6 +343,33 @@ Rebuild-davor ist der Punkt.
 304..356 / px 1796 / tx 8 — reiner Opacity-Fade 255→45, null Bewegung.
 `make check` grün inkl. Click-Close-Regressions-Test + 33px-Anker-Reject.
 
+## 3e. RUNDE 5 (2026-09-17 spät, Track wird beim Close weiß — 47556c5)
+
+### Farewell-Boost entfernt: Close-Fade = reiner Opacity-Multiplikator
+
+**Claudius zweites Video (22.45.25):** Der ungefärbte Ring-Track (bei grünen
+UND blauen Ringen) hellt sich in den ersten Fade-Frames deutlich auf
+(„weiß fast") — im Upstream bleibt die Farbe unverändert.
+
+**Wurzel:** Unser eigener Farewell-Boost (660a797/c1dfaf9): Bei `_closing`
+wurden Track- (42→126) und Glow-Alphas (58→174) verdreifacht und dimmte
+S/G-Flächen auf 255 geflippt. Der Track ist Menü-Vordergrundfarbe — ×3
+macht ihn fast weiß. Messung aus Claudius Video: Track-Mean 67.0 (open,
+konstant) → 103+ bei Close-Start, Hintergrund noch voll abgedeckt.
+
+**Fix (47556c5):** Beide Close-Zeit-Verfärbungen entfernt — konstante
+Track-/Glow-Alphas in `_paintCircularProgress`, kein Area-Opacity-Flip im
+Close-Pfad. Das Fade ist jetzt ein reiner Opacity-Multiplikator auf die
+exakten Offen-Farben (Upstream-Verhalten); dimmte S/G-Ringe behalten ihre
+128 durch den Fade. Trade-off bewusst gesetzt: Die transluzenten Anteile
+erreichen visuell Null wieder etwas früher im Fade — Claudius explizite
+Wahl gegen den Boost.
+
+**Beweis (isolierte 60fps-Click-Close-Aufnahmen, A/B, gleiche Geometrie):**
+ALT Track 57.7 → 69.2 → 81.7 über die ersten Fade-Frames (grüne Arc-Pixel
+613→855 = heller); NEU 57.7 → 54.5 → 52.6, Arc monoton ab — nur die Menu-
+Opacity ändert sich. `make check` grün.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
