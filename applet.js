@@ -2819,22 +2819,8 @@ class ZUsageApplet extends Applet.Applet {
         let lastFont = null;
         let plotActor = null;
         let plotAllocationId = 0;
-        // The whole line scales uniformly (upstream look): the fixed part
-        // keeps its own colors and paddings, only the font size is
-        // appended so it overrides whatever size the style declared.
-        const baseStyles = {
-            label: labelActor.style,
-            value: valueLabel.style,
-            separator: separatorLabel.style,
-            expires: expiresLabel.style,
-            expiry: expiryDateLabel.style
-        };
 
         const applyFontSize = fontSize => {
-            labelActor.style = baseStyles.label + ` font-size: ${fontSize}%;`;
-            valueLabel.style = baseStyles.value + ` font-size: ${fontSize}%;`;
-            separatorLabel.style = baseStyles.separator +
-                ` font-size: ${Math.round(fontSize * 0.8 * 10) / 10}%;`;
             expiresLabel.style = this._emphasizedValueStyle(
                 suffixLabelColor || this._menuColor(1),
                 0,
@@ -2896,15 +2882,20 @@ class ZUsageApplet extends Applet.Applet {
                 const startFont = this._lastCreditFontSize ||
                     CREDIT_CONSUMPTION_BASE_FONT_SIZE;
                 applyFontSize(startFont);
-                const totalWidth = preferredWidth(labelActor) +
-                    preferredWidth(valueLabel) + preferredWidth(separatorLabel) +
-                    preferredWidth(expiresLabel) + preferredWidth(expiryDateLabel);
+                const fixedWidth = preferredWidth(labelActor) +
+                    preferredWidth(valueLabel) + preferredWidth(separatorLabel);
+                const suffixWidth = preferredWidth(expiresLabel) +
+                    preferredWidth(expiryDateLabel);
                 const targetWidth = availableWidth();
-                // Every label scales with the font, so the whole line's
-                // width is linear in the font size: one ratio fits it to
-                // the grid anchor, bounded by the base size and growing
-                // back toward it when the new text is shorter.
-                const ratio = totalWidth > 0 ? targetWidth / totalWidth : 1;
+                const availableSuffixWidth = Math.max(0, targetWidth - fixedWidth);
+                // Widths scale linearly with the font size, so the ratio
+                // applies to the font the widths were measured at (the
+                // carried size), bounded by the base size - the line may
+                // grow back toward the base font when the new text is
+                // shorter.
+                const ratio = suffixWidth > 0
+                    ? availableSuffixWidth / suffixWidth
+                    : 1;
                 let fontSize = Math.min(
                     CREDIT_CONSUMPTION_BASE_FONT_SIZE,
                     Math.max(
