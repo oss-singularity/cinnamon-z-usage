@@ -732,39 +732,9 @@ class ZUsageApplet extends Applet.Applet {
         });
         // The credits consumption line flows naturally like upstream and
         // the font fit owns its size - but its painted end is pinned to
-        // the grid edge: glyph hinting shifts the painted end by a few
-        // pixels depending on the digits (the "manchmal" flush drift), and
-        // this pin rides every sync so the end always finishes with the
-        // buttons. Translations never feed back into the preferred widths
-        // the fit measures.
-        const suffixLabels = this._creditsSuffixLabels;
-        if (suffixLabels && suffixLabels.length) {
-            const last = suffixLabels[suffixLabels.length - 1];
-            if (!last.is_finalized()) {
-                const [suffixX] = last.get_transformed_position();
-                const [suffixWidth] = last.get_transformed_size();
-                if (suffixWidth > 0) {
-                    const delta =
-                        right - (Math.round(suffixX) + Math.round(suffixWidth));
-                    // The cap must cover the full preferred-vs-painted
-                    // slop of the markup label (~40px with long numbers):
-                    // a skipped correction leaves the end visibly past the
-                    // buttons with nothing ever re-triggering it.
-                    if (delta !== 0 && Math.abs(delta) <= 120) {
-                        for (const label of suffixLabels) {
-                            if (!label.is_finalized()) label.translation_x += delta;
-                        }
-                    }
-                }
-                // Reveal only after the pin: showing the row one frame
-                // earlier painted it unpinned for a frame - the residual
-                // ~2px jump on open.
-                if (typeof this._creditsRowReveal === "function") {
-                    this._creditsRowReveal();
-                    this._creditsRowReveal = null;
-                }
-            }
-        }
+        // the grid edge. No suffix translation here - moving the group per
+        // translation detached it from the balance value and made the line
+        // visibly jump whenever the fit and the pin disagreed on timing.
     }
 
     _rebuildPanel() {
@@ -1260,20 +1230,6 @@ class ZUsageApplet extends Applet.Applet {
             entry.actor && !entry.actor.is_finalized() &&
             Math.abs(entry.actor.translation_x) <= POPUP_WIDTH
                 ? entry.actor.translation_x : null);
-    }
-
-    _captureCarriedSuffixTranslation() {
-        const labels = this._creditsSuffixLabels || [];
-        if (!labels.length) return null;
-        let value = null;
-        for (const label of labels) {
-            if (!label || label.is_finalized()) return null;
-            const tx = label.translation_x;
-            if (typeof tx !== "number" || Math.abs(tx) > 120) return null;
-            if (value === null) value = tx;
-            else if (Math.abs(value - tx) > 1) return null;
-        }
-        return value;
     }
 
     _captureCarriedHeaderTranslation() {
@@ -2950,36 +2906,6 @@ class ZUsageApplet extends Applet.Applet {
                 }
                 lastFont = fontSize;
                 this._lastCreditFontSize = fontSize;
-                // The painted end can differ from the preferred widths by a
-                // few pixels of hinting; nudge the suffix group so the red
-                // text ends exactly on the grid edge. A translation never
-                // feeds back into the preferred widths the fit measures.
-                const frame = this._actionWidthFrame;
-                if (
-                    frame &&
-                    !frame.is_finalized() &&
-                    !expiryDateLabel.is_finalized()
-                ) {
-                    const [gridX] = frame.get_transformed_position();
-                    const [gridWidth] = frame.get_transformed_size();
-                    const [suffixX] = expiryDateLabel.get_transformed_position();
-                    const [suffixWidth] = expiryDateLabel.get_transformed_size();
-                    if (suffixWidth > 0) {
-                        const delta = Math.round(
-                            (gridX + gridWidth) - (suffixX + suffixWidth)
-                        );
-                        if (delta !== 0 && Math.abs(delta) <= 40) {
-                            separatorLabel.translation_x += delta;
-                            expiresLabel.translation_x += delta;
-                            expiryDateLabel.translation_x += delta;
-                        }
-                    }
-                }
-                // Carry the pinned translation so the next rebuild's fresh
-                // labels start at the pinned position - starting natural
-                // made the red text jump onto its spot after the popup
-                // appeared.
-                this._carriedSuffixTx = this._captureCarriedSuffixTranslation();
             } finally {
                 fitting = false;
             }
@@ -3181,11 +3107,6 @@ class ZUsageApplet extends Applet.Applet {
                 fitTargets.expiresLabel,
                 fitTargets.expiryDateLabel
             ];
-            if (typeof this._carriedSuffixTx === "number") {
-                for (const label of this._creditsSuffixLabels) {
-                    label.translation_x = this._carriedSuffixTx;
-                }
-            }
             // Paint-suppress the row until the fit has applied the carried
             // font size and the pin: showing it one or two frames early
             // made the red text visibly jump onto its final spot (the
