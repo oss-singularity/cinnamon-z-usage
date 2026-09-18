@@ -2868,8 +2868,13 @@ class ZUsageApplet extends Applet.Applet {
                 applyFontSize(startFont);
                 const fixedWidth = preferredWidth(labelActor) +
                     preferredWidth(valueLabel) + preferredWidth(separatorLabel);
-                const suffixWidth = preferredWidth(expiresLabel) +
-                    preferredWidth(expiryDateLabel);
+                // The suffix width comes from the ALLOCATED labels when they
+                // exist: the markup label paints wider than its preferred
+                // width reports (nbsp entities + bold spans), and the
+                // preferred-based ratio undershot the font so the line end
+                // fell short of the anchor.
+                const suffixWidth = expiresLabel.get_width() +
+                    expiryDateLabel.get_width();
                 const targetWidth = availableWidth();
                 // An unpositioned or mid-teardown menu reports no usable
                 // target; fitting against it would clamp to the minimum.
