@@ -52,7 +52,9 @@ def install(data_root):
     for relative, content in files.items():
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(prefix=".install-", dir=destination.parent)
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=".install-", dir=destination.parent
+        )
         try:
             with os.fdopen(descriptor, "wb") as stream:
                 stream.write(content)
@@ -94,19 +96,28 @@ def export(output):
     # Store-download layout is files/UUID, whereas the submission includes info
     # and screenshot at the outer level. Produce both, without timestamps/owners.
     for archive, prefix in [("submission.zip", ""), ("install.zip", f"{UUID}/files/")]:
-        with zipfile.ZipFile(output / archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
+        with zipfile.ZipFile(
+            output / archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+        ) as bundle:
             for name, content in sorted(files.items()):
                 if prefix and not name.startswith(prefix):
                     continue
-                info = zipfile.ZipInfo(name[len(prefix) :], date_time=(1980, 1, 1, 0, 0, 0))
+                info = zipfile.ZipInfo(
+                    name[len(prefix) :], date_time=(1980, 1, 1, 0, 0, 0)
+                )
                 info.create_system = 3
                 info.external_attr = (stat.S_IFREG | 0o644) << 16
                 info.compress_type = zipfile.ZIP_DEFLATED
                 bundle.writestr(info, content)
-    hashes = {name: hashlib.sha256(content).hexdigest() for name, content in sorted(files.items())}
+    hashes = {
+        name: hashlib.sha256(content).hexdigest()
+        for name, content in sorted(files.items())
+    }
     for name in ["submission.zip", "install.zip"]:
         hashes[name] = hashlib.sha256((output / name).read_bytes()).hexdigest()
-    (output / "SHA256SUMS").write_text("".join(f"{digest}  {name}\n" for name, digest in hashes.items()))
+    (output / "SHA256SUMS").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items())
+    )
     return output
 
 

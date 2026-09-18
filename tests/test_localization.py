@@ -31,10 +31,15 @@ class LocalizationTests(unittest.TestCase):
                 'msgid ""\nmsgstr '
                 + json.dumps(header)
                 + "\n\n"
-                + "\n\n".join(f"msgid {json.dumps(key)}\nmsgstr {json.dumps(value)}" for key, value in messages.items())
+                + "\n\n".join(
+                    f"msgid {json.dumps(key)}\nmsgstr {json.dumps(value)}"
+                    for key, value in messages.items()
+                )
                 + "\n"
             )
-            subprocess.run(["msgfmt", "--check-format", str(po), "-o", str(catalog)], check=True)
+            subprocess.run(
+                ["msgfmt", "--check-format", str(po), "-o", str(catalog)], check=True
+            )
             env = {
                 **os.environ,
                 "HOME": str(home),
@@ -61,17 +66,28 @@ import z_usage as usage
 assert usage.ACCOUNT_LIMIT_LABEL == "Z.AI PLAN TRANSLATED", usage.ACCOUNT_LIMIT_LABEL
 """
             subprocess.run(["python3", "-c", py], cwd=ROOT, env=env, check=True)
-            translated = gettext.translation(UUID, localedir=str(home / ".local/share/locale"), languages=["zz"])
-            self.assertEqual(translated.gettext("No Z.ai API key found"), "NO KEY TRANSLATED")
+            translated = gettext.translation(
+                UUID, localedir=str(home / ".local/share/locale"), languages=["zz"]
+            )
+            self.assertEqual(
+                translated.gettext("No Z.ai API key found"), "NO KEY TRANSLATED"
+            )
 
     def test_template_includes_all_settings_metadata_and_safety_messages(self):
-        spec = importlib.util.spec_from_file_location("update_translations", ROOT / "scripts/update-translations.py")
+        spec = importlib.util.spec_from_file_location(
+            "update_translations", ROOT / "scripts/update-translations.py"
+        )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         template = module.POT.read_text()
         settings = json.loads((ROOT / "settings-schema.json").read_text())
         for message in module.settings_messages(settings):
             self.assertIn("msgid " + json.dumps(message, ensure_ascii=False), template)
-        for message in ["Z.ai GLM Coding usage", "Z.ai Coding Plan", "No Z.ai API key found", "Reset applied"]:
+        for message in [
+            "Z.ai GLM Coding usage",
+            "Z.ai Coding Plan",
+            "No Z.ai API key found",
+            "Reset applied",
+        ]:
             self.assertIn("msgid " + json.dumps(message), template)
         self.assertNotIn("AUTH_REQUIRED:", template)

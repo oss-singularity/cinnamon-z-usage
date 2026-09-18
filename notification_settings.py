@@ -10,7 +10,9 @@ class _DependencyMixin:
         self._dependency_invert = bool(info.get("dependency-invert", False))
         self._dependency_value = settings.get_value(self._dependency_key)
         settings.listen(self._dependency_key, self._dependency_changed)
-        self._dependency_changed(self._dependency_key, settings.get_value(self._dependency_key))
+        self._dependency_changed(
+            self._dependency_key, settings.get_value(self._dependency_key)
+        )
 
     def _dependency_changed(self, _key, value):
         self._dependency_value = value

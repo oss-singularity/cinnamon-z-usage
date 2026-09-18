@@ -59,7 +59,9 @@ def main() -> int:
     svg_renderer = rsvg_convert()
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="chatgpt-usage-social-preview-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="chatgpt-usage-social-preview-"
+    ) as temporary:
         work_dir = Path(temporary)
         overlay_svg = work_dir / "overlay.svg"
         overlay_png = work_dir / "overlay.png"
@@ -76,7 +78,8 @@ def main() -> int:
             check=True,
         )
         subprocess.run(
-            command + [str(icon), "-filter", "Lanczos", "-resize", "82x82", str(app_icon)],
+            command
+            + [str(icon), "-filter", "Lanczos", "-resize", "82x82", str(app_icon)],
             check=True,
         )
         subprocess.run(

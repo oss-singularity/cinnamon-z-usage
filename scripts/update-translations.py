@@ -17,7 +17,9 @@ def settings_messages(value):
     if not isinstance(value, dict):
         return
     for key, child in value.items():
-        if key in {"title", "description", "tooltip", "units"} and isinstance(child, str):
+        if key in {"title", "description", "tooltip", "units"} and isinstance(
+            child, str
+        ):
             yield child
         elif key == "options" and isinstance(child, dict):
             yield from child
@@ -33,10 +35,15 @@ def extract():
         for name in ["settings-schema", "metadata"]:
             data = json.loads((ROOT / f"{name}.json").read_text())
             messages = (
-                settings_messages(data) if name == "settings-schema" else (data[key] for key in ["name", "description"])
+                settings_messages(data)
+                if name == "settings-schema"
+                else (data[key] for key in ["name", "description"])
             )
             (work / f"{name}.json.js").write_text(
-                "\n".join(f"_({json.dumps(text, ensure_ascii=False)});" for text in messages) + "\n"
+                "\n".join(
+                    f"_({json.dumps(text, ensure_ascii=False)});" for text in messages
+                )
+                + "\n"
             )
         common = [
             "xgettext",
@@ -71,8 +78,14 @@ def extract():
             check=True,
         )
         result = (work / "messages.pot").read_text()
-        result = re.sub(r'"POT-Creation-Date: .*?\\n"', '"POT-Creation-Date: 2026-09-08 00:00+0000\\\\n"', result)
-        result = result.replace("SOME DESCRIPTIVE TITLE.", "Z Usage Monitor translation template.")
+        result = re.sub(
+            r'"POT-Creation-Date: .*?\\n"',
+            '"POT-Creation-Date: 2026-09-08 00:00+0000\\\\n"',
+            result,
+        )
+        result = result.replace(
+            "SOME DESCRIPTIVE TITLE.", "Z Usage Monitor translation template."
+        )
         result = result.replace("YEAR OSS Singularity", "2026 OSS Singularity")
         result = result.replace(
             "This file is distributed under the same license as the Z Usage Monitor package.",
@@ -89,7 +102,9 @@ def main():
     if args.check:
         if not POT.is_file() or POT.read_text() != result:
             raise SystemExit("Translation template is stale; run make translations")
-        print("Translation template: JS, Python, metadata and settings extraction is current.")
+        print(
+            "Translation template: JS, Python, metadata and settings extraction is current."
+        )
     else:
         POT.parent.mkdir(exist_ok=True)
         POT.write_text(result)

@@ -31,7 +31,9 @@ class _FixtureHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         else:
-            body = json.dumps({"code": 401, "msg": "token expired or incorrect", "success": False}).encode("utf-8")
+            body = json.dumps(
+                {"code": 401, "msg": "token expired or incorrect", "success": False}
+            ).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -67,7 +69,9 @@ class TransportTests(unittest.TestCase):
     def test_bad_key_maps_to_authentication_required(self):
         with self.assertRaisesRegex(AuthenticationRequired, "Z.ai API key"):
             fetch_quota_limits("bad-key", self.base_url, 5)
-        self.assertEqual(AuthenticationRequired(AUTH_REQUIRED_MESSAGE).args[0].count("Z.ai"), 1)
+        self.assertEqual(
+            AuthenticationRequired(AUTH_REQUIRED_MESSAGE).args[0].count("Z.ai"), 1
+        )
 
     def test_missing_key_never_reaches_the_network(self):
         with self.assertRaises(AuthenticationRequired):

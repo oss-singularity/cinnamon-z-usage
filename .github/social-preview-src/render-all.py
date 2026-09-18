@@ -30,7 +30,9 @@ def configured_output(repo_dir: Path, value: object) -> Path:
     try:
         output.relative_to(repo_dir)
     except ValueError as error:
-        raise SystemExit(f"Preview output escapes the repository: {relative}") from error
+        raise SystemExit(
+            f"Preview output escapes the repository: {relative}"
+        ) from error
     return output
 
 
@@ -65,18 +67,25 @@ def main() -> int:
         return 0
 
     stale: list[Path] = []
-    with tempfile.TemporaryDirectory(prefix="chatgpt-usage-social-preview-check-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="chatgpt-usage-social-preview-check-"
+    ) as temporary:
         check_dir = Path(temporary)
         for name in sorted(variants):
             committed = configured_output(repo_dir, variants[name]["output"])
             candidate = check_dir / f"{name}.png"
             render(render_script, name, candidate)
-            if not committed.is_file() or committed.read_bytes() != candidate.read_bytes():
+            if (
+                not committed.is_file()
+                or committed.read_bytes() != candidate.read_bytes()
+            ):
                 stale.append(committed)
 
     if stale:
         for output in stale:
-            print(f"Stale social preview: {output.relative_to(repo_dir)}", file=sys.stderr)
+            print(
+                f"Stale social preview: {output.relative_to(repo_dir)}", file=sys.stderr
+            )
         print("Run make social-preview and commit the results.", file=sys.stderr)
         return 1
 
