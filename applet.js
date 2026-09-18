@@ -2817,8 +2817,6 @@ class ZUsageApplet extends Applet.Applet {
         let armed = true;
         let converged = false;
         let lastFont = null;
-        let plotActor = null;
-        let plotAllocationId = 0;
 
         const applyFontSize = fontSize => {
             expiresLabel.style = this._emphasizedValueStyle(
@@ -2835,43 +2833,44 @@ class ZUsageApplet extends Applet.Applet {
             );
         };
         const preferredWidth = actor => actor.get_preferred_width(-1)[1];
-        const findPlot = () => {
-            const entry = (this._activityCharts || []).find(candidate => {
-                if (candidate.nested || !candidate.chart) return false;
-                return candidate.chart.get_children().length > 0;
-            });
-            const candidate = entry ? entry.chart.get_children()[0] : null;
-            if (candidate === plotActor) return;
-            if (plotActor && plotAllocationId) plotActor.disconnect(plotAllocationId);
-            plotActor = candidate;
-            plotAllocationId = plotActor
-                ? plotActor.connect("notify::allocation", fit)
-                : 0;
-        };
+        // The fit target is the button grid's right edge, measured from the
+        // stable action frame - never from the activity plots: fresh plots
+        // allocate at their natural geometry and only the edge sync pulls
+        // them onto the grid edge afterwards, so a plot-based target made
+        // the fit converge on whatever the transient offered (the font
+        // bottomed out at the minimum and the line ended short).
         const availableWidth = () => {
-            findPlot();
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return 0;
-            if (!plotActor || !(plotActor.get_width() > 0)) {
+            const frame = this._actionWidthFrame;
+            if (
+                !frame ||
+                frame.is_finalized() ||
+                !this.menu ||
+                !this.menu.actor ||
+                this.menu.actor.is_finalized()
+            ) {
                 const rowSize = row.get_transformed_size();
                 const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
                 return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
             }
             const [rowX] = row.get_transformed_position();
-            const [plotX] = plotActor.get_transformed_position();
-            const [plotWidth] = plotActor.get_transformed_size();
+            const [gridX] = frame.get_transformed_position();
+            const [gridWidth] = frame.get_transformed_size();
             const [rowWidthTransformed] = row.get_transformed_size();
             const scale = rowWidthTransformed > 0
                 ? rowWidthTransformed / rowWidth
                 : 1;
-            const width = (plotX + plotWidth - rowX) / scale;
+            const width = (gridX + gridWidth - rowX) / scale;
             return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
         };
         const fit = () => {
-            // Converged means done for this open: every further allocation
-            // (hover tooltips, scroll churn) would re-apply the base font
-            // and visibly pulse the line.
-            if (!armed || converged || fitting) return;
+            // The carried start font makes every pass idempotent (the ratio
+            // recomputes to the same size), so the fit can run on every
+            // allocation without pulsing - and it self-corrects whenever a
+            // transient target settles, which the old converged latch
+            // froze out forever.
+            if (!armed || fitting) return;
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return;
             fitting = true;
@@ -2887,6 +2886,9 @@ class ZUsageApplet extends Applet.Applet {
                 const suffixWidth = preferredWidth(expiresLabel) +
                     preferredWidth(expiryDateLabel);
                 const targetWidth = availableWidth();
+                // An unpositioned or mid-teardown menu reports no usable
+                // target; fitting against it would clamp to the minimum.
+                if (!(targetWidth > 0)) return;
                 const availableSuffixWidth = Math.max(0, targetWidth - fixedWidth);
                 // Widths scale linearly with the font size, so the ratio
                 // applies to the font the widths were measured at (the
@@ -2904,6 +2906,9 @@ class ZUsageApplet extends Applet.Applet {
                     )
                 );
                 applyFontSize(fontSize);
+                // Trim both ways: the ratio estimate carries the fixed
+                // paddings only approximately, so walk the last pixels
+                // until the line ends exactly at the grid anchor.
                 while (
                     fontSize > CREDIT_CONSUMPTION_MIN_FONT_SIZE &&
                     preferredWidth(row) > targetWidth + 1
@@ -2914,6 +2919,16 @@ class ZUsageApplet extends Applet.Applet {
                     );
                     applyFontSize(fontSize);
                 }
+                while (
+                    fontSize < CREDIT_CONSUMPTION_BASE_FONT_SIZE &&
+                    preferredWidth(row) < targetWidth - 1
+                ) {
+                    fontSize = Math.min(
+                        CREDIT_CONSUMPTION_BASE_FONT_SIZE,
+                        fontSize + 1
+                    );
+                    applyFontSize(fontSize);
+                }
                 // Two passes agreeing on the font size means the fit has
                 // settled: from now on the edge sync owns the placement.
                 if (lastFont !== null && Math.abs(lastFont - fontSize) < 0.05) {
@@ -2921,9 +2936,31 @@ class ZUsageApplet extends Applet.Applet {
                 }
                 lastFont = fontSize;
                 this._lastCreditFontSize = fontSize;
-                // The font change re-wraps the suffix; the edge sync owns
-                // its position and needs to run on the new geometry.
-                this._queueActionEdgeSync();
+                // The painted end can differ from the preferred widths by a
+                // few pixels of hinting; nudge the suffix group so the red
+                // text ends exactly on the grid edge. A translation never
+                // feeds back into the preferred widths the fit measures.
+                const frame = this._actionWidthFrame;
+                if (
+                    frame &&
+                    !frame.is_finalized() &&
+                    !expiryDateLabel.is_finalized()
+                ) {
+                    const [gridX] = frame.get_transformed_position();
+                    const [gridWidth] = frame.get_transformed_size();
+                    const [suffixX] = expiryDateLabel.get_transformed_position();
+                    const [suffixWidth] = expiryDateLabel.get_transformed_size();
+                    if (suffixWidth > 0) {
+                        const delta = Math.round(
+                            (gridX + gridWidth) - (suffixX + suffixWidth)
+                        );
+                        if (delta !== 0 && Math.abs(delta) <= 40) {
+                            separatorLabel.translation_x += delta;
+                            expiresLabel.translation_x += delta;
+                            expiryDateLabel.translation_x += delta;
+                        }
+                    }
+                }
             } finally {
                 fitting = false;
             }
