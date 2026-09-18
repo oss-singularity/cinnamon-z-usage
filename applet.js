@@ -1347,7 +1347,7 @@ class ZUsageApplet extends Applet.Applet {
             title.y_align = Clutter.ActorAlign.CENTER;
             planLabel.style = [
                 "margin-left: 8px",
-                "padding: 1px 8px 2px 8px",
+                "padding: 3px 8px 1px 8px",
                 "border-radius: 10px",
                 "background-color: rgba(255, 255, 255, 0.08)",
                 "font-size: 80%",
@@ -2908,10 +2908,17 @@ class ZUsageApplet extends Applet.Applet {
                 applyFontSize(fontSize);
                 // Trim both ways: the ratio estimate carries the fixed
                 // paddings only approximately, so walk the last pixels
-                // until the line ends exactly at the grid anchor.
+                // until the line ends exactly at the grid anchor. The
+                // markup suffix label paints wider than its preferred
+                // width (nbsp entities + bold spans, ~20-40px): fitting
+                // preferred-to-target left the LAST label's sub-allocation
+                // short and its ellipsize ate the "1h" tail ("1h ..." on
+                // Claudiu's live data). Reserve the slop so the allocated
+                // line fits too, not just the preferred one.
+                const paintSlop = 20;
                 while (
                     fontSize > CREDIT_CONSUMPTION_MIN_FONT_SIZE &&
-                    preferredWidth(row) > targetWidth + 1
+                    preferredWidth(row) > targetWidth - paintSlop
                 ) {
                     fontSize = Math.max(
                         CREDIT_CONSUMPTION_MIN_FONT_SIZE,
@@ -2921,7 +2928,7 @@ class ZUsageApplet extends Applet.Applet {
                 }
                 while (
                     fontSize < CREDIT_CONSUMPTION_BASE_FONT_SIZE &&
-                    preferredWidth(row) < targetWidth - 1
+                    preferredWidth(row) < targetWidth - paintSlop - 1
                 ) {
                     fontSize = Math.min(
                         CREDIT_CONSUMPTION_BASE_FONT_SIZE,
@@ -4161,7 +4168,15 @@ class ZUsageApplet extends Applet.Applet {
                     if (acc + childNat > viewport) {
                         const peek = viewport - acc;
                         if (peek > 0 && peek <= 56) {
-                            viewport = Math.max(200, acc - 2);
+                            // A constant shave, not a 2px nit: preferred
+                            // heights drift a little per item against the
+                            // real allocations (theme paddings), and the
+                            // drift scales with the number of rows -
+                            // measured 1px here, ~16px on Claudiu's live
+                            // data. A dozen px below the last full row
+                            // hides the next section reliably; the lost
+                            // strip is the row's own bottom padding.
+                            viewport = Math.max(200, acc - 12);
                         }
                         break;
                     }

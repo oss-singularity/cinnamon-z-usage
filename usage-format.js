@@ -579,12 +579,18 @@ function activityBarHeight(bar, peakPercent) {
     const fraction = bar.estimated
         ? 0
         : clamp(bar.consumedPercent / peakPercent, 0, 1);
+    // Square-root spread: a linear scale compresses the low end whenever
+    // one bucket dominates the peak (Z.ai windows: recent buckets at
+    // 3-5% against an earlier 20% spike), making 3% and 5% the same
+    // height. The root curve stretches small differences while the peak
+    // still reaches the maximum - visual ranking is preserved.
+    const spread = Math.sqrt(fraction);
     return Math.min(
         ACTIVITY_BAR_MAX_HEIGHT,
         Math.max(
             ACTIVITY_BAR_MIN_HEIGHT,
             ACTIVITY_BAR_MIN_HEIGHT + Math.round(
-                fraction * (ACTIVITY_BAR_MAX_HEIGHT - ACTIVITY_BAR_MIN_HEIGHT)
+                spread * (ACTIVITY_BAR_MAX_HEIGHT - ACTIVITY_BAR_MIN_HEIGHT)
             )
         )
     );

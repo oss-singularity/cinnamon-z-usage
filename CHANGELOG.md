@@ -16,6 +16,15 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- No more truncated consumption tail: the credits fit reserves the
+  markup label's paint slop, so the "1h" value no longer collapses into
+  "..." when the line runs long (weekend plans + permanent scrollbar).
+  The bar heights spread on a square-root curve, so a 3% bucket next to
+  a 5% one reads clearly even under a dominant chart peak. The viewport
+  trim shaves a constant strip below the last full row - preferred
+  heights drift per item against real allocations (theme paddings), and
+  the drift scaled with the row count on live data, leaving the next
+  section peeking.
 - The header plan renders as a small rounded pill, vertically centered
   on the title line; the 5h window's consumption rows show 12h/Today
   like every other window; and the viewport trim measures rows at the
