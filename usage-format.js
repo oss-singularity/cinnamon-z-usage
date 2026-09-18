@@ -279,15 +279,20 @@ function formatResetCountdownTooltip(window, nowSeconds = null) {
     ].join("\n");
 }
 
-function formatLastResetTooltip(window, lastResetAt, use24Hour = true, estimated = false) {
+function formatLastResetTooltip(window, lastResetAt, use24Hour = true) {
     const durationLabel = formatDuration(window && window.durationMinutes);
     const timestamp = formatTimestamp(lastResetAt, use24Hour);
     if (timestamp === _("unknown")) {
         return _f("Last %s reset: unavailable", durationLabel);
     }
-    return estimated
-        ? _f("Last %s reset: %s (estimated from next reset)", durationLabel, timestamp)
-        : _f("Last %s reset: %s", durationLabel, timestamp);
+    // Z.ai resets sit on a fixed grid: the last reset is exactly one
+    // window duration before the next one, so the computed timestamp
+    // needs no estimation caveat - just a human-readable "how long ago".
+    const ago = formatRelativeTime(lastResetAt);
+    if (ago === _("unknown")) {
+        return _f("Last %s reset: %s", durationLabel, timestamp);
+    }
+    return _f("Last %s reset: %s · %s", durationLabel, timestamp, ago);
 }
 
 function buildQuotaIndicator(window) {

@@ -311,20 +311,21 @@ assertEqual(
 const exactLastResetTooltip = UsageFormat.formatLastResetTooltip(
     { durationMinutes: 10080 },
     1700000000,
-    true,
-    false
+    true
 );
 if (!exactLastResetTooltip.startsWith("Last 7d reset: ") || /estimated/.test(exactLastResetTooltip)) {
     throw new Error(`Expected exact last-reset tooltip, got ${exactLastResetTooltip}`);
 }
-const estimatedLastResetTooltip = UsageFormat.formatLastResetTooltip(
+if (!/ · \d+[smhd] ago$/.test(exactLastResetTooltip)) {
+    throw new Error(`Expected human-readable ago suffix, got ${exactLastResetTooltip}`);
+}
+const exactRecentResetTooltip = UsageFormat.formatLastResetTooltip(
     { durationMinutes: 10080 },
-    1700000000,
-    true,
+    GLib.get_real_time() / 1000000 - 90,
     true
 );
-if (!estimatedLastResetTooltip.includes("(estimated from next reset)")) {
-    throw new Error(`Expected estimated last-reset tooltip, got ${estimatedLastResetTooltip}`);
+if (!exactRecentResetTooltip.includes("1m ago") && !exactRecentResetTooltip.includes("90s ago")) {
+    throw new Error(`Expected a fresh relative suffix, got ${exactRecentResetTooltip}`);
 }
 assertEqual(
     UsageFormat.formatLastResetTooltip({ durationMinutes: 10080 }, null),

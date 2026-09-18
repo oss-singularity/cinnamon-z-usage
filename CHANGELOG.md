@@ -79,6 +79,20 @@
   stack by ONE global factor instead of clamping each slot to the chart
   height - the per-slot clamp pressed every tall stack onto exactly the
   maximum, erasing the difference between a big bucket and the peak.
+- Ring repaint healing: GJS blocks JS callbacks that fire during a GC
+  sweep, and a freshly rebuilt ring whose first repaint gets blocked
+  stays blank (the one-time all-rings-vanished popup after an
+  auto-update). Deferred repaint passes after every rebuild and open
+  heal any blocked drawing area.
+- The weekly ring tooltip drops the "(estimated from next reset)"
+  caveat - Z.ai resets sit on a fixed grid, so the computed timestamp
+  is exact - and appends a human-readable "· 6d ago" after the
+  timestamp.
+- The credits consumption prefix reads "Used:" instead of "Consumed:"
+  - four characters shorter, and the prefix no longer squeezes into
+  "Consume..." on tight rows.
+- The plan pill in the title renders bold with a per-letter
+  blue-to-green gradient.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries

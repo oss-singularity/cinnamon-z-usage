@@ -271,6 +271,7 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             // rebuilds or the previous session left scrolled.
             this._scroll.get_vscroll_bar().get_adjustment().set_value(0);
         }
+        if (freshOpen) owner._healRingRepaints();
     }
 
     _releaseFoldHold() {
@@ -1293,6 +1294,9 @@ class ZUsageApplet extends Applet.Applet {
             if (this.menu.isOpen) this._clampPopupHeight();
         }
         this._builtMenuSignature = this._menuSignature(this._snapshot);
+        // Freshly rebuilt rings can lose their first repaint to a GC
+        // sweep block; the deferred repaint passes heal that.
+        this._healRingRepaints();
         // Fresh items must be width-locked BEFORE their first allocation:
         // without the lock they allocate at their inflated natural width
         // (ring rows measured 458px instead of 373) and nothing ever
@@ -1450,8 +1454,11 @@ class ZUsageApplet extends Applet.Applet {
             : null;
         if (plan) {
             // The plan rides the title line (Claudiu): saves the "Plan:"
-            // row below the credits section and shrinks the popup.
-            const planLabel = new St.Label({ text: _f("Plan: %s", String(plan)) });
+            // row below the credits section and shrinks the popup. The
+            // text paints as a bold per-letter blue-to-green gradient -
+            // St labels cannot gradient their text, Pango spans can.
+            const planText = _f("Plan: %s", String(plan));
+            const planLabel = new St.Label({ text: planText });
             planLabel.y_align = Clutter.ActorAlign.CENTER;
             title.y_align = Clutter.ActorAlign.CENTER;
             planLabel.style = [
@@ -1460,8 +1467,37 @@ class ZUsageApplet extends Applet.Applet {
                 "border-radius: 10px",
                 "background-color: rgba(255, 255, 255, 0.08)",
                 "font-size: 80%",
+                "font-weight: 700",
                 `color: ${this._menuColor(0.75)}`
             ].join("; ") + ";";
+            if (planLabel.clutter_text) {
+                const [fromValid, fromColor] = Clutter.Color.from_string(
+                    String(this.normalColor || "#62c7f5")
+                );
+                const [toValid, toColor] = Clutter.Color.from_string("#62e9a8");
+                if (fromValid && toValid) {
+                    const chars = Array.from(planText);
+                    const spans = chars.map((ch, index) => {
+                        const t = chars.length > 1
+                            ? index / (chars.length - 1)
+                            : 0;
+                        const mix = (a, b) =>
+                            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
+                        const hex = `#${mix(fromColor.red, toColor.red)}` +
+                            `${mix(fromColor.green, toColor.green)}` +
+                            `${mix(fromColor.blue, toColor.blue)}`;
+                        const escaped = ch === "&"
+                            ? "&amp;"
+                            : ch === "<"
+                                ? "&lt;"
+                                : ch === ">"
+                                    ? "&gt;"
+                                    : ch;
+                        return `<span foreground="${hex}">${escaped}</span>`;
+                    });
+                    planLabel.clutter_text.set_markup(spans.join(""));
+                }
+            }
             titleLine.add_child(planLabel);
         }
         text.add_child(titleLine);
@@ -1602,8 +1638,7 @@ class ZUsageApplet extends Applet.Applet {
             const tooltipText = UsageFormat.formatLastResetTooltip(
                 window,
                 details.timestamp,
-                this._use24HourClock,
-                details.estimated
+                this._use24HourClock
             );
             actor.accessible_name = UsageFormat.formatAccessibleTooltip(tooltipText);
             tooltip = this._createPositionedTooltip(actor, tooltipText);
@@ -3119,7 +3154,7 @@ class ZUsageApplet extends Applet.Applet {
             creditConsumption,
             creditConsumptionColor,
             null,
-            creditConsumption ? _("Consumed:  ") : null,
+            creditConsumption ? _("Used:  ") : null,
             creditConsumptionColor,
             creditConsumptionEmphasized,
             false,
@@ -4479,6 +4514,39 @@ class ZUsageApplet extends Applet.Applet {
         scroll.set_height(target);
         this.menu.actor.set_height(this._popupFrameHeight);
         return true;
+    }
+
+    _healRingRepaints() {
+        if (typeof Mainloop === "undefined") return;
+        // GJS blocks a JS callback that fires during the GC sweeping
+        // phase ("call back into JSAPI during the sweeping phase ... the
+        // JS callback not invoked"). When that hits a freshly rebuilt
+        // ring's first `repaint` emission, the drawing area stays blank -
+        // the all-rings-vanished popup after one auto-update. Re-queue
+        // every drawing area on two deferred passes; a repaint past the
+        // sweep window heals the blank rings, and a repaint of an intact
+        // ring paints the same pixels again (invisible either way).
+        const heal = () => {
+            if (this._destroyed || !this.menu || !this.menu.actor) return;
+            if (this.menu.actor.is_finalized && this.menu.actor.is_finalized()) return;
+            const areas = [];
+            const walk = actor => {
+                if (!actor || (actor.is_finalized && actor.is_finalized())) return;
+                if (actor instanceof St.DrawingArea) areas.push(actor);
+                const children = actor.get_children ? actor.get_children() : [];
+                for (const child of children) walk(child);
+            };
+            walk(this.menu.actor);
+            for (const area of areas) area.queue_repaint();
+        };
+        Mainloop.timeout_add(350, () => {
+            heal();
+            return GLib.SOURCE_REMOVE;
+        });
+        Mainloop.timeout_add(1000, () => {
+            heal();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _ensureActorVisible(actor) {

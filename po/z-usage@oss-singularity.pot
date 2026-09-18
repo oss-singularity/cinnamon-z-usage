@@ -314,10 +314,6 @@ msgid "Configure..."
 msgstr ""
 
 #: applet.js
-msgid "Consumed:  "
-msgstr ""
-
-#: applet.js
 msgid "Copied"
 msgstr ""
 
@@ -397,7 +393,7 @@ msgstr ""
 
 #: usage-format.js
 #, javascript-format
-msgid "Last %s reset: %s (estimated from next reset)"
+msgid "Last %s reset: %s · %s"
 msgstr ""
 
 #: usage-format.js
@@ -676,6 +672,10 @@ msgstr ""
 
 #: settings-schema.json.js
 msgid "Use warning and critical colors in the panel"
+msgstr ""
+
+#: applet.js
+msgid "Used:  "
 msgstr ""
 
 #: settings-schema.json.js
