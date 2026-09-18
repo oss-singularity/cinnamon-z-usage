@@ -353,14 +353,29 @@ function buildActivityChart(values, valueKey = "consumedPercent") {
     // value-normalization compresses recent buckets onto the same few
     // pixels (Claudiu's 5%-vs-3% indistinguishable). The rank spreads
     // every chart across the full bar range regardless of distribution;
-    // the caption keeps the honest peak value.
+    // the caption keeps the honest peak value. Competition ranking:
+    // EQUAL values share one rank, so equal buckets render at equal
+    // heights. Sorting ties into arbitrary consecutive ranks made
+    // same-value buckets tower at random heights - stacked with the
+    // credit series, a 1% bucket ended up as tall as the 5% peak
+    // (Claudiu's 7d chart).
     if (known.length > 1) {
         const sorted = known.slice().sort(
             (a, b) => a.consumedPercent - b.consumedPercent
         );
-        sorted.forEach((bar, index) => {
-            bar.rankFraction = index / (sorted.length - 1);
-        });
+        let start = 0;
+        while (start < sorted.length) {
+            let end = start;
+            while (
+                end < sorted.length &&
+                sorted[end].consumedPercent === sorted[start].consumedPercent
+            ) {
+                end += 1;
+            }
+            const rankFraction = start / (sorted.length - 1);
+            for (let k = start; k < end; k++) sorted[k].rankFraction = rankFraction;
+            start = end;
+        }
     }
     bars.forEach(bar => {
         if (!bar.known) return;

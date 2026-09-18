@@ -382,6 +382,19 @@ assertEqual(
     "Activity peak keeps the maximum bar height"
 );
 
+const tieChart = UsageFormat.buildActivityChart([1, 1, 5]);
+assertEqual(
+    UsageFormat.activityBarHeight(tieChart.bars[0], tieChart.peakPercent),
+    UsageFormat.activityBarHeight(tieChart.bars[1], tieChart.peakPercent),
+    "Equal activity values render at equal bar heights"
+);
+assertEqual(
+    UsageFormat.activityBarHeight(tieChart.bars[0], tieChart.peakPercent) <=
+        UsageFormat.activityBarHeight(tieChart.bars[2], tieChart.peakPercent) - 10,
+    true,
+    "Tied small buckets stay clearly below the chart peak"
+);
+
 const partialChart = UsageFormat.buildActivityChart([
     { consumedPercent: 0, complete: false },
     { consumedPercent: 4, complete: false }

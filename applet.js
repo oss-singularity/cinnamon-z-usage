@@ -222,23 +222,46 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         // this open establishes where the grid edge rides.
         owner._stableRelativeAnchor = null;
         owner._clampPopupHeight(owner.actor);
-        super.open(animate);
+        // The fold snap needs the popup's REAL allocations, which exist only
+        // once the open has laid out - on live data that decision lands 2-3
+        // frames into Cinnamon's animation, and the height correction then
+        // painted as a visible jump (the popup grew ~240px mid-fade). Hold
+        // the popup invisible (still mapped, so the layout pass runs) and
+        // replay the regular slide+fade from the FINAL geometry once the
+        // snap lands. Without the hold the open proceeds untouched.
+        const holdForSnap = freshOpen && animate &&
+            Main.wm && Main.wm.desktop_effects_menus &&
+            typeof Meta !== "undefined" && Meta.later_add;
+        this._foldHoldActive = false;
+        if (holdForSnap) {
+            this._foldHoldActive = true;
+            super.open(false);
+            this.actor.opacity = 0;
+            this._foldHoldTimer = Mainloop.timeout_add(400, () => {
+                this._foldHoldTimer = 0;
+                this._releaseFoldHold();
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            super.open(animate);
+        }
         owner._lockPopupLayoutWidth();
-        // No post-open clamp: the pre-open clamp already fixed the final
-        // height, and a post-position resize is the visible jump. The one
-        // exception runs before the first visible paint: the fold snap
-        // aligns the viewport bottom onto the real row boundary, so the
-        // correction never shows up as a resize.
         if (freshOpen && typeof Meta !== "undefined" && Meta.later_add) {
             let attempts = 0;
             const snapFold = () => {
-                if (owner._destroyed || !owner.menu || !owner.menu.isOpen) return;
+                if (owner._destroyed || !owner.menu || !owner.menu.isOpen) {
+                    this._releaseFoldHold();
+                    return;
+                }
                 attempts += 1;
                 // The first frame(s) after the open may run before the
                 // popup's layout pass produced measurable geometry; a
                 // MetaLater does not reliably honor SOURCE_CONTINUE, so
                 // re-arm it explicitly until the fold decision lands.
-                if (owner._snapViewportFoldToRows(attempts) || attempts >= 12) return;
+                if (owner._snapViewportFoldToRows(attempts) || attempts >= 12) {
+                    this._releaseFoldHold();
+                    return;
+                }
                 Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
             };
             Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
@@ -250,8 +273,67 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         }
     }
 
+    _releaseFoldHold() {
+        if (!this._foldHoldActive) return;
+        this._foldHoldActive = false;
+        if (this._foldHoldTimer) {
+            Mainloop.source_remove(this._foldHoldTimer);
+            this._foldHoldTimer = 0;
+        }
+        if (!this.isOpen || !this.actor || this.actor.is_finalized()) return;
+        // Replay Cinnamon's animated open (popupMenu.js open(animate)):
+        // slide MENU_ANIMATION_OFFSET from the panel plus the fade, now
+        // from the settled final geometry.
+        this.animating = true;
+        const easeParams = {
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration: Main.wm.MENU_ANIMATION_TIME,
+            opacity: 255,
+            onComplete: () => {
+                this.animating = false;
+            }
+        };
+        let [xPos, yPos] = this._calculatePosition();
+        switch (this._orientation) {
+            case St.Side.TOP:
+            case St.Side.BOTTOM:
+                this.actor.x = xPos;
+                easeParams.y = yPos;
+                yPos -= this.actor.margin_top;
+                if (this.sideFlipped) {
+                    this.actor.y = yPos + 12 + this.actor.margin_top;
+                } else {
+                    this.actor.y = yPos - 12 + this.actor.margin_bottom;
+                }
+                break;
+            case St.Side.LEFT:
+            case St.Side.RIGHT:
+            default:
+                this.actor.y = yPos;
+                easeParams.x = xPos;
+                xPos -= this.actor.margin_left;
+                if (this.sideFlipped) {
+                    this.actor.x = xPos + 12 + this.actor.margin_left;
+                } else {
+                    this.actor.x = xPos - 12 + this.actor.margin_right;
+                }
+                break;
+        }
+        this.actor.ease(easeParams);
+    }
+
     close(animate) {
         const owner = this._usageOwner;
+        if (this._foldHoldActive) {
+            // The hold never released (fast toggle): drop it at full
+            // opacity so the close fade starts from a sane state.
+            this._foldHoldActive = false;
+            if (this._foldHoldTimer) {
+                Mainloop.source_remove(this._foldHoldTimer);
+                this._foldHoldTimer = 0;
+            }
+            if (this.actor && !this.actor.is_finalized()) this.actor.opacity = 255;
+        }
         if (owner._isRightPanel && this.isOpen) {
             owner._rightPanelPopupLockedWidth = owner._popupWidth();
             owner._normalizeRightPanelPopupCloseWidth();

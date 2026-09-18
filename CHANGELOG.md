@@ -63,6 +63,19 @@
   preferred width) instead of reserving a constant slop - too small a
   slop cut the "1h" tail into "...", too large left a visible gap -
   and the label never ellipsizes.
+- The open animation plays from the popup's final geometry: the fold
+  snap's decision needs the popup's real allocations, which only exist
+  2-3 frames into the open - the height correction painted as a visible
+  jump mid-fade (the popup grew ~240px after two frames). A fresh
+  animated open now stays invisible (still mapped, so the layout pass
+  runs) until the fold snap lands, then replays Cinnamon's slide+fade
+  from the settled size; a 400ms fallback releases the hold even if
+  the snap never fires.
+- Equal activity buckets render at equal heights: the bar ranks now use
+  competition ranking (ties share one rank). Sorting equal values into
+  arbitrary consecutive ranks stacked quota and credit lottery heights
+  onto same-value buckets - a 1% bucket ended up as tall as the 5% peak
+  in the 7d chart.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries
