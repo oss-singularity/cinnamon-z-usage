@@ -1255,6 +1255,20 @@ class ZUsageApplet extends Applet.Applet {
                 ? entry.actor.translation_x : null);
     }
 
+    _captureCarriedSuffixTranslation() {
+        const labels = this._creditsSuffixLabels || [];
+        if (!labels.length) return null;
+        let value = null;
+        for (const label of labels) {
+            if (!label || label.is_finalized()) return null;
+            const tx = label.translation_x;
+            if (typeof tx !== "number" || Math.abs(tx) > 120) return null;
+            if (value === null) value = tx;
+            else if (Math.abs(value - tx) > 1) return null;
+        }
+        return value;
+    }
+
     _captureCarriedHeaderTranslation() {
         return this._headerRings && !this._headerRings.is_finalized() &&
             Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
@@ -2954,6 +2968,11 @@ class ZUsageApplet extends Applet.Applet {
                         }
                     }
                 }
+                // Carry the pinned translation so the next rebuild's fresh
+                // labels start at the pinned position - starting natural
+                // made the red text jump onto its spot after the popup
+                // appeared.
+                this._carriedSuffixTx = this._captureCarriedSuffixTranslation();
             } finally {
                 fitting = false;
             }
@@ -2985,7 +3004,7 @@ class ZUsageApplet extends Applet.Applet {
             this._addCreditItem(_("Plan"), String(credits.plan), true);
         }
         let balance = credits
-            ? UsageFormat.formatCreditNumber(credits.balance)
+            ? UsageFormat.formatCompactNumber(credits.balance)
             : _("unavailable");
         if (credits && credits.unlimited) balance = "unlimited";
         const creditConsumption = credits && !credits.unlimited && history
@@ -3148,6 +3167,11 @@ class ZUsageApplet extends Applet.Applet {
                 fitTargets.expiresLabel,
                 fitTargets.expiryDateLabel
             ];
+            if (typeof this._carriedSuffixTx === "number") {
+                for (const label of this._creditsSuffixLabels) {
+                    label.translation_x = this._carriedSuffixTx;
+                }
+            }
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,

@@ -145,17 +145,20 @@ function formatConsumedCredits(period) {
     return String(Math.round(value));
 }
 
-// Compact magnitude display for the credits line only: the raw numbers
-// wiggle every refresh and the compact tokens keep the line narrow
-// (buckets per Claudiu: <0.5k, <1k, ~1k, ~2k, ~3k ... nearest thousand).
+// Compact magnitude display (buckets per Claudiu: <0.5k, <1k, 1k, 2k,
+// 3k ... nearest thousand) - keeps the credits line narrow while the raw
+// numbers wiggle every refresh.
+function formatCompactNumber(value) {
+    const numeric = Math.max(0, Math.round(Number(value)));
+    if (numeric >= 1000) return `${Math.round(numeric / 1000)}k`;
+    if (numeric >= 500) return "<1k";
+    if (numeric >= 1) return "<0.5k";
+    return "0";
+}
+
 function formatCompactConsumedCredits(period) {
     if (!period || !Number.isFinite(Number(period.consumed))) return "--";
-    const value = Math.max(0, Number(period.consumed));
-    const rounded = Math.round(value);
-    if (rounded >= 1000) return `${Math.round(rounded / 1000)}k`;
-    if (rounded >= 500) return "<1k";
-    if (rounded >= 1) return "<0.5k";
-    return "0";
+    return formatCompactNumber(period.consumed);
 }
 
 function formatCreditConsumption(periods) {
@@ -963,6 +966,7 @@ module.exports = {
     formatPanelPercent,
     formatConsumedPercent,
     formatCompactConsumedCredits,
+    formatCompactNumber,
     formatConsumedCredits,
     formatCreditConsumption,
     formatCreditConsumptionMarkup,
