@@ -464,6 +464,32 @@ Fit erfasst, nur der font-size-Anteil wird appended; die Ratio rechnet
 über die Gesamt-Breite, Base-Cap). Live verifiziert: uniforme Schrift,
 Separator sichtbar, kein Gap, Ende natürlich wie upstream.
 
+## 3i. RUNDE 9 (2026-09-18 Nacht, Credits-Finale — 043af8c-Rückbau … b08877b-Folge)
+
+### Consumed-Ende exakt auf der Button-Kante, „Credits:" statisch — FINALE
+
+**Claudius Spec (nach dem Uniform-Versuch):** „Credits: ... " in statischer
+Größe wie „Plan: ... " obendrüber; NUR der rote „Consumed: ... "-Text
+passt seine Größe dynamisch an, sodass er den Platz zwischen Credits-Wert
+und Button-Ende perfekt ausfüllt.
+
+**Umsetzung:** Der Uniform-Scaling-Versuch (2bf7c57) wurde revertiert; der
+Suffix-only-Fit trägt jetzt die konvergierte Größe über Rebuilds
+(`_lastCreditFontSize`, lineare Ratio, Base-Cap, Grow-Trim in beide
+Richtungen) und misst sein Target am **stabilen Action-Frame** statt an
+den Activity-Plots (die allozieren erst natural und wandern erst durch
+den Sync auf die Kante — der Plot-basierte Target ließ den Fit am
+Min-Font (54%) latchen, Ende ~55px zu kurz). Der Convergence-Latch ist
+entfernt (der Font-Carry macht jeden Pass idempotent — der Fit
+selbstkorrigiert, wenn ein transientes Target sich setzt) plus ein
+End-Nudge: der Suffix-Gruppe (Separator+Consumed+Werte) wird die
+gemalte Restdifferenz zur Kante als Translation mitgegeben (±40px
+gecleant, kein Feedback in den Fit).
+
+**Live-Verifikation:** Font konvergiert 73.4 (dynamisch), „Credits:" und
+Wert statisch wie die Plan-Row, gemaltes Consumed-Ende = 1847 =
+Grid-Kante (NULL Differenz) über Rebuilds. `make check` grün.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
