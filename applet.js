@@ -3431,8 +3431,14 @@ class ZUsageApplet extends Applet.Applet {
             ? UsageFormat.formatPeakCredits(creditValues)
             : null;
         const peakCreditsLabel = peakCredits ? _f(" / %s AIC", peakCredits) : "";
+        // The window total may exceed 100% at Z.ai (overage) - render it
+        // like the leaf rows instead of formatPercent, which clamps to
+        // 100 and made a 138% day read as "100%".
         const totalLabel = model.knownCount > 0
-            ? UsageFormat.formatPercent(model.totalPercent)
+            ? UsageFormat.formatConsumedPercent({
+                consumedPercent: model.totalPercent,
+                complete: model.totalComplete
+            })
             : "—";
         const item = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
