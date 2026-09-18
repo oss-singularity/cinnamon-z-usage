@@ -1,4 +1,4 @@
-/* global imports, ARGV, Mainloop */
+/* global imports, ARGV */
 
 // Credits-row baseline: the font fit scales only the suffix labels, and
 // the row mixed default and CENTER alignment, so the "Used:" group rode
