@@ -628,7 +628,7 @@ assertEqual(
         "4h": { consumed: 880, complete: true },
         "1h": { consumed: 120, complete: true }
     }, "numbers"),
-    "24h <span weight=\"bold\">6k</span>&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2k</span>&#160;&#160;·&#160;&#160;4h <span weight=\"bold\"><1k</span>&#160;&#160;·&#160;&#160;1h <span weight=\"bold\"><0.5k</span>",
+    "24h <span weight=\"bold\">6</span>k&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2</span>k&#160;&#160;·&#160;&#160;4h &lt;<span weight=\"bold\">1</span>k&#160;&#160;·&#160;&#160;1h &lt;<span weight=\"bold\">0.5</span>k",
     "Credit-only emphasis keeps periods and label unbolded"
 );
 assertEqual(

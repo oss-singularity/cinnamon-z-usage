@@ -156,6 +156,18 @@ function formatCompactNumber(value) {
     return "0";
 }
 
+// Pango markup for a compact token: only the digits are bold; the "<"
+// prefix and the "k" suffix keep the regular weight (Claudiu). The "<"
+// is escaped for the Pango parser.
+function markupBoldCompactToken(value) {
+    const match = /^(<)?([\d.]+)(k?)$/.exec(value);
+    if (!match) return value.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const prefix = match[1] ? "&lt;" : "";
+    const digits = match[2];
+    const suffix = match[3] || "";
+    return prefix + '<span weight="bold">' + digits + "</span>" + suffix;
+}
+
 function formatCompactConsumedCredits(period) {
     if (!period || !Number.isFinite(Number(period.consumed))) return "--";
     return formatCompactNumber(period.consumed);
@@ -180,7 +192,7 @@ function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
         const consumed = italicPart === "credits"
             ? `<i>${value}</i>`
             : italicPart === "numbers"
-                ? `<span weight="bold">${value}</span>`
+                ? markupBoldCompactToken(value)
                 : value;
         return `${period} ${consumed}`;
     // Keep separators unstyled so only the consumed values receive emphasis.
