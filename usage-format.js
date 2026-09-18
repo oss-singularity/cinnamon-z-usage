@@ -534,10 +534,11 @@ function hasRecentActivity(activity24h, valueKey = "consumedPercent") {
     });
 }
 
-function historyPeriodKeys(durationMinutes) {
-    return Number(durationMinutes) <= 300
-        ? ["1h", "4h", "24h"]
-        : ["1h", "4h", "12h", "today"];
+function historyPeriodKeys() {
+    // Every window shows the same period set (Claudiu): the 5h window's
+    // rows used to stop at 1h/4h once the duplicated 24h total was
+    // dropped from the rows - 12h/today carry the rolling context now.
+    return ["1h", "4h", "12h", "today"];
 }
 
 function buildActivityTotalPeriod(activity24h) {

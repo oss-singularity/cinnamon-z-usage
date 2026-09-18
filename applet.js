@@ -1344,10 +1344,14 @@ class ZUsageApplet extends Applet.Applet {
             // row below the credits section and shrinks the popup.
             const planLabel = new St.Label({ text: _f("Plan: %s", String(plan)) });
             planLabel.y_align = Clutter.ActorAlign.CENTER;
+            title.y_align = Clutter.ActorAlign.CENTER;
             planLabel.style = [
-                "padding-left: 8px",
-                "font-size: 90%",
-                `color: ${this._menuColor(0.68)}`
+                "margin-left: 8px",
+                "padding: 1px 8px 2px 8px",
+                "border-radius: 10px",
+                "background-color: rgba(255, 255, 255, 0.08)",
+                "font-size: 80%",
+                `color: ${this._menuColor(0.75)}`
             ].join("; ") + ";";
             titleLine.add_child(planLabel);
         }
@@ -4139,22 +4143,26 @@ class ZUsageApplet extends Applet.Applet {
             // overflows, whatever row straddles the viewport bottom pokes
             // out a few pixels above the footer and reads as a glitch
             // (Claudiu: the collapsible headers should appear only once
-            // you scroll, not peek). Hiding a small straddler (<48px,
-            // a header/normal row) is worth the few lost pixels; a tall
+            // you scroll, not peek). Hiding a straddler up to 56px
+            // (a header/normal ring row) is worth the lost pixels; a tall
             // straddler (an open leaf) keeps the peek - scrolling past
             // mid-content is normal, and losing a large chunk of the
-            // viewport would not be. The unspaced preferred-height sum
-            // underestimates the real boundary, so the next row hides
-            // fully.
+            // viewport would not be. Measure at the width the width lock
+            // actually enforces (the popup's outer width): measuring at
+            // the narrower inner width wraps more text, overreports every
+            // row and left the boundary a few pixels too deep - the next
+            // row still peeked (Claudiu's screenshot).
             if (viewport < contentNat + POPUP_VIEWPORT_PAD) {
                 let acc = 0;
                 const children = this.menu._content.actor.get_children ?
                     this.menu._content.actor.get_children() : [];
                 for (const child of children) {
-                    const [, childNat] = child.get_preferred_height(inner);
+                    const [, childNat] = child.get_preferred_height(outer);
                     if (acc + childNat > viewport) {
                         const peek = viewport - acc;
-                        if (peek > 0 && peek <= 48) viewport = Math.max(200, acc);
+                        if (peek > 0 && peek <= 56) {
+                            viewport = Math.max(200, acc - 2);
+                        }
                         break;
                     }
                     acc += childNat;

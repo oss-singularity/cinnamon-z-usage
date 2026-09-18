@@ -16,6 +16,11 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- The header plan renders as a small rounded pill, vertically centered
+  on the title line; the 5h window's consumption rows show 12h/Today
+  like every other window; and the viewport trim measures rows at the
+  width the lock actually enforces, so the next section hides fully
+  below the fold instead of peeking a few pixels (Claudiu's screenshot).
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries

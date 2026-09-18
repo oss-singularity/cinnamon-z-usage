@@ -426,8 +426,8 @@ assertEqual(
 );
 assertEqual(
     UsageFormat.historyPeriodKeys(300).join(","),
-    "1h,4h,24h",
-    "Five-hour history replaces reset-spanning periods with a rolling day"
+    "1h,4h,12h,today",
+    "Five-hour history shows the same periods as every window"
 );
 assertEqual(
     UsageFormat.historyPeriodKeys(10080).join(","),
