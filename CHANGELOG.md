@@ -2,6 +2,25 @@
 
 ## Unreleased — 1.0.0 (planned)
 
+- Stable credits consumption line: the fit measures the suffix from the
+  allocated labels, sizes the line to end exactly at the grid anchor and
+  starts from the previously converged size - rebuilds while the popup is
+  open no longer rescale, shift or delay the red consumption text.
+- No scrollbar-induced shifts: the vertical scrollbar policy is always
+  "always" for this content (it is taller than the viewport by design), so
+  the content width never changes under a rebuild.
+- Deterministic popup geometry: the height clamp reserves the real theme
+  paddings of the header and footer items and a 16 px bottom safety, so the
+  popup ends above the screen edge with the button rows fully visible.
+- Compact magnitude tokens everywhere: the credits balance, the consumed
+  windows and the peak-AIC label render as "109.3k", "11k", "<1k", "<0.5k"
+  - only the digits are bold, the "k" and "<" stay in the regular weight.
+- The API key settings row keeps keyboard focus when clicks land on
+  labels or empty UI, and the API keys page button renders right below the
+  entry.
+- The launch footer is two rows (Z.ai Chat / ZCode, Refresh now / Usage) -
+  the legacy transparent Z.ai/Docs row that sat clipped below the screen
+  edge is removed.
 - Deterministic popup height: the height clamp computes the header, scroll
   viewport and footer sizes from the real naturals before Cinnamon positions
   the popup, and menu items are clamped to the inner width - so toggling
