@@ -20,14 +20,8 @@ from pathlib import Path
 from typing import Any
 
 _data_home = os.environ.get("XDG_DATA_HOME")
-_locale_dir = (
-    Path(_data_home) / "locale"
-    if _data_home
-    else Path.home() / ".local" / "share" / "locale"
-)
-_ = gettext.translation(
-    "z-usage@oss-singularity", localedir=str(_locale_dir), fallback=True
-).gettext
+_locale_dir = Path(_data_home) / "locale" if _data_home else Path.home() / ".local" / "share" / "locale"
+_ = gettext.translation("z-usage@oss-singularity", localedir=str(_locale_dir), fallback=True).gettext
 
 
 DEFAULT_API_BASE = "https://api.z.ai"
@@ -209,9 +203,7 @@ def plan_balance_cache_path() -> Path:
     return Path(state_root) / "cinnamon-z-usage" / "plan-balances-cache.json"
 
 
-def save_plan_balance_cache(
-    limits: list[dict[str, Any]], now: int | None = None
-) -> None:
+def save_plan_balance_cache(limits: list[dict[str, Any]], now: int | None = None) -> None:
     """Persist the normalised plan limits; failures never break the snapshot."""
 
     try:
@@ -239,10 +231,7 @@ def load_plan_balance_cache(now: int | None = None) -> list[dict[str, Any]]:
         payload = json.loads(plan_balance_cache_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    if (
-        not isinstance(payload, dict)
-        or payload.get("version") != PLAN_BALANCE_CACHE_VERSION
-    ):
+    if not isinstance(payload, dict) or payload.get("version") != PLAN_BALANCE_CACHE_VERSION:
         return []
     fetched_at = _number(payload.get("fetchedAt"), -1)
     if fetched_at < 0 or now - int(fetched_at) > PLAN_BALANCE_CACHE_TTL:
@@ -257,8 +246,7 @@ def load_plan_balance_cache(now: int | None = None) -> list[dict[str, Any]]:
         windows = [
             window
             for window in limit.get("windows", [])
-            if isinstance(window, dict)
-            and int(_number(window.get("resetsAt"), 0)) > now
+            if isinstance(window, dict) and int(_number(window.get("resetsAt"), 0)) > now
         ]
         if windows:
             fresh.append({**limit, "windows": windows})
@@ -337,9 +325,7 @@ def _load_history(path: Path) -> list[dict[str, Any]]:
 
 def _write_history(path: Path, samples: list[dict[str, Any]]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        prefix=".history-", suffix=".json", dir=path.parent
-    )
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".history-", suffix=".json", dir=path.parent)
     try:
         os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
@@ -362,9 +348,7 @@ def _write_history(path: Path, samples: list[dict[str, Any]]) -> None:
         raise
 
 
-def _window_points(
-    samples: list[dict[str, Any]], key: str, end_at: int
-) -> list[tuple[int, dict[str, Any]]]:
+def _window_points(samples: list[dict[str, Any]], key: str, end_at: int) -> list[tuple[int, dict[str, Any]]]:
     points = []
     for sample in samples:
         timestamp = int(_number(sample.get("timestamp")))
@@ -377,9 +361,7 @@ def _window_points(
     return sorted(points, key=lambda point: point[0])
 
 
-def _credit_points(
-    samples: list[dict[str, Any]], end_at: int
-) -> list[tuple[int, dict[str, Any]]]:
+def _credit_points(samples: list[dict[str, Any]], end_at: int) -> list[tuple[int, dict[str, Any]]]:
     points = []
     for sample in samples:
         timestamp = int(_number(sample.get("timestamp")))
@@ -396,11 +378,7 @@ def _positive_delta(previous: dict[str, Any], current: dict[str, Any]) -> float:
     previous_used = _number(previous.get("usedPercent"))
     current_used = _number(current.get("usedPercent"))
     reset_shift = abs(_number(current_reset) - _number(previous_reset))
-    if (
-        previous_reset
-        and current_reset
-        and reset_shift > RESET_TIMESTAMP_JITTER_SECONDS
-    ):
+    if previous_reset and current_reset and reset_shift > RESET_TIMESTAMP_JITTER_SECONDS:
         # A capped rolling window can move its advertised reset timestamp while
         # remaining at 100%; that is not a fresh full-window consumption event.
         if previous_used >= 100 and current_used >= 100:
@@ -430,10 +408,7 @@ def _observed_consumption(
         elif point[0] <= end_at:
             after_start.append(point)
     selected = ([baseline] if baseline else []) + after_start
-    consumed = sum(
-        _positive_delta(previous[1], current[1])
-        for previous, current in zip(selected, selected[1:])
-    )
+    consumed = sum(_positive_delta(previous[1], current[1]) for previous, current in zip(selected, selected[1:]))
     return consumed, baseline is not None, len(selected) >= 2
 
 
@@ -450,10 +425,7 @@ def _observed_credit_consumption(
         elif point[0] <= end_at:
             after_start.append(point)
     selected = ([baseline] if baseline else []) + after_start
-    consumed = sum(
-        _positive_credit_delta(previous[1], current[1])
-        for previous, current in zip(selected, selected[1:])
-    )
+    consumed = sum(_positive_credit_delta(previous[1], current[1]) for previous, current in zip(selected, selected[1:]))
     return consumed, baseline is not None, len(selected) >= 2
 
 
@@ -463,9 +435,7 @@ def _aligned_bucket_end(now: int, bucket_seconds: int) -> int:
     local_now = dt.datetime.fromtimestamp(now).astimezone()
     offset_seconds = int((local_now.utcoffset() or dt.timedelta()).total_seconds())
     local_epoch = now + offset_seconds
-    return (
-        (local_epoch + bucket_seconds - 1) // bucket_seconds
-    ) * bucket_seconds - offset_seconds
+    return ((local_epoch + bucket_seconds - 1) // bucket_seconds) * bucket_seconds - offset_seconds
 
 
 def build_usage_history(
@@ -480,9 +450,7 @@ def build_usage_history(
     bucket_count = ACTIVITY_WINDOW_SECONDS // bucket_seconds
     activity_end = _aligned_bucket_end(now, bucket_seconds)
     local_now = dt.datetime.fromtimestamp(now).astimezone()
-    start_of_today = int(
-        local_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    )
+    start_of_today = int(local_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
     periods = (
         ("1h", now - 60 * 60),
         ("4h", now - 4 * 60 * 60),
@@ -491,15 +459,11 @@ def build_usage_history(
         ("today", start_of_today),
     )
     history_windows = []
-    tracked_since = min(
-        (int(_number(sample.get("timestamp"))) for sample in samples), default=now
-    )
+    tracked_since = min((int(_number(sample.get("timestamp"))) for sample in samples), default=now)
     credit_points = _credit_points(samples, now)
     credit_periods = {}
     for period_key, start_at in periods:
-        consumed, complete, _ = _observed_credit_consumption(
-            credit_points, start_at, now
-        )
+        consumed, complete, _ = _observed_credit_consumption(credit_points, start_at, now)
         credit_periods[period_key] = {
             "consumed": round(consumed, 2),
             "complete": complete,
@@ -589,11 +553,7 @@ def update_usage_history(
 
     now = int(snapshot["updatedAt"])
     cutoff = now - HISTORY_RETENTION_SECONDS
-    samples = [
-        sample
-        for sample in _load_history(path)
-        if int(_number(sample.get("timestamp"))) >= cutoff
-    ]
+    samples = [sample for sample in _load_history(path) if int(_number(sample.get("timestamp"))) >= cutoff]
     current = _sample_from_snapshot(snapshot)
     if current["windows"] or "creditBalance" in current:
         if samples and int(_number(samples[-1].get("timestamp"))) == now:
@@ -716,13 +676,10 @@ def fetch_quota_limits(api_key: str, base_url: str, timeout: float) -> dict[str,
         if error.code in (401, 403):
             raise AuthenticationRequired(AUTH_REQUIRED_MESSAGE) from error
         raise UsageError(
-            _("Z.ai rejected the request: HTTP %(code)s %(detail)s")
-            % {"code": error.code, "detail": detail}
+            _("Z.ai rejected the request: HTTP %(code)s %(detail)s") % {"code": error.code, "detail": detail}
         )
     except (urllib.error.URLError, OSError, TimeoutError) as error:
-        raise UsageError(
-            _("Could not reach the Z.ai usage API: %(error)s") % {"error": error}
-        ) from error
+        raise UsageError(_("Could not reach the Z.ai usage API: %(error)s") % {"error": error}) from error
 
     try:
         envelope = json.loads(body)
@@ -732,15 +689,11 @@ def fetch_quota_limits(api_key: str, base_url: str, timeout: float) -> dict[str,
         raise UsageError(_("Z.ai returned an unreadable usage response"))
 
     code = envelope.get("code")
-    if envelope.get("success") is False or (
-        code not in (None, 200) and not envelope.get("success")
-    ):
+    if envelope.get("success") is False or (code not in (None, 200) and not envelope.get("success")):
         message = str(envelope.get("msg") or "")
         if code in (401, 403) or is_authentication_error(message):
             raise AuthenticationRequired(AUTH_REQUIRED_MESSAGE)
-        raise UsageError(
-            _("Z.ai rejected the request: %(message)s") % {"message": message or code}
-        )
+        raise UsageError(_("Z.ai rejected the request: %(message)s") % {"message": message or code})
 
     data = envelope.get("data")
     if not isinstance(data, dict):
@@ -765,11 +718,7 @@ def zcode_source_headers(origin: str) -> dict[str, str]:
         "X-Os-Version": os.uname().release,
     }
     try:
-        telemetry = json.loads(
-            (Path.home() / ".zcode" / "v2" / "telemetry-state.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        telemetry = json.loads((Path.home() / ".zcode" / "v2" / "telemetry-state.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         telemetry = None
     device_mid = telemetry.get("deviceMid") if isinstance(telemetry, dict) else None
@@ -801,26 +750,16 @@ def fetch_plan_balances(token: str, base_url: str, timeout: float) -> dict[str, 
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
-        raise UsageError(
-            _("ZCode plan balance request failed: HTTP %(code)s") % {"code": error.code}
-        ) from error
+        raise UsageError(_("ZCode plan balance request failed: HTTP %(code)s") % {"code": error.code}) from error
     except (urllib.error.URLError, OSError, TimeoutError) as error:
-        raise UsageError(
-            _("Could not reach the ZCode plan balance API: %(error)s")
-            % {"error": error}
-        ) from error
+        raise UsageError(_("Could not reach the ZCode plan balance API: %(error)s") % {"error": error}) from error
     try:
         envelope = json.loads(body)
     except json.JSONDecodeError as error:
-        raise UsageError(
-            _("ZCode returned an unreadable plan balance response")
-        ) from error
+        raise UsageError(_("ZCode returned an unreadable plan balance response")) from error
     if not isinstance(envelope, dict) or envelope.get("code") not in (0, 200):
         message = str(envelope.get("msg") or "") if isinstance(envelope, dict) else ""
-        raise UsageError(
-            _("ZCode rejected the plan balance request: %(message)s")
-            % {"message": message or "unknown"}
-        )
+        raise UsageError(_("ZCode rejected the plan balance request: %(message)s") % {"message": message or "unknown"})
     data = envelope.get("data")
     if not isinstance(data, dict):
         raise UsageError(_("ZCode returned no plan balance data"))
@@ -862,25 +801,19 @@ def normalise_plan_balances(data: Any, now: int | None = None) -> list[dict[str,
         plan_short = re.sub(r"^ZCode\s+", "", plan_name).strip() or plan_name
         model = _bucket_model_name(bucket)
         label = f"{plan_short} · {model}" if model else plan_short
-        limit_id = "zai-" + re.sub(
-            r"[^a-z0-9]+", "-", f"{plan_short} {model}".lower()
-        ).strip("-")
+        limit_id = "zai-" + re.sub(r"[^a-z0-9]+", "-", f"{plan_short} {model}".lower()).strip("-")
         limits.append(
             {
                 "id": limit_id,
                 "label": label,
                 "planType": plan_short,
                 "source": ZCODE_PLAN_SOURCE,
-                "priority": _number(
-                    bucket.get("plan_priority") or bucket.get("priority"), 0
-                ),
+                "priority": _number(bucket.get("plan_priority") or bucket.get("priority"), 0),
                 "windows": [
                     {
                         "durationMinutes": duration,
                         "usedPercent": min(100.0, max(0.0, 100.0 * used / total)),
-                        "remainingPercent": min(
-                            100.0, max(0.0, 100.0 * remaining / total)
-                        ),
+                        "remainingPercent": min(100.0, max(0.0, 100.0 * remaining / total)),
                         "resetsAt": period_end,
                         "lastResetAt": period_start,
                         "usedCredits": used,
@@ -910,22 +843,12 @@ def _bucket_model_name(bucket: dict[str, Any]) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=_(
-            "Read Z.ai GLM Coding Plan limits through the Z.ai usage monitor API."
-        )
+        description=_("Read Z.ai GLM Coding Plan limits through the Z.ai usage monitor API.")
     )
-    parser.add_argument(
-        "--api-key", help=_("Z.ai API key; defaults to ZAI_API_KEY or the key file")
-    )
-    parser.add_argument(
-        "--api-base-url", help=_("Z.ai API base URL for the monitor endpoints")
-    )
-    parser.add_argument(
-        "--timeout", type=float, default=25, help=_("Request timeout in seconds")
-    )
-    parser.add_argument(
-        "--history-file", type=Path, help=_("Override the local history path")
-    )
+    parser.add_argument("--api-key", help=_("Z.ai API key; defaults to ZAI_API_KEY or the key file"))
+    parser.add_argument("--api-base-url", help=_("Z.ai API base URL for the monitor endpoints"))
+    parser.add_argument("--timeout", type=float, default=25, help=_("Request timeout in seconds"))
+    parser.add_argument("--history-file", type=Path, help=_("Override the local history path"))
     parser.add_argument(
         "--activity-bucket-minutes",
         type=int,
@@ -933,9 +856,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_ACTIVITY_BUCKET_MINUTES,
         help=_("24-hour activity bucket size"),
     )
-    parser.add_argument(
-        "--no-history", action="store_true", help=_("Do not read or write history")
-    )
+    parser.add_argument("--no-history", action="store_true", help=_("Do not read or write history"))
     return parser.parse_args()
 
 
@@ -969,14 +890,12 @@ def main() -> int:
             if cached_limits:
                 snapshot["limits"].extend(cached_limits)
                 print(
-                    _("ZCode plan quotas unavailable, showing recent values: %(error)s")
-                    % {"error": plan_error},
+                    _("ZCode plan quotas unavailable, showing recent values: %(error)s") % {"error": plan_error},
                     file=sys.stderr,
                 )
             else:
                 print(
-                    _("ZCode plan quotas unavailable: %(error)s")
-                    % {"error": plan_error},
+                    _("ZCode plan quotas unavailable: %(error)s") % {"error": plan_error},
                     file=sys.stderr,
                 )
         if not args.no_history:
@@ -987,10 +906,7 @@ def main() -> int:
                     args.activity_bucket_minutes,
                 )
             except OSError as error:
-                snapshot["history"] = {
-                    "error": _("Could not store local history: %(error)s")
-                    % {"error": error}
-                }
+                snapshot["history"] = {"error": _("Could not store local history: %(error)s") % {"error": error}}
         print(json.dumps(snapshot, separators=(",", ":")))
         return 0
     except AuthenticationRequired as error:

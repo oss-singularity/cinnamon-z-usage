@@ -20,17 +20,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="usage-icons-") as temporary:
         for output, source in SOURCES.items():
             rendered = Path(temporary) / Path(output).name
-            subprocess.run(
-                ["rsvg-convert", "-o", str(rendered), str(ROOT / source)], check=True
-            )
+            subprocess.run(["rsvg-convert", "-o", str(rendered), str(ROOT / source)], check=True)
             if args.check:
                 if rendered.read_bytes() != (ROOT / output).read_bytes():
                     raise SystemExit(f"Icon differs from its SVG source: {output}")
             else:
                 (ROOT / output).write_bytes(rendered.read_bytes())
-    print(
-        f"Original icons: {len(SOURCES)} PNGs {'verified' if args.check else 'rendered'}."
-    )
+    print(f"Original icons: {len(SOURCES)} PNGs {'verified' if args.check else 'rendered'}.")
 
 
 if __name__ == "__main__":

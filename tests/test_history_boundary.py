@@ -44,9 +44,5 @@ class HistoryBoundaryTests(unittest.TestCase):
             self.assertEqual(samples[0]["timestamp"], 11000)
             self.assertEqual(archive.read_bytes(), archived)
             self.assertEqual(journal.read_text(), "unresolved reset fixture")
-            self.assertEqual(
-                current["history"]["windows"][0]["periods"]["1h"]["consumedPercent"], 0
-            )
-            self.assertFalse(
-                current["history"]["windows"][0]["periods"]["1h"]["complete"]
-            )
+            self.assertEqual(current["history"]["windows"][0]["periods"]["1h"]["consumedPercent"], 0)
+            self.assertFalse(current["history"]["windows"][0]["periods"]["1h"]["complete"])

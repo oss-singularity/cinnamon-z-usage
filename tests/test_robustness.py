@@ -16,11 +16,7 @@ class RobustnessTests(unittest.TestCase):
     def test_invalid_reset_times_never_crash(self):
         for bad in [float("inf"), float("-inf"), float("nan"), True, "soon"]:
             with self.subTest(bad=bad):
-                data = {
-                    "limits": [
-                        {"unit": 3, "number": 5, "percentage": 5, "nextResetTime": bad}
-                    ]
-                }
+                data = {"limits": [{"unit": 3, "number": 5, "percentage": 5, "nextResetTime": bad}]}
                 snapshot = normalise_quota_limits(data)
                 self.assertEqual(len(snapshot["limits"]), 1)
                 self.assertIsNone(snapshot["limits"][0]["windows"][0]["resetsAt"])

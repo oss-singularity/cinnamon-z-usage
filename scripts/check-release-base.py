@@ -32,9 +32,7 @@ def fail(message):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--version", required=True, help="Version from metadata.json, for example 1.0.4"
-    )
+    parser.add_argument("--version", required=True, help="Version from metadata.json, for example 1.0.4")
     parser.add_argument(
         "--main-ref",
         default="refs/remotes/origin/main",
@@ -49,16 +47,12 @@ def main():
     except (OSError, json.JSONDecodeError) as error:
         return fail(f"cannot read metadata.json: {error}")
     if metadata.get("version") != args.version:
-        return fail(
-            f"metadata.json declares {metadata.get('version')!r}, expected {args.version!r}"
-        )
+        return fail(f"metadata.json declares {metadata.get('version')!r}, expected {args.version!r}")
 
     try:
         status = git("status", "--porcelain")
         if status:
-            return fail(
-                "checkout is not clean; commit or remove every change before tagging"
-            )
+            return fail("checkout is not clean; commit or remove every change before tagging")
         main_sha = git("rev-parse", "--verify", f"{args.main_ref}^{{commit}}")
         head_sha = git("rev-parse", "--verify", f"{args.head}^{{commit}}")
     except RuntimeError as error:
@@ -79,14 +73,10 @@ def main():
         except RuntimeError as error:
             return fail(f"cannot resolve {args.tag}: {error}")
         if tag_sha != main_sha:
-            return fail(
-                f"tag {args.tag} peels to {tag_sha}, not the exact main commit {main_sha}"
-            )
+            return fail(f"tag {args.tag} peels to {tag_sha}, not the exact main commit {main_sha}")
 
     suffix = f" tag={args.tag} tag_sha={tag_sha}" if args.tag else ""
-    print(
-        f"RELEASE_BASE_OK version={args.version} main_sha={main_sha} head_sha={head_sha}{suffix}"
-    )
+    print(f"RELEASE_BASE_OK version={args.version} main_sha={main_sha} head_sha={head_sha}{suffix}")
     return 0
 
 

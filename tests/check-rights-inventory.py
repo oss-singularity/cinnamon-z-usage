@@ -32,16 +32,10 @@ paths = (
     .decode()
     .split("\0")
 )
-assets = {
-    name
-    for name in paths
-    if Path(name).suffix.lower() in EXTENSIONS and (ROOT / name).is_file()
-}
+assets = {name for name in paths if Path(name).suffix.lower() in EXTENSIONS and (ROOT / name).is_file()}
 inventory = json.loads((ROOT / "docs/rights-inventory.json").read_text())["assets"]
 if assets != set(inventory):
-    raise SystemExit(
-        f"Rights inventory coverage mismatch: {sorted(assets.symmetric_difference(inventory))}"
-    )
+    raise SystemExit(f"Rights inventory coverage mismatch: {sorted(assets.symmetric_difference(inventory))}")
 for name in sorted(assets):
     digest = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     if digest in RETIRED_HASHES:
@@ -54,6 +48,4 @@ for name in sorted(assets):
         "CC-BY-SA-4.0",
     } or not record.get("evidence"):
         raise SystemExit(f"Missing declared license/evidence: {name}")
-print(
-    f"Rights inventory: {len(assets)} assets covered; retired image hashes absent. Not a legal clearance."
-)
+print(f"Rights inventory: {len(assets)} assets covered; retired image hashes absent. Not a legal clearance.")

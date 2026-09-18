@@ -64,18 +64,12 @@ class NormaliseQuotaLimitsTests(unittest.TestCase):
 
         snapshot = normalise_quota_limits(data, now=1789474928)
         self.assertEqual(snapshot["updatedAt"], 1789474928)
-        self.assertEqual(
-            [item["id"] for item in snapshot["limits"]], [ACCOUNT_LIMIT_ID]
-        )
+        self.assertEqual([item["id"] for item in snapshot["limits"]], [ACCOUNT_LIMIT_ID])
         self.assertEqual(snapshot["limits"][0]["label"], "Z.ai Coding Plan")
         self.assertEqual(snapshot["limits"][0]["planType"], "max")
         windows = snapshot["limits"][0]["windows"]
-        self.assertEqual(
-            [window["durationMinutes"] for window in windows], [300, 10080]
-        )
-        self.assertEqual(
-            [window["remainingPercent"] for window in windows], [93.0, 99.0]
-        )
+        self.assertEqual([window["durationMinutes"] for window in windows], [300, 10080])
+        self.assertEqual([window["remainingPercent"] for window in windows], [93.0, 99.0])
         self.assertEqual(windows[0]["resetsAt"], 1789479939)
         self.assertEqual(windows[1]["resetsAt"], 1790064603)
         self.assertEqual(windows[0]["usedCredits"], 2073)
@@ -101,17 +95,13 @@ class NormaliseQuotaLimitsTests(unittest.TestCase):
 class WindowDurationTests(unittest.TestCase):
     def test_known_units_map_to_coding_plan_windows(self) -> None:
         five_hour = normalise_quota_limits({"limits": [quota_entry()]}, now=1789474928)
-        weekly = normalise_quota_limits(
-            {"limits": [quota_entry(unit=6, number=1)]}, now=1789474928
-        )
+        weekly = normalise_quota_limits({"limits": [quota_entry(unit=6, number=1)]}, now=1789474928)
         self.assertEqual(five_hour["limits"][0]["windows"][0]["durationMinutes"], 300)
         self.assertEqual(weekly["limits"][0]["windows"][0]["durationMinutes"], 10080)
 
     def test_unknown_unit_snaps_onto_known_windows(self) -> None:
         # Reset roughly five hours away snaps onto the 5h window.
-        entry = quota_entry(
-            unit=99, number=1, nextResetTime=(1789474928 + 4 * 3600 + 3000) * 1000
-        )
+        entry = quota_entry(unit=99, number=1, nextResetTime=(1789474928 + 4 * 3600 + 3000) * 1000)
         snapshot = normalise_quota_limits({"limits": [entry]}, now=1789474928)
         self.assertEqual(snapshot["limits"][0]["windows"][0]["durationMinutes"], 300)
 
@@ -159,12 +149,8 @@ class ApiKeyResolutionTests(unittest.TestCase):
                 json.dumps(
                     {
                         "provider": {
-                            "builtin:zai-coding-plan": {
-                                "options": {"apiKey": "cached-key"}
-                            },
-                            "builtin:zai-start-plan": {
-                                "options": {"apiKey": "stale-key"}
-                            },
+                            "builtin:zai-coding-plan": {"options": {"apiKey": "cached-key"}},
+                            "builtin:zai-start-plan": {"options": {"apiKey": "stale-key"}},
                         }
                     }
                 ),
@@ -209,9 +195,7 @@ class AuthenticationErrorTests(unittest.TestCase):
 
 class UsageHistoryTests(unittest.TestCase):
     @staticmethod
-    def snapshot(
-        now: int, used: float = 20, resets_at: int = 9999, balance: str = "0"
-    ) -> dict:
+    def snapshot(now: int, used: float = 20, resets_at: int = 9999, balance: str = "0") -> dict:
         return {
             "updatedAt": now,
             "limits": [
@@ -265,14 +249,10 @@ class UsageHistoryTests(unittest.TestCase):
         self.assertEqual(len(history["windows"][0]["activity24h"]), 24)
         one_hour_end = dt.datetime.fromtimestamp(history["activityEndAt"]).astimezone()
         self.assertEqual((one_hour_end.minute, one_hour_end.second), (0, 0))
-        two_hour_history = build_usage_history(
-            self.snapshot(now, 18), samples, bucket_minutes=120
-        )
+        two_hour_history = build_usage_history(self.snapshot(now, 18), samples, bucket_minutes=120)
         self.assertEqual(two_hour_history["activityBucketMinutes"], 120)
         self.assertEqual(len(two_hour_history["windows"][0]["activity24h"]), 12)
-        two_hour_end = dt.datetime.fromtimestamp(
-            two_hour_history["activityEndAt"]
-        ).astimezone()
+        two_hour_end = dt.datetime.fromtimestamp(two_hour_history["activityEndAt"]).astimezone()
         self.assertEqual((two_hour_end.hour % 2, two_hour_end.minute), (0, 0))
         periods = history["windows"][0]["periods"]
         self.assertEqual(periods["1h"]["consumedPercent"], 8)
@@ -288,9 +268,7 @@ class UsageHistoryTests(unittest.TestCase):
             self.sample(now, 5, 200),
         ]
 
-        periods = build_usage_history(self.snapshot(now, 5, 200), samples)["windows"][
-            0
-        ]["periods"]
+        periods = build_usage_history(self.snapshot(now, 5, 200), samples)["windows"][0]["periods"]
         self.assertEqual(periods["1h"]["consumedPercent"], 5)
 
     def test_credit_balance_samples_round_trip_through_history(self) -> None:
@@ -503,9 +481,7 @@ class ZcodePlanBalanceTests(unittest.TestCase):
         self.assertEqual(window["remainingPercent"], 0)
 
     def test_invalid_and_unknown_buckets_are_skipped(self):
-        limits = normalise_plan_balances(
-            {"balances": [None, {"total_units": 0}, {"total_units": 100}]}, now=1
-        )
+        limits = normalise_plan_balances({"balances": [None, {"total_units": 0}, {"total_units": 100}]}, now=1)
         self.assertEqual(limits, [])
 
     def test_merged_snapshot_keeps_account_limit_first(self):
@@ -518,15 +494,11 @@ class ZcodePlanBalanceTests(unittest.TestCase):
             ),
         ):
             # main() is exercised indirectly; here just assert the merge order rule
-            snapshot = normalise_quota_limits(
-                {"limits": [quota_entry()], "level": "max"}
-            )
+            snapshot = normalise_quota_limits({"limits": [quota_entry()], "level": "max"})
             snapshot["limits"].extend(normalise_plan_balances(self.payload(), now=1))
         self.assertEqual(snapshot["limits"][0]["id"], ACCOUNT_LIMIT_ID)
         self.assertEqual(
-            snapshot["limits"][0]["source"]
-            if "source" in snapshot["limits"][0]
-            else "coding-plan",
+            snapshot["limits"][0]["source"] if "source" in snapshot["limits"][0] else "coding-plan",
             "coding-plan",
         )
 
@@ -560,9 +532,7 @@ class PlanBalanceCacheTests(unittest.TestCase):
         ):
             save_plan_balance_cache([cached_plan_limit(resets_at=2000)], now=1000)
             self.assertTrue(plan_balance_cache_path().exists())
-            self.assertEqual(
-                load_plan_balance_cache(now=1599), [cached_plan_limit(resets_at=2000)]
-            )
+            self.assertEqual(load_plan_balance_cache(now=1599), [cached_plan_limit(resets_at=2000)])
             # Past the grace window the cache is not replayed.
             self.assertEqual(load_plan_balance_cache(now=1601), [])
 
@@ -603,9 +573,7 @@ class PlanBalanceCacheTests(unittest.TestCase):
             TemporaryDirectory() as tmp,
             patch.dict(os.environ, {"XDG_STATE_HOME": tmp}),
         ):
-            save_plan_balance_cache(
-                [cached_plan_limit(resets_at=real_now + 86400)], now=real_now
-            )
+            save_plan_balance_cache([cached_plan_limit(resets_at=real_now + 86400)], now=real_now)
             with (
                 patch("sys.argv", ["z_usage.py", "--no-history"]),
                 patch("z_usage.resolve_api_key", return_value="key"),
@@ -614,9 +582,7 @@ class PlanBalanceCacheTests(unittest.TestCase):
                     return_value={"limits": [quota_entry()], "level": "max"},
                 ),
                 patch("z_usage.zcode_plan_token", return_value="tok"),
-                patch(
-                    "z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")
-                ),
+                patch("z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")),
             ):
                 captured = io.StringIO()
                 with redirect_stdout(captured):
@@ -641,9 +607,7 @@ class PlanBalanceCacheTests(unittest.TestCase):
                     return_value={"limits": [quota_entry()], "level": "max"},
                 ),
                 patch("z_usage.zcode_plan_token", return_value="tok"),
-                patch(
-                    "z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")
-                ),
+                patch("z_usage.fetch_plan_balances", side_effect=UsageError("HTTP 429")),
             ):
                 captured = io.StringIO()
                 with redirect_stdout(captured):

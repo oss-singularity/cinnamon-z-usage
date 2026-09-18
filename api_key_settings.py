@@ -32,9 +32,7 @@ class ApiKeyEntryWidget(JSONSettingsEntry):
         self._click_gesture = Gtk.GestureMultiPress.new(window)
         self._click_gesture.set_button(0)
         self._click_gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        self._click_handler = self._click_gesture.connect(
-            "pressed", self._window_pressed
-        )
+        self._click_handler = self._click_gesture.connect("pressed", self._window_pressed)
 
     def _window_pressed(self, gesture, _count, x, y):
         window = gesture.get_widget()
@@ -45,10 +43,7 @@ class ApiKeyEntryWidget(JSONSettingsEntry):
         if position is None:
             return
         left, top = position
-        if not (
-            left <= x < left + entry.get_allocated_width()
-            and top <= y < top + entry.get_allocated_height()
-        ):
+        if not (left <= x < left + entry.get_allocated_width() and top <= y < top + entry.get_allocated_height()):
             window.set_focus(None)
 
     @staticmethod

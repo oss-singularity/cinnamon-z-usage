@@ -11,9 +11,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-SPEC = importlib.util.spec_from_file_location(
-    "package", Path(__file__).resolve().parents[1] / "scripts/package.py"
-)
+SPEC = importlib.util.spec_from_file_location("package", Path(__file__).resolve().parents[1] / "scripts/package.py")
 package = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(package)
 
@@ -24,9 +22,7 @@ class PackageTests(unittest.TestCase):
             first = package.export(Path(directory) / "first")
             second = package.export(Path(directory) / "second")
             for name in ["submission.zip", "install.zip", "SHA256SUMS"]:
-                self.assertEqual(
-                    (first / name).read_bytes(), (second / name).read_bytes()
-                )
+                self.assertEqual((first / name).read_bytes(), (second / name).read_bytes())
             with zipfile.ZipFile(first / "install.zip") as archive:
                 files = package.payload()
                 self.assertEqual(
@@ -36,9 +32,7 @@ class PackageTests(unittest.TestCase):
                 extracted = Path(directory) / "extract"
                 archive.extractall(extracted)
                 for name, content in files.items():
-                    self.assertEqual(
-                        (extracted / package.UUID / name).read_bytes(), content
-                    )
+                    self.assertEqual((extracted / package.UUID / name).read_bytes(), content)
             with self.assertRaises(ValueError):
                 package.export(first)
 
@@ -100,14 +94,10 @@ class PackageTests(unittest.TestCase):
 
     def test_original_artwork_sources_and_no_retired_assets(self):
         files = package.payload()
-        self.assertFalse(
-            {"icons/codex.png", "icons/chatgpt-white.png"}.intersection(files)
-        )
+        self.assertFalse({"icons/codex.png", "icons/chatgpt-white.png"}.intersection(files))
         for name in ["applet", "usage", "chat-bubble"]:
             self.assertIn(f"icons/{name}.svg", files)
-            self.assertIn(
-                b"SPDX-License-Identifier: GPL-3.0-or-later", files[f"icons/{name}.svg"]
-            )
+            self.assertIn(b"SPDX-License-Identifier: GPL-3.0-or-later", files[f"icons/{name}.svg"])
         self.assertNotIn("icons/terminal-bot.svg", files)
         self.assertNotIn("icons/terminal-bot.png", files)
         self.assertIn("icons/usage-white.png", files)
@@ -120,9 +110,7 @@ class PackageTests(unittest.TestCase):
             retired = target / "icons/codex.png"
             expected = b"old artwork fixture"
             digest = hashlib.sha256(expected).hexdigest()
-            with patch.dict(
-                package.RETIRED_ARTWORK, {"icons/codex.png": digest}, clear=True
-            ):
+            with patch.dict(package.RETIRED_ARTWORK, {"icons/codex.png": digest}, clear=True):
                 retired.write_bytes(expected)
                 package.install(directory)
                 self.assertFalse(retired.exists())
