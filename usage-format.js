@@ -145,6 +145,19 @@ function formatConsumedCredits(period) {
     return String(Math.round(value));
 }
 
+// Compact magnitude display for the credits line only: the raw numbers
+// wiggle every refresh and the compact tokens keep the line narrow
+// (buckets per Claudiu: <0.5k, <1k, ~1k, ~2k, ~3k ... nearest thousand).
+function formatCompactConsumedCredits(period) {
+    if (!period || !Number.isFinite(Number(period.consumed))) return "--";
+    const value = Math.max(0, Number(period.consumed));
+    const rounded = Math.round(value);
+    if (rounded >= 1000) return `${Math.round(rounded / 1000)}k`;
+    if (rounded >= 500) return "<1k";
+    if (rounded >= 1) return "<0.5k";
+    return "0";
+}
+
 function formatCreditConsumption(periods) {
     const keys = ["24h", "12h", "4h", "1h"];
     const hasConsumption = keys.some(key => {
@@ -152,7 +165,7 @@ function formatCreditConsumption(periods) {
         return Number.isFinite(value) && value > 0;
     });
     if (!hasConsumption) return null;
-    return keys.map(key => _f("%s %s", key, formatConsumedCredits(periods[key]))).join("  ·  ");
+    return keys.map(key => _f("%s %s", key, formatCompactConsumedCredits(periods[key]))).join("  ·  ");
 }
 
 function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
@@ -160,7 +173,7 @@ function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
     const keys = ["24h", "12h", "4h", "1h"];
     return keys.map(key => {
         const period = italicPart === "periods" ? `<i>${key}</i>` : key;
-        const value = formatConsumedCredits(periods && periods[key]);
+        const value = formatCompactConsumedCredits(periods && periods[key]);
         const consumed = italicPart === "credits"
             ? `<i>${value}</i>`
             : italicPart === "numbers"
@@ -350,7 +363,7 @@ function buildCreditActivityChart(values) {
 function formatPeakCredits(values) {
     const chart = buildCreditActivityChart(values);
     if (chart.knownCount === 0 || chart.peakPercent <= 0) return null;
-    return formatConsumedCredits({ consumed: chart.peakPercent });
+    return formatCompactConsumedCredits({ consumed: chart.peakPercent });
 }
 
 function formatActivityBucketRange(
@@ -949,6 +962,7 @@ module.exports = {
     formatPercent,
     formatPanelPercent,
     formatConsumedPercent,
+    formatCompactConsumedCredits,
     formatConsumedCredits,
     formatCreditConsumption,
     formatCreditConsumptionMarkup,

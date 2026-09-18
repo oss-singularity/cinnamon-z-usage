@@ -542,14 +542,29 @@ assertEqual(
     "Missing credit balance stays unavailable"
 );
 assertEqual(
-    UsageFormat.formatConsumedCredits({ consumed: 2.4, complete: true }),
-    "2",
-    "Consumed credits show whole numbers"
+    UsageFormat.formatCompactConsumedCredits({ consumed: 2.4, complete: true }),
+    "<0.5k",
+    "Consumed credits use compact magnitude tokens"
 );
 assertEqual(
-    UsageFormat.formatConsumedCredits({ consumed: 2.4, complete: false }),
-    "2",
-    "Partial consumed credits show whole numbers without approximation markers"
+    UsageFormat.formatCompactConsumedCredits({ consumed: 7849, complete: true }),
+    "8k",
+    "Thousands round to the nearest k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 2499, complete: false }),
+    "2k",
+    "Partial consumed credits round to the nearest k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 999, complete: true }),
+    "<1k",
+    "Sub-thousand consumed credits keep the below-one-k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 249, complete: true }),
+    "<0.5k",
+    "Sub-half-k consumed credits keep the below-half token"
 );
 assertEqual(
     UsageFormat.formatCreditNumber("158.04"),
@@ -578,42 +593,42 @@ assertEqual(
 );
 assertEqual(
     UsageFormat.formatCreditConsumption({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }),
-    "24h 9  ·  12h 4  ·  4h 2  ·  1h 1",
+    "24h 6k  ·  12h 2k  ·  4h <1k  ·  1h <0.5k",
     "Credit consumption periods use the requested order"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "periods"),
-    "<i>24h</i> 9&#160;&#160;·&#160;&#160;<i>12h</i> 4&#160;&#160;·&#160;&#160;<i>4h</i> 2&#160;&#160;·&#160;&#160;<i>1h</i> 1",
+    "<i>24h</i> 6k&#160;&#160;·&#160;&#160;<i>12h</i> 2k&#160;&#160;·&#160;&#160;<i>4h</i> <1k&#160;&#160;·&#160;&#160;<i>1h</i> <0.5k",
     "Period labels can be italicized in the credit consumption markup"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "credits"),
-    "24h <i>9</i>&#160;&#160;·&#160;&#160;12h <i>4</i>&#160;&#160;·&#160;&#160;4h <i>2</i>&#160;&#160;·&#160;&#160;1h <i>1</i>",
+    "24h <i>6k</i>&#160;&#160;·&#160;&#160;12h <i>2k</i>&#160;&#160;·&#160;&#160;4h <i><1k</i>&#160;&#160;·&#160;&#160;1h <i><0.5k</i>",
     "Credit values can be italicized in the credit consumption markup"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "numbers"),
-    "24h <span weight=\"bold\">9</span>&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">4</span>&#160;&#160;·&#160;&#160;4h <span weight=\"bold\">2</span>&#160;&#160;·&#160;&#160;1h <span weight=\"bold\">1</span>",
+    "24h <span weight=\"bold\">6k</span>&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2k</span>&#160;&#160;·&#160;&#160;4h <span weight=\"bold\"><1k</span>&#160;&#160;·&#160;&#160;1h <span weight=\"bold\"><0.5k</span>",
     "Credit-only emphasis keeps periods and label unbolded"
 );
 assertEqual(
@@ -634,12 +649,12 @@ assertEqual(creditActivityChart.totalPercent, 3, "Credit activity total");
 assertEqual(creditActivityChart.bars[1].known, true, "Credit activity bucket is known");
 assertEqual(
     UsageFormat.formatPeakCredits([
-        { consumed: 4.4, complete: true, observed: true },
-        { consumed: 13.4, complete: true, observed: true },
-        { consumed: 9.6, complete: true, observed: true }
+        { consumed: 4400, complete: true, observed: true },
+        { consumed: 13400, complete: true, observed: true },
+        { consumed: 9600, complete: true, observed: true }
     ]),
-    "13",
-    "Peak credit consumption uses whole AIC values"
+    "13k",
+    "Peak credit consumption uses compact magnitude tokens"
 );
 assertEqual(
     UsageFormat.formatPeakCredits([

@@ -746,7 +746,11 @@ class ZUsageApplet extends Applet.Applet {
                 if (suffixWidth > 0) {
                     const delta =
                         right - (Math.round(suffixX) + Math.round(suffixWidth));
-                    if (delta !== 0 && Math.abs(delta) <= 40) {
+                    // The cap must cover the full preferred-vs-painted
+                    // slop of the markup label (~40px with long numbers):
+                    // a skipped correction leaves the end visibly past the
+                    // buttons with nothing ever re-triggering it.
+                    if (delta !== 0 && Math.abs(delta) <= 120) {
                         for (const label of suffixLabels) {
                             if (!label.is_finalized()) label.translation_x += delta;
                         }
@@ -3077,22 +3081,34 @@ class ZUsageApplet extends Applet.Applet {
             const suffixTranslationY = suffixFitToChart ? 1 : 0;
             expiresLabel.translation_y = suffixTranslationY;
             expiryDateLabel.translation_y = suffixTranslationY;
+            // The suffix labels are created at the converged size so the
+            // very first paint after an open already sits at the final
+            // geometry - starting at the base size made the red text
+            // visibly rescale a few frames into the fade.
+            const suffixFontSize = this._lastCreditFontSize ||
+                CREDIT_CONSUMPTION_BASE_FONT_SIZE;
             if (suffixEmphasized) {
                 expiresLabel.style = this._emphasizedValueStyle(
-                    suffixLabelColor || this._menuColor(1)
+                    suffixLabelColor || this._menuColor(1),
+                    0,
+                    suffixFontSize
                 );
                 expiryDateLabel.style = this._emphasizedValueStyle(
-                    suffixColor || this._menuColor(1)
+                    suffixColor || this._menuColor(1),
+                    0,
+                    suffixFontSize
                 );
                 expiresLabel.opacity = 255;
                 expiryDateLabel.opacity = 255;
             } else {
                 expiresLabel.style = [
                     "font-weight: normal",
+                    `font-size: ${suffixFontSize}%`,
                     `color: ${suffixLabelColor || this._menuColor(0.68)}`
                 ].join("; ") + ";";
                 expiryDateLabel.style = [
                     "font-weight: normal",
+                    `font-size: ${suffixFontSize}%`,
                     `color: ${suffixColor || this._menuColor(0.68)}`
                 ].join("; ") + ";";
             }
