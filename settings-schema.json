@@ -1,26 +1,45 @@
 {
   "layout": {
     "type": "layout",
-    "pages": ["general-page", "colors-page", "notifications-page"],
+    "pages": [
+      "general-page",
+      "colors-page",
+      "notifications-page"
+    ],
     "general-page": {
       "type": "page",
       "title": "General",
-      "sections": ["data-section", "display-section"]
+      "sections": [
+        "data-section",
+        "display-section"
+      ]
     },
     "colors-page": {
       "type": "page",
       "title": "Colors",
-      "sections": ["panel-color-section", "color-section", "threshold-section"]
+      "sections": [
+        "panel-color-section",
+        "color-section",
+        "threshold-section"
+      ]
     },
     "notifications-page": {
       "type": "page",
       "title": "Notifications",
-      "sections": ["reset-notification-section", "low-notification-section"]
+      "sections": [
+        "reset-notification-section",
+        "low-notification-section"
+      ]
     },
     "data-section": {
       "type": "section",
       "title": "Usage data",
-      "keys": ["refresh-interval", "activity-bucket-minutes", "api-key"]
+      "keys": [
+        "refresh-interval",
+        "activity-bucket-minutes",
+        "api-key",
+        "api-keys-page-button"
+      ]
     },
     "display-section": {
       "type": "section",
@@ -41,17 +60,28 @@
     "panel-color-section": {
       "type": "section",
       "title": "Panel text",
-      "keys": ["panel-text-color", "show-panel-threshold-colors"]
+      "keys": [
+        "panel-text-color",
+        "show-panel-threshold-colors"
+      ]
     },
     "color-section": {
       "type": "section",
       "title": "Colors",
-      "keys": ["show-colors", "normal-color", "warning-color", "critical-color"]
+      "keys": [
+        "show-colors",
+        "normal-color",
+        "warning-color",
+        "critical-color"
+      ]
     },
     "threshold-section": {
       "type": "section",
       "title": "Remaining usage thresholds",
-      "keys": ["warning-remaining", "critical-remaining"]
+      "keys": [
+        "warning-remaining",
+        "critical-remaining"
+      ]
     },
     "reset-notification-section": {
       "type": "section",
