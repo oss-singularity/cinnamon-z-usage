@@ -75,7 +75,10 @@
   competition ranking (ties share one rank). Sorting equal values into
   arbitrary consecutive ranks stacked quota and credit lottery heights
   onto same-value buckets - a 1% bucket ended up as tall as the 5% peak
-  in the 7d chart.
+  in the 7d chart. The chart also scales every slot's quota+credit
+  stack by ONE global factor instead of clamping each slot to the chart
+  height - the per-slot clamp pressed every tall stack onto exactly the
+  maximum, erasing the difference between a big bucket and the peak.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries

@@ -3640,9 +3640,49 @@ class ZUsageApplet extends Applet.Applet {
         });
         plot.style = `border-bottom: 1px solid ${this._menuColor(0.28)}; padding-top: 2px;`;
         const creditHighlightColor = this._brightenColor(this.normalColor);
+        // One GLOBAL stack scale for the whole chart: the old per-slot
+        // clamp pressed every slot whose quota+credit stack exceeded the
+        // chart height onto EXACTLY the maximum, so a 1% bucket and the
+        // 5% peak rendered at the same height (Claudiu's 7d chart). A
+        // single factor preserves every slot's relative share.
+        const slotHeights = [];
         for (let index = 0; index < barCount; index++) {
             const bar = model.bars[index] || null;
             const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
+            const quotaVisible = Boolean(
+                bar && bar.known &&
+                Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0
+            );
+            const creditVisible = Boolean(
+                creditBar && creditBar.known &&
+                Number.isFinite(creditBar.consumedPercent) &&
+                creditBar.consumedPercent > 0
+            );
+            slotHeights.push([
+                quotaVisible
+                    ? UsageFormat.activityBarHeight(bar, model.peakPercent)
+                    : 0,
+                creditVisible
+                    ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
+                    : 0
+            ]);
+        }
+        const maxStacked = slotHeights.reduce(
+            (max, heights) => Math.max(max, heights[0] + heights[1]),
+            0
+        );
+        const globalStackScale = maxStacked > ACTIVITY_CHART_BAR_MAX_HEIGHT
+            ? ACTIVITY_CHART_BAR_MAX_HEIGHT / maxStacked
+            : 1;
+        for (let index = 0; index < barCount; index++) {
+            const bar = model.bars[index] || null;
+            const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
+            const [quotaHeightBase, creditHeightBase] = slotHeights[index];
+            const quotaHeight = quotaHeightBase;
+            const creditHeight = creditHeightBase;
+            const quotaHasVisibleBar = quotaHeight > 0;
+            const creditHasVisibleBar = creditHeight > 0;
+            const stackScale = globalStackScale;
             const slot = new St.Bin({
                 height: 28,
                 reactive: true,
@@ -3655,20 +3695,6 @@ class ZUsageApplet extends Applet.Applet {
             }
 
             const barWidth = barCount >= 24 ? 8 : 14;
-            const quotaHasVisibleBar = bar && bar.known &&
-                Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0;
-            const creditHasVisibleBar = creditBar && creditBar.known &&
-                Number.isFinite(creditBar.consumedPercent) && creditBar.consumedPercent > 0;
-            const quotaHeight = quotaHasVisibleBar
-                ? UsageFormat.activityBarHeight(bar, model.peakPercent)
-                : 0;
-            const creditHeight = creditHasVisibleBar
-                ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
-                : 0;
-            const stackedHeight = quotaHeight + creditHeight;
-            const stackScale = stackedHeight > ACTIVITY_CHART_BAR_MAX_HEIGHT
-                ? ACTIVITY_CHART_BAR_MAX_HEIGHT / stackedHeight
-                : 1;
             const bars = new St.BoxLayout({
                 vertical: true,
                 y_align: Clutter.ActorAlign.END
@@ -3677,7 +3703,7 @@ class ZUsageApplet extends Applet.Applet {
                 if (!entry) return;
                 if (isCredit && !creditHasVisibleBar) return;
                 if (!isCredit && creditHasVisibleBar && !quotaHasVisibleBar) return;
-                const naturalHeight = UsageFormat.activityBarHeight(entry, peak);
+                const naturalHeight = isCredit ? creditHeight : quotaHeight;
                 const height = hasCreditModel && creditHasVisibleBar
                     ? Math.max(2, Math.round(naturalHeight * stackScale))
                     : naturalHeight;
