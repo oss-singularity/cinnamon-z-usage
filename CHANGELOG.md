@@ -2,6 +2,24 @@
 
 ## Unreleased — 1.0.0 (planned)
 
+- No more intermittent open/refresh jump: the action grid is statically
+  centered (the popup width is locked and the grid width is fixed, so the
+  layout placement alone holds the design offset) instead of being
+  re-centered by a sync that read mid-relayout geometry - the old dynamic
+  centering latched the whole grid, the buttons and the graph edge ~33px
+  against the popup edge after a rebuild while open, and the fight between
+  the two states was the visible ~20px two-frame jump.
+- Rebuilds while the popup is open allocate in the settled geometry from
+  the first frame: the width lock now reproduces the settled layout width
+  instead of a 24px narrower first pass, so rows, rings and charts no
+  longer collapse for one or two frames mid-rebuild.
+- Chart widths change only when two sync passes agree (beyond 4px noise):
+  a transient first read after a rebuild can no longer pin the graph a few
+  pixels narrow for a frame.
+- Hardened against a Cinnamon crash: the credits font-fit callbacks are
+  destroy-aware, so queued fit passes after a rebuild can no longer touch
+  disposed actors (a Gjs-CRITICAL storm that ended in a libmozjs
+  segfault during rapid open/refresh cycles).
 - Stable credits consumption line: the fit measures the suffix from the
   allocated labels, sizes the line to end exactly at the grid anchor and
   starts from the previously converged size - rebuilds while the popup is

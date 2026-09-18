@@ -63,9 +63,6 @@ const POPUP_RELATIVE_ANCHOR_TOLERANCE = 24;
 // Ring corrections beyond this size need two agreeing passes before they
 // are applied: honest layout changes repeat, stale reads do not.
 const POPUP_RING_DELTA_TRUST = 32;
-// Chart widths are stable by design (row edge to grid edge); corrections
-// beyond this size between passes are transient reads and get skipped.
-const CHART_WIDTH_DELTA_TRUST = 64;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
@@ -265,6 +262,7 @@ class ZUsageApplet extends Applet.Applet {
         this._lastCreditFontSize = null;
         this._closing = false;
         this._lastChartWidths = [];
+        this._chartWidthCandidates = [];
         this._actionEdgeSyncQueuedId = 0;
         this._stableRelativeAnchor = null;
         this._isRightPanel = this._orientationIsRight(orientation);
@@ -602,38 +600,17 @@ class ZUsageApplet extends Applet.Applet {
             !this._actionWidthFrame.get_stage() ||
             this._closing
         ) return;
-        const [menuX] = this.menu.actor.get_transformed_position();
-        const [menuWidth] = this.menu.actor.get_transformed_size();
-        const [gridX] = this._actionWidthFrame.get_transformed_position();
-        const [gridWidth] = this._actionWidthFrame.get_transformed_size();
-        // Transformed coordinates can differ by tiny float errors between
-        // opening and rebuilding. Snap to pixels before the half-width math
-        // so an odd popup width cannot flip the translation by one pixel.
-        // The current translation is subtracted so the math is independent
-        // of what earlier passes wrote (no zero-then-write flicker).
-        const menuCenter = Math.round(menuX) + Math.round(menuWidth) / 2;
-        const gridCenter =
-            Math.round(gridX) + Math.round(gridWidth) / 2 - this._actionWidthFrame.translation_x;
-        const centering = Math.round(menuCenter - gridCenter);
-        // The grid always lives inside the menu, so its centering offset
-        // cannot exceed the menu width. Anything larger is a mid-relayout
-        // read; writing it would fling the anchor and every ring with it.
-        if (Math.abs(centering) > menuWidth) return;
-        // Validate the RESULTING anchor distance before writing anything:
-        // a centering computed from a mid-relayout read shifts the grid and
-        // every ring glued to it by that error, and later passes find no
-        // reason to correct it (the stable-anchor baseline is per open).
-        const resultingRight =
-            Math.round(gridX) + Math.round(gridWidth) - this._actionWidthFrame.translation_x + centering;
-        const relative = Math.round(menuX + menuWidth) - resultingRight;
-        if (this._stableRelativeAnchor === null || this._stableRelativeAnchor === undefined) {
-            this._stableRelativeAnchor = relative;
-        } else if (
-            Math.abs(relative - this._stableRelativeAnchor) > POPUP_RELATIVE_ANCHOR_TOLERANCE
-        ) {
-            return;
-        }
-        this._actionWidthFrame.translation_x = centering;
+        // The grid is statically centered and stays that way: the popup
+        // width is locked and the grid width is fixed, so the BinLayout
+        // placement alone puts it at the design offset in every allocation
+        // pass. The former dynamic centering read mid-relayout geometry
+        // (the frame still at its natural position before the expand
+        // allocation) and wrote a translation that doubled with the
+        // BinLayout centering once the layout settled - latching the whole
+        // grid flush against the popup edge (the bistable +33px button
+        // jump). No translation is written anymore; this pass only
+        // refreshes the content edge alignment that anchors to the grid.
+        this._actionWidthFrame.translation_x = 0;
         this._syncContentRightEdges();
     }
 
@@ -726,17 +703,20 @@ class ZUsageApplet extends Applet.Applet {
             // a stale read (mid-scroll or mid-relayout), never a real width.
             if (width > chartLimit) return;
             // A settled layout keeps every chart at a constant width, so a
-            // large jump between passes is a transient read (mid-rebuild the
-            // chart's transformed x drifts). Pinning that width made the
-            // graph visibly stretch for a frame. Wait for a pass that
-            // measures the settled geometry.
+            // jump between passes is a transient read (mid-rebuild the
+            // chart's transformed x drifts; the first pass after a rebuild
+            // measured the graph ~10px narrow and pinned that for a frame).
+            // Width changes beyond noise must survive two agreeing passes
+            // before they are written; small drifts apply immediately.
             const last = (this._lastChartWidths || [])[index];
-            if (
-                typeof last === "number" &&
-                Math.abs(width - last) > CHART_WIDTH_DELTA_TRUST
-            ) {
-                return;
+            if (typeof last === "number" && Math.abs(width - last) > 4) {
+                if ((this._chartWidthCandidates || [])[index] !== width) {
+                    if (!this._chartWidthCandidates) this._chartWidthCandidates = [];
+                    this._chartWidthCandidates[index] = width;
+                    return;
+                }
             }
+            if (this._chartWidthCandidates) this._chartWidthCandidates[index] = null;
             if (!chart.min_width_set || chart.min_width !== width) {
                 this._forceActorWidth(chart, width);
                 this._lastChartWidths[index] = width;
@@ -2769,6 +2749,16 @@ class ZUsageApplet extends Applet.Applet {
         let armed = true;
         let converged = false;
         let lastFont = null;
+        // A rebuild destroys this row while fit callbacks may still be
+        // queued (allocation notifications, the creation idle). Touching
+        // disposed actors floods Cinnamon with Gjs-CRITICALs and was seen
+        // to end in a libmozjs GC segfault during rapid open/refresh
+        // cycles. The destroy hook flips a plain JS flag so every later
+        // pass returns before any native call.
+        let alive = true;
+        const markDead = () => { alive = false; };
+        row.connect("destroy", markDead);
+        item.actor.connect("destroy", markDead);
 
         const applyFontSize = fontSize => {
             expiresLabel.style = this._emphasizedValueStyle(
@@ -2822,7 +2812,7 @@ class ZUsageApplet extends Applet.Applet {
             // allocation without pulsing - and it self-corrects whenever a
             // transient target settles, which the old converged latch
             // froze out forever.
-            if (!armed || fitting) return;
+            if (!alive || !armed || fitting) return;
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return;
             fitting = true;
@@ -3961,32 +3951,39 @@ class ZUsageApplet extends Applet.Applet {
         const outer = this._rightPanelPopupLockedWidth > 0
             ? this._rightPanelPopupLockedWidth
             : this._popupWidth();
-        // The popup actor keeps the full outer width; only the children are
-        // clamped to the inner width (outer minus theme padding), otherwise
-        // the theme padding pushes them out under the panel.
-        const inner = this._menuInnerWidth(outer);
+        // The lock must reproduce the SETTLED layout on the very first
+        // allocation pass: the settled scroll/content/items measure exactly
+        // the popup's outer width (St re-allocates them at the box width no
+        // matter what smaller fixed width is forced). Forcing the old inner
+        // width (outer - 24) made every rebuild-while-open allocate its
+        // first frames in a 24px narrower world - rows collapsed to their
+        // minimum, right-aligned content shifted, and the edge syncs read
+        // that transient geometry. Locking to the settled width keeps the
+        // first pass and the settled pass in the same world; the item clamp
+        // still caps the inflated natural widths (458px rows) at the popup
+        // edge.
         this.menu.actor.set_width(outer);
         this.menu.box.set_width(outer);
         this.menu.box.clip_to_allocation = true;
-        this._forceActorWidth(this.menu._scroll, inner);
-        this._forceActorWidth(this.menu._content.actor, inner);
+        this._forceActorWidth(this.menu._scroll, outer);
+        this._forceActorWidth(this.menu._content.actor, outer);
         this.menu._content.actor.clip_to_allocation = false;
         if (this.menu._header) {
-            this._forceActorWidth(this.menu._header, inner);
+            this._forceActorWidth(this.menu._header, outer);
         }
         if (this.menu._footer) {
-            this._forceActorWidth(this.menu._footer, inner);
+            this._forceActorWidth(this.menu._footer, outer);
         }
         // Menu items report inflated minimum widths in the scroll regime and
-        // would overflow the popup; clamp every item to the inner width.
+        // would overflow the popup; clamp every item to the settled width.
         const items = this.menu._content.actor.get_children ?
             this.menu._content.actor.get_children() : [];
         for (const child of items) {
-            this._forceActorWidth(child, inner);
+            this._forceActorWidth(child, outer);
         }
         for (const entry of this._historySubmenus) {
-            this._forceActorWidth(entry.submenu.menu.actor, inner);
-            this._forceActorWidth(entry.submenu.menu.box, inner);
+            this._forceActorWidth(entry.submenu.menu.actor, this._menuInnerWidth(outer));
+            this._forceActorWidth(entry.submenu.menu.box, this._menuInnerWidth(outer));
         }
     }
 
