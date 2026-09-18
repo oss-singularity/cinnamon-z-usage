@@ -16,6 +16,16 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- Honest activity bar heights: every percent chart shares the tallest
+  peak in the popup and the minimum bar floor dropped from 8px to 3px -
+  Z.ai percentages are small (1-9%) with very different per-window
+  peaks, so per-chart normalization plus the high floor made a 1% bucket
+  look exactly like the 5% peak. Bars now scale comparably across
+  windows and stay distinguishable at the low end.
+- The popup viewport trims to the last fully visible row: a section
+  header poking out a few pixels above the footer buttons reads as a
+  glitch - collapsible areas now appear only when you actually scroll
+  (small straddlers hide fully; tall open leaves keep the peek).
 - The collapsible history graphs sit below the plan and credits rows:
   the default collapsed view always shows the plan, balance and
   consumption values without scrolling past graph headers.

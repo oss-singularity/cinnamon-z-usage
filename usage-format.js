@@ -556,7 +556,11 @@ function activityValue(bucket) {
 }
 
 const ACTIVITY_BAR_EMPTY_HEIGHT = 2;
-const ACTIVITY_BAR_MIN_HEIGHT = 8;
+// A tiny floor: Z.ai percentages are small (1-9%), and an 8px floor out
+// of a 26px range compressed every sub-30% bucket onto the same height
+// ("all bars equal"). Three pixels keeps known-nonzero bars visible
+// while low fractions stay distinguishable.
+const ACTIVITY_BAR_MIN_HEIGHT = 3;
 const ACTIVITY_BAR_MAX_HEIGHT = 26;
 
 function activityBarHeight(bar, peakPercent) {

@@ -266,6 +266,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
+        this._activityPercentPeak = 0;
         this._creditsFit = null;
         this._lastCreditFontSize = null;
         this._closing = false;
@@ -1126,6 +1127,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
+        this._activityPercentPeak = 0;
         this._creditsFit = null;
         this.menu.removeAll();
         if (this.menu._footer) {
@@ -3192,6 +3194,22 @@ class ZUsageApplet extends Applet.Applet {
 
         const visibleWindows = this._filterModelLimits(history.windows);
         if (visibleWindows.length === 0) return;
+        // One shared peak for every percent chart in the popup: Z.ai
+        // windows carry small percentages (1-9%) with very different
+        // per-window peaks, and per-chart normalization made a 1% bar in
+        // a 2%-peak window tower like a 5% bar in a 9%-peak window. All
+        // percent bars share the tallest peak so their heights compare
+        // honestly; the AIC chart keeps its own absolute-unit scale.
+        let percentPeak = 0;
+        for (const window of visibleWindows) {
+            for (const value of window.activity24h || []) {
+                const pct = value && Number(value.consumedPercent);
+                if (value && value.observed !== false && Number.isFinite(pct)) {
+                    percentPeak = Math.max(percentPeak, pct);
+                }
+            }
+        }
+        this._activityPercentPeak = percentPeak;
         const creditActivityValues = UsageFormat.hasRecentActivity(
             history.creditActivity24h,
             "consumed"
@@ -3502,8 +3520,11 @@ class ZUsageApplet extends Applet.Applet {
                 Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0;
             const creditHasVisibleBar = creditBar && creditBar.known &&
                 Number.isFinite(creditBar.consumedPercent) && creditBar.consumedPercent > 0;
+            const quotaScalePeak = this._activityPercentPeak > model.peakPercent
+                ? this._activityPercentPeak
+                : model.peakPercent;
             const quotaHeight = quotaHasVisibleBar
-                ? UsageFormat.activityBarHeight(bar, model.peakPercent)
+                ? UsageFormat.activityBarHeight(bar, quotaScalePeak)
                 : 0;
             const creditHeight = creditHasVisibleBar
                 ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
@@ -3548,7 +3569,7 @@ class ZUsageApplet extends Applet.Applet {
                 hasCreditModel ? creditModel.peakPercent : 0,
                 true
             );
-            addBar(bar, model.peakPercent, false);
+            addBar(bar, quotaScalePeak, false);
             slot.set_child(bars);
             const tooltipLines = [];
             if (bar && bar.known) {
@@ -4112,10 +4133,35 @@ class ZUsageApplet extends Applet.Applet {
             // the natural content exceeds the viewport by a few pixels, and
             // the pad absorbs post-lock content growth. The 16px top-panel
             // slack absorbs the difference instead.
-            const viewport = Math.max(200, Math.min(
+            let viewport = Math.max(200, Math.min(
                 contentNat + POPUP_VIEWPORT_PAD,
                 maxMenu - headerNat - footerNat - 2
             ));
+            // Trim to the last fully visible row: when the content
+            // overflows, whatever row straddles the viewport bottom pokes
+            // out a few pixels above the footer and reads as a glitch
+            // (Claudiu: the collapsible headers should appear only once
+            // you scroll, not peek). Hiding a small straddler (<48px,
+            // a header/normal row) is worth the few lost pixels; a tall
+            // straddler (an open leaf) keeps the peek - scrolling past
+            // mid-content is normal, and losing a large chunk of the
+            // viewport would not be. The unspaced preferred-height sum
+            // underestimates the real boundary, so the next row hides
+            // fully.
+            if (viewport < contentNat + POPUP_VIEWPORT_PAD) {
+                let acc = 0;
+                const children = this.menu._content.actor.get_children ?
+                    this.menu._content.actor.get_children() : [];
+                for (const child of children) {
+                    const [, childNat] = child.get_preferred_height(inner);
+                    if (acc + childNat > viewport) {
+                        const peek = viewport - acc;
+                        if (peek > 0 && peek <= 48) viewport = Math.max(200, acc);
+                        break;
+                    }
+                    acc += childNat;
+                }
+            }
             this._popupViewport = viewport;
             this._popupFrameHeight = headerNat + viewport + footerNat + 2;
         }
