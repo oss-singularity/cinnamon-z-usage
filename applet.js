@@ -756,6 +756,13 @@ class ZUsageApplet extends Applet.Applet {
                         }
                     }
                 }
+                // Reveal only after the pin: showing the row one frame
+                // earlier painted it unpinned for a frame - the residual
+                // ~2px jump on open.
+                if (typeof this._creditsRowReveal === "function") {
+                    this._creditsRowReveal();
+                    this._creditsRowReveal = null;
+                }
             }
         }
     }
@@ -2984,6 +2991,13 @@ class ZUsageApplet extends Applet.Applet {
             fit();
             return GLib.SOURCE_REMOVE;
         });
+        Mainloop.timeout_add(600, () => {
+            if (typeof this._creditsRowReveal === "function") {
+                this._creditsRowReveal();
+                this._creditsRowReveal = null;
+            }
+            return GLib.SOURCE_REMOVE;
+        });
         return {
             setArmed: value => {
                 armed = value;
@@ -3172,6 +3186,15 @@ class ZUsageApplet extends Applet.Applet {
                     label.translation_x = this._carriedSuffixTx;
                 }
             }
+            // Paint-suppress the row until the fit has applied the carried
+            // font size and the pin: showing it one or two frames early
+            // made the red text visibly jump onto its final spot (the
+            // timing of that correction varied with system load - the
+            // "sometimes it jumps on open" repro).
+            row.visible = false;
+            this._creditsRowReveal = () => {
+                if (!row.is_finalized()) row.visible = true;
+            };
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
