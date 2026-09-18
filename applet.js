@@ -1090,6 +1090,15 @@ class ZUsageApplet extends Applet.Applet {
     _rebuildMenu() {
         if (!this.menu) return;
         const wasOpen = this.menu.isOpen;
+        // Rebuilds empty the content for a moment: the automatic scrollbar
+        // hides, the scroll content widens by its width and every
+        // right-aligned row shifts right - then everything shifts back
+        // when the scrollbar returns. Hold the scrollbar across the whole
+        // rebuild so the width never changes mid-flight.
+        if (wasOpen && this.menu._scroll) {
+            this._scrollPolicyHold = true;
+            this.menu._scroll.vscrollbar_policy = St.PolicyType.ALWAYS;
+        }
         const expandedSubmenus = new Set();
         const limitStates = new Map(
             this._limitSections.map(section => [section.limit.id, section.expanded])
@@ -1224,6 +1233,11 @@ class ZUsageApplet extends Applet.Applet {
                 if (!this._destroyed) this._queueActionEdgeSync();
                 return GLib.SOURCE_REMOVE;
             });
+            Mainloop.timeout_add(900, () => {
+                if (this._destroyed) return GLib.SOURCE_REMOVE;
+                this._restoreScrollbarPolicy();
+                return GLib.SOURCE_REMOVE;
+            });
         }
         this._carriedRingTranslations = null;
         this._carriedHeaderTx = null;
@@ -1281,6 +1295,14 @@ class ZUsageApplet extends Applet.Applet {
         }
     }
 
+    _restoreScrollbarPolicy() {
+        if (!this._scrollPolicyHold) return;
+        this._scrollPolicyHold = false;
+        if (this.menu && this.menu._scroll) {
+            this.menu._scroll.vscrollbar_policy = St.PolicyType.AUTOMATIC;
+        }
+    }
+
     _menuSignature(snapshot) {
         // A refresh returns a fresh snapshot every time even when nothing
         // visible changed; rebuilding the open menu for it blanks the
@@ -1317,6 +1339,7 @@ class ZUsageApplet extends Applet.Applet {
             if (this.menu && !this.menu.isOpen && this.menu.animating) {
                 return GLib.SOURCE_REMOVE;
             }
+            this._restoreScrollbarPolicy();
             // Identical data renders an identical menu - skip the rebuild
             // and the content flicker that comes with it.
             const signature = this._menuSignature(this._snapshot);
