@@ -2917,13 +2917,6 @@ class ZUsageApplet extends Applet.Applet {
             fit();
             return GLib.SOURCE_REMOVE;
         });
-        Mainloop.timeout_add(600, () => {
-            if (typeof this._creditsRowReveal === "function") {
-                this._creditsRowReveal();
-                this._creditsRowReveal = null;
-            }
-            return GLib.SOURCE_REMOVE;
-        });
         return {
             setArmed: value => {
                 armed = value;
@@ -3107,18 +3100,6 @@ class ZUsageApplet extends Applet.Applet {
                 fitTargets.expiresLabel,
                 fitTargets.expiryDateLabel
             ];
-            // Paint-suppress the row only until its first allocation: it
-            // then renders immediately at the carried font size (the fit
-            // refines afterwards). Revealing on the fit's success kept the
-            // line hidden for up to the safety timeout whenever the fit's
-            // early passes skipped on unsettled geometry.
-            row.visible = false;
-            let creditsRowRevealed = false;
-            row.connect("notify::allocation", () => {
-                if (creditsRowRevealed || row.is_finalized()) return;
-                creditsRowRevealed = true;
-                row.visible = true;
-            });
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
