@@ -4171,7 +4171,12 @@ class ZUsageApplet extends Applet.Applet {
                 for (const child of children) {
                     const [, childNat] = child.get_preferred_height(outer);
                     if (acc + childNat > viewport) {
-                        viewport = Math.max(200, acc - 20);
+                        // 32px below the last full row: the live preferred-
+                        // vs-allocation drift (theme paddings) measured
+                        // ~24px on Claudiu's row counts - 20 still left a
+                        // few-pixel corner peeking (his red-arrow shot).
+                        // The strip sits in the row's own bottom padding.
+                        viewport = Math.max(200, acc - 32);
                         break;
                     }
                     acc += childNat;
