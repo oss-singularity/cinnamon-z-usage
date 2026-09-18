@@ -490,6 +490,21 @@ gecleant, kein Feedback in den Fit).
 Wert statisch wie die Plan-Row, gemaltes Consumed-Ende = 1847 =
 Grid-Kante (NULL Differenz) über Rebuilds. `make check` grün.
 
+## 3j. NACHTRAG (2026-09-18, Footer-Bereinigung — nach 9dd1ce4)
+
+### Die Legacy-WebRow ([Z.ai][Docs]) ist entfernt — Footer = 2 Reihen/4 Buttons
+
+**Claudius Meldung während der Remote-Tests:** Die zwei „alten" Buttons
+(Z.ai, Docs) poppten auf — das Applet hatte kurzzeitig 6 Buttons. Ursache:
+`_addLaunchButtons` baute die dritte Reihe UNBEDINGT; auf dem rechten
+Panel lag sie nur unterhalb der Screen-Kante gekappt und wurde bei
+höhenändernden Rebuilds (remote getriggert) sichtbar.
+
+**Fix:** webRow + zaiWebButton + docsButton + ZAI_DOCS_URL entfernt —
+Footer = [Z.ai Chat][ZCode] / [Refresh now][Usage]. Live verifiziert
+(Action-Column-Traversal: 2 Reihen), `make check` grün (Translations
+regeneriert, CHANGELOG-Footer-Zeile korrigiert).
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
