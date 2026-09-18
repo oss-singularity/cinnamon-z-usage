@@ -3107,15 +3107,18 @@ class ZUsageApplet extends Applet.Applet {
                 fitTargets.expiresLabel,
                 fitTargets.expiryDateLabel
             ];
-            // Paint-suppress the row until the fit has applied the carried
-            // font size and the pin: showing it one or two frames early
-            // made the red text visibly jump onto its final spot (the
-            // timing of that correction varied with system load - the
-            // "sometimes it jumps on open" repro).
+            // Paint-suppress the row only until its first allocation: it
+            // then renders immediately at the carried font size (the fit
+            // refines afterwards). Revealing on the fit's success kept the
+            // line hidden for up to the safety timeout whenever the fit's
+            // early passes skipped on unsettled geometry.
             row.visible = false;
-            this._creditsRowReveal = () => {
-                if (!row.is_finalized()) row.visible = true;
-            };
+            let creditsRowRevealed = false;
+            row.connect("notify::allocation", () => {
+                if (creditsRowRevealed || row.is_finalized()) return;
+                creditsRowRevealed = true;
+                row.visible = true;
+            });
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
