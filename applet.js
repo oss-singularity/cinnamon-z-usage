@@ -1083,13 +1083,6 @@ class ZUsageApplet extends Applet.Applet {
         // always taller than the viewport, so the automatic policy only
         // added toggle transients (the scrollbar hiding/reappearing
         // shifted the whole content by its width on rebuilds).
-        // Und den Inhalt selbst hinter einem Opacity-Vorhang halten, bis
-        // Layout und Syncs konvergiert sind: die Zwischen-Zustände
-        // (unpadded Rows, unforced Charts) werden nie sichtbar.
-        if (wasOpen && this.menu && this.menu._content && this.menu._content.actor) {
-            this.menu._content.actor.opacity = 0;
-            this._contentCurtain = true;
-        }
         const expandedSubmenus = new Set();
         const limitStates = new Map(
             this._limitSections.map(section => [section.limit.id, section.expanded])
@@ -1218,10 +1211,6 @@ class ZUsageApplet extends Applet.Applet {
             this._queueActionEdgeSync();
             Mainloop.timeout_add(120, () => {
                 if (!this._destroyed) this._queueActionEdgeSync();
-                if (this._contentCurtain && this.menu && this.menu._content) {
-                    this.menu._content.actor.opacity = 255;
-                    this._contentCurtain = false;
-                }
                 return GLib.SOURCE_REMOVE;
             });
             Mainloop.timeout_add(400, () => {
@@ -1229,11 +1218,7 @@ class ZUsageApplet extends Applet.Applet {
                 return GLib.SOURCE_REMOVE;
             });
             Mainloop.timeout_add(900, () => {
-                if (this._destroyed) return GLib.SOURCE_REMOVE;
-                    if (this._contentCurtain && this.menu && this.menu._content) {
-                    this.menu._content.actor.opacity = 255;
-                    this._contentCurtain = false;
-                }
+                if (!this._destroyed) this._queueActionEdgeSync();
                 return GLib.SOURCE_REMOVE;
             });
         }
