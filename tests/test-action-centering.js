@@ -127,7 +127,6 @@ print("Content alignment: rings keep their designed positions, the plot edge fol
 {
     const menuX = 1461;
     const grid = { x: menuX + 48 };
-    const right = menuX + 400;
     const ring = {
         translation_x: 0,
         _usageHomeTx: 0,
@@ -273,7 +272,6 @@ print("Carry-over validation: poisoned translations are dropped.");
 // agreeing passes (the one-poll refresh flash of the green rings).
 {
     const menuX = 1461;
-    const right = menuX + 400;
     const ring = {
         translation_x: 0,
         _usageHomeTx: 0,
@@ -396,7 +394,6 @@ print("Click-close: toggling closed never rebuilds (no fade-time transient).");
         _lastChartWidths: [329],
         _activityCharts: [{ chart }]
     });
-    const right = menuX + 400;
 
     // Settled: the chart width equals the row-to-edge distance.
     applet._syncContentRightEdges();
