@@ -2,6 +2,18 @@
 
 ## Unreleased — 1.0.0 (planned)
 
+- The plan pill's first letter keeps its gradient color: the label's own
+  foreground won over the markup's first span at glyph 0, leaving the "P"
+  white while every later letter took its blue-to-green ramp. An invisible
+  leading space inside the first span absorbs the override (Pango itself
+  renders the spans correctly), and the per-letter markup is built by one
+  tested helper.
+- The credits line shares one baseline: the fit scaled only the "Used:"
+  suffix while the row mixed alignment modes, so the whole suffix block
+  rode visibly lower than "Credits:". Every label now measures its Pango
+  layout baseline and is translation-corrected onto the prefix baseline
+  (translations never touch layout, so the width fit stays independent),
+  with mid-relayout garbage reads skipped.
 - The ZCode button helps with the initial setup: when the coding agent
   is not installed it opens a modal with Z.ai's installation page and
   explains that the applet reads plan usage from the agent's stored

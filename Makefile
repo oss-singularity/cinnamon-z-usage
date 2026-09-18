@@ -7,6 +7,8 @@ check:
 	cjs tests/test-action-centering.js
 	cjs tests/test-popup-width.js
 	cjs tests/test-install-help.js
+	cjs tests/test-plan-pill.js
+	cjs tests/test-credits-baseline.js
 	cjs tests/test-panel-colors.js
 	cjs tests/test-model-visibility.js
 	cjs tests/test-notification-delivery.js

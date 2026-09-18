@@ -1417,6 +1417,34 @@ class ZUsageApplet extends Applet.Applet {
         });
     }
 
+    // St applies the label's own foreground over the markup's first span:
+    // Pango itself paints every span color correctly (verified headless),
+    // but Cinnamon's Clutter layer lets the label color win at glyph 0 -
+    // the "P" stayed white while every later letter took its gradient
+    // (Claudiu's pill report). A leading space inside the first span
+    // absorbs that override, so every visible letter keeps its gradient.
+    _planPillGradientMarkup(planText, fromColor, toColor) {
+        const chars = Array.from(planText);
+        const channel = (a, b, t) =>
+            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
+        const hex = t =>
+            `#${channel(fromColor.red, toColor.red, t)}` +
+            `${channel(fromColor.green, toColor.green, t)}` +
+            `${channel(fromColor.blue, toColor.blue, t)}`;
+        const spans = chars.map((ch, index) => {
+            const t = chars.length > 1 ? index / (chars.length - 1) : 0;
+            const escaped = ch === "&"
+                ? "&amp;"
+                : ch === "<"
+                    ? "&lt;"
+                    : ch === ">"
+                        ? "&gt;"
+                        : ch;
+            return `<span foreground="${hex(t)}">${escaped}</span>`;
+        });
+        return `<span foreground="${hex(0)}"> </span>${spans.join("")}`;
+    }
+
     _addHeaderItem() {
         this._headerRings = null;
         const item = new PopupMenu.PopupBaseMenuItem({
@@ -1484,26 +1512,9 @@ class ZUsageApplet extends Applet.Applet {
                 );
                 const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
                 if (fromValid && toValid) {
-                    const chars = Array.from(planText);
-                    const spans = chars.map((ch, index) => {
-                        const t = chars.length > 1
-                            ? index / (chars.length - 1)
-                            : 0;
-                        const mix = (a, b) =>
-                            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
-                        const hex = `#${mix(fromColor.red, toColor.red)}` +
-                            `${mix(fromColor.green, toColor.green)}` +
-                            `${mix(fromColor.blue, toColor.blue)}`;
-                        const escaped = ch === "&"
-                            ? "&amp;"
-                            : ch === "<"
-                                ? "&lt;"
-                                : ch === ">"
-                                    ? "&gt;"
-                                    : ch;
-                        return `<span foreground="${hex}">${escaped}</span>`;
-                    });
-                    planLabel.clutter_text.set_markup(spans.join(""));
+                    planLabel.clutter_text.set_markup(
+                        this._planPillGradientMarkup(planText, fromColor, toColor)
+                    );
                 }
             }
             titleLine.add_child(planLabel);
@@ -3073,6 +3084,55 @@ class ZUsageApplet extends Applet.Applet {
             // short of that agreement.
             return rowWidth;
         };
+        // Baseline alignment: the fit scales only the suffix labels, so
+        // the scaled group rode visibly lower than "Credits:" (Claudiu's
+        // "Used:" report - the whole suffix block sits a pixel or more
+        // below the prefix baseline). St has no baseline alignment:
+        // measure each label's Pango layout baseline inside the row and
+        // translation-correct the followers onto the prefix baseline.
+        // Translations never touch layout, so this cannot feed back into
+        // the width fit.
+        const baselineInRow = label => {
+            if (!alive) return null;
+            try {
+                const alloc = label.allocation;
+                const rowAlloc = row.allocation;
+                if (
+                    !alloc || !rowAlloc ||
+                    !(alloc.y2 > alloc.y1) || !(rowAlloc.y2 > rowAlloc.y1)
+                ) {
+                    return null;
+                }
+                const text = label.clutter_text;
+                if (!text || typeof text.get_layout !== "function") return null;
+                const layout = text.get_layout();
+                if (!layout || typeof layout.get_baseline !== "function") {
+                    return null;
+                }
+                const baseline = layout.get_baseline();
+                if (!Number.isFinite(baseline) || baseline <= 0) return null;
+                return (alloc.y1 - rowAlloc.y1) + baseline / Pango.SCALE;
+            } catch {
+                return null;
+            }
+        };
+        const syncBaseline = () => {
+            const target = baselineInRow(labelActor);
+            if (target === null) return;
+            for (const label of [
+                valueLabel,
+                separatorLabel,
+                expiresLabel,
+                expiryDateLabel
+            ]) {
+                const own = baselineInRow(label);
+                if (own === null) continue;
+                const delta = target - own;
+                // A mid-relayout read must not latch a garbage offset.
+                if (Math.abs(delta) > 40) continue;
+                label.translation_y = Math.round(delta * 10) / 10;
+            }
+        };
         const fit = () => {
             // The carried start font makes every pass idempotent (the ratio
             // recomputes to the same size), so the fit can run on every
@@ -3157,10 +3217,15 @@ class ZUsageApplet extends Applet.Applet {
             }
         };
 
-        row.connect("notify::allocation", fit);
-        item.actor.connect("notify::allocation", fit);
+        const onRowAllocation = () => {
+            fit();
+            syncBaseline();
+        };
+        row.connect("notify::allocation", onRowAllocation);
+        item.actor.connect("notify::allocation", onRowAllocation);
         Mainloop.idle_add(() => {
             fit();
+            syncBaseline();
             return GLib.SOURCE_REMOVE;
         });
         return {
@@ -3240,10 +3305,21 @@ class ZUsageApplet extends Applet.Applet {
         }
         const row = new St.BoxLayout({ vertical: false });
         let fitTargets = null;
-        const labelActor = new St.Label({ text: `${label}:` });
+        // Every child of the row is CENTER-aligned so its allocation hugs
+        // its text box - the baseline sync below then measures exact
+        // baselines (a default-aligned label is stretched to the row
+        // height and its text paints from the top, which shifts the
+        // painted baseline away from the allocation math).
+        const labelActor = new St.Label({
+            text: `${label}:`,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         labelActor.style = `color: ${this._menuColor(0.68)};`;
         row.add_child(labelActor);
-        const valueLabel = new St.Label({ text: value });
+        const valueLabel = new St.Label({
+            text: value,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         if (emphasized) {
             const zeroValue = String(value) === "0";
             valueLabel.style = this._emphasizedValueStyle(
