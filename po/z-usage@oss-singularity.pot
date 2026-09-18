@@ -19,16 +19,6 @@ msgstr ""
 
 #: applet.js
 #, javascript-format
-msgid "    12h %s  ·  Today %s"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "    1h %s  ·  4h %s%s"
-msgstr ""
-
-#: applet.js
-#, javascript-format
 msgid "  %s usage"
 msgstr ""
 
@@ -44,11 +34,6 @@ msgstr ""
 #: applet.js
 #, javascript-format
 msgid "  ·  %s  ·  %s buckets  ·  peak %s%s"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "  ·  24h %s"
 msgstr ""
 
 #: applet.js
@@ -231,6 +216,16 @@ msgstr ""
 msgid "1 hour"
 msgstr ""
 
+#: applet.js
+#, javascript-format
+msgid "12h %s"
+msgstr ""
+
+#: applet.js
+#, javascript-format
+msgid "1h %s"
+msgstr ""
+
 #: settings-schema.json.js
 msgid "2 hours"
 msgstr ""
@@ -241,6 +236,11 @@ msgstr ""
 
 #: settings-schema.json.js
 msgid "24h activity bucket size"
+msgstr ""
+
+#: applet.js
+#, javascript-format
+msgid "4h %s"
 msgstr ""
 
 #: settings-schema.json.js
@@ -506,7 +506,8 @@ msgid "Panel text color"
 msgstr ""
 
 #: applet.js
-msgid "Plan"
+#, javascript-format
+msgid "Plan: %s"
 msgstr ""
 
 #: z_usage.py
@@ -624,6 +625,11 @@ msgstr ""
 
 #: usage-format.js
 msgid "This redemption was already completed. Usage limits are refreshing."
+msgstr ""
+
+#: applet.js
+#, javascript-format
+msgid "Today %s"
 msgstr ""
 
 #: applet.js

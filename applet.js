@@ -1332,9 +1332,26 @@ class ZUsageApplet extends Applet.Applet {
         this._screenshotButton.y_align = Clutter.ActorAlign.START;
         this._screenshotButtonLabel = this._screenshotButton._usageLabel;
         this._buildScreenshotContextMenu();
+        const titleLine = new St.BoxLayout({ vertical: false });
         const title = new St.Label({ text: _("Z.ai GLM Coding usage") });
         title.style = POPUP_HEADING_STYLE;
-        text.add_child(title);
+        titleLine.add_child(title);
+        const plan = this._snapshot && this._snapshot.credits
+            ? this._snapshot.credits.plan
+            : null;
+        if (plan) {
+            // The plan rides the title line (Claudiu): saves the "Plan:"
+            // row below the credits section and shrinks the popup.
+            const planLabel = new St.Label({ text: _f("Plan: %s", String(plan)) });
+            planLabel.y_align = Clutter.ActorAlign.CENTER;
+            planLabel.style = [
+                "padding-left: 8px",
+                "font-size: 90%",
+                `color: ${this._menuColor(0.68)}`
+            ].join("; ") + ";";
+            titleLine.add_child(planLabel);
+        }
+        text.add_child(titleLine);
         if (this._snapshot) {
             this._updatedLabel = new St.Label({
                 text: _f("Updated %s", UsageFormat.formatRelativeTime(this._snapshot.updatedAt))
@@ -2943,9 +2960,6 @@ class ZUsageApplet extends Applet.Applet {
     _addCreditItems() {
         const credits = this._snapshot ? this._snapshot.credits : null;
         const history = this._snapshot ? this._snapshot.history : null;
-        if (credits && credits.plan) {
-            this._addCreditItem(_("Plan"), String(credits.plan), true);
-        }
         let balance = credits
             ? UsageFormat.formatCompactNumber(credits.balance, 1)
             : _("unavailable");
@@ -3341,12 +3355,10 @@ class ZUsageApplet extends Applet.Applet {
     ) {
         const duration = UsageFormat.formatDuration(window.durationMinutes);
         const periods = window.periods || {};
-        const activityTotal = periods["24h"];
         const oneHour = UsageFormat.formatConsumedPercent(periods["1h"]);
         const fourHours = UsageFormat.formatConsumedPercent(periods["4h"]);
         const twelveHours = UsageFormat.formatConsumedPercent(periods["12h"]);
         const today = UsageFormat.formatConsumedPercent(periods.today);
-        const rollingDay = UsageFormat.formatConsumedPercent(activityTotal);
         const periodKeys = UsageFormat.historyPeriodKeys(window.durationMinutes);
         if (showLimitLabel) {
             this._addIconHeading(
@@ -3357,16 +3369,17 @@ class ZUsageApplet extends Applet.Applet {
         } else {
             this._addInfoItem(_f("  %s usage", duration), "font-weight: bold;", menu);
         }
-        const rollingDayText = periodKeys.includes("24h")
-            ? _f("  ·  24h %s", rollingDay)
-            : "";
-        this._addInfoItem(
-            _f("    1h %s  ·  4h %s%s", oneHour, fourHours, rollingDayText),
-            null,
-            menu
-        );
-        if (periodKeys.includes("12h")) {
-            this._addInfoItem(_f("    12h %s  ·  Today %s", twelveHours, today), null, menu);
+        // One compact line: the chart caption already carries the window
+        // total, so a 24h row repeated the same number (Claudiu) - the
+        // 12h/today values join 1h/4h on the same line instead of
+        // spending an extra row.
+        const periodParts = [];
+        if (periodKeys.includes("1h")) periodParts.push(_f("1h %s", oneHour));
+        if (periodKeys.includes("4h")) periodParts.push(_f("4h %s", fourHours));
+        if (periodKeys.includes("12h")) periodParts.push(_f("12h %s", twelveHours));
+        if (periodKeys.includes("today")) periodParts.push(_f("Today %s", today));
+        if (periodParts.length > 0) {
+            this._addInfoItem(`    ${periodParts.join("  ·  ")}`, null, menu);
         }
         if (activityValues) {
             this._addActivityChart(

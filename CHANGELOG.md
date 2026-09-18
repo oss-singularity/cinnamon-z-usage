@@ -16,6 +16,11 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- Compact consumption layout: the plan rides the header title line, the
+  per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
+  the duplicated 24h window total is gone (the chart caption carries
+  it, uncapped - a 138% overage day no longer reads as "100%"). The
+  popup shrinks by two rows.
 - Honest activity bar heights: the minimum bar floor dropped from 8px
   to 3px - Z.ai percentages are small (1-9%), and the 8px floor out of
   a 26px range compressed every sub-30% bucket onto the same height (a
