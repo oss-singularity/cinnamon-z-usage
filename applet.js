@@ -1471,10 +1471,14 @@ class ZUsageApplet extends Applet.Applet {
                 `color: ${this._menuColor(0.75)}`
             ].join("; ") + ";";
             if (planLabel.clutter_text) {
+                // Brighten the gradient's start: at this tiny size the
+                // subpixel antialiasing shaves ~40% off the stroke color,
+                // and the first letters of a plain normalColor start read
+                // as muddy dark (Claudiu's invisible "P").
                 const [fromValid, fromColor] = Clutter.Color.from_string(
-                    String(this.normalColor || "#62c7f5")
+                    this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)
                 );
-                const [toValid, toColor] = Clutter.Color.from_string("#62e9a8");
+                const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
                 if (fromValid && toValid) {
                     const chars = Array.from(planText);
                     const spans = chars.map((ch, index) => {
