@@ -90,7 +90,7 @@
   timestamp.
 - The credits consumption prefix reads "Used:" instead of "Consumed:"
   - four characters shorter, and the prefix no longer squeezes into
-  "Consume..." on tight rows.
+    "Consume..." on tight rows.
 - The plan pill in the title renders bold with a per-letter
   blue-to-green gradient.
 - Compact consumption layout: the plan rides the header title line, the
