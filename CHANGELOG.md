@@ -2,6 +2,11 @@
 
 ## Unreleased — 1.0.0 (planned)
 
+- The ZCode button helps with the initial setup: when the coding agent
+  is not installed it opens a modal with Z.ai's installation page and
+  explains that the applet reads plan usage from the agent's stored
+  credentials - an API key stays optional. The button tooltip reflects
+  the install state, and the modal is covered by automated tests.
 - No more intermittent open/refresh jump: the action grid is statically
   centered (the popup width is locked and the grid width is fixed, so the
   layout placement alone holds the design offset) instead of being

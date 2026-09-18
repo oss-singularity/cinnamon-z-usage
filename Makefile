@@ -6,6 +6,7 @@ check:
 	cjs tests/test-spark-disclosure.js
 	cjs tests/test-action-centering.js
 	cjs tests/test-popup-width.js
+	cjs tests/test-install-help.js
 	cjs tests/test-panel-colors.js
 	cjs tests/test-model-visibility.js
 	cjs tests/test-notification-delivery.js

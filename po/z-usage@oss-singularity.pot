@@ -297,6 +297,10 @@ msgstr ""
 msgid "Base color of panel percentages, window labels and separators. Warning and critical colors can override percentages below the configured thresholds."
 msgstr ""
 
+#: applet.js
+msgid "Close"
+msgstr ""
+
 #: settings-schema.json.js
 msgid "Color panel percentages at or below the remaining usage thresholds using the warning and critical colors below. Independent of menu coloring; window labels and separators keep the panel text color."
 msgstr ""
@@ -382,6 +386,10 @@ msgstr ""
 msgid "General"
 msgstr ""
 
+#: applet.js
+msgid "Install ZCode"
+msgstr ""
+
 #: settings-schema.json.js
 msgid "Keep ZCode plan sections expanded"
 msgstr ""
@@ -463,6 +471,10 @@ msgstr ""
 
 #: usage-format.js
 msgid "One reset credit was consumed. Usage limits are refreshing."
+msgstr ""
+
+#: applet.js
+msgid "Open installation guide"
 msgstr ""
 
 #: settings-schema.json.js
@@ -575,6 +587,10 @@ msgstr ""
 msgid "Separators are hidden automatically in vertical panels."
 msgstr ""
 
+#: applet.js
+msgid "Set up the ZCode coding agent"
+msgstr ""
+
 #: settings-schema.json.js
 msgid "Show 5h / 7d window labels"
 msgstr ""
@@ -613,6 +629,11 @@ msgstr ""
 
 #: settings-schema.json.js
 msgid "Show usage icon"
+msgstr ""
+
+#: applet.js
+#, javascript-format
+msgid "The ZCode coding agent was not found. Z.ai's page installs it and signs you into your GLM Coding Plan; this applet then reads the plan usage from its stored credentials. An API key is only needed when that keyless login is unavailable - it stays optional."
 msgstr ""
 
 #: usage-format.js

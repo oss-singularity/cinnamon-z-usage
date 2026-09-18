@@ -22,6 +22,8 @@ const GdkPixbuf = imports.gi.GdkPixbuf;
 const Cairo = imports.cairo;
 const Atk = imports.gi.Atk;
 const Cinnamon = imports.gi.Cinnamon;
+const ModalDialog = imports.ui.modalDialog;
+const Dialog = imports.ui.dialog;
 
 const UsageFormat = require("./usage-format");
 
@@ -40,6 +42,7 @@ const ZCODE_PLAN_SOURCE = "zcode-plan";
 const ZAI_URL = "https://chat.z.ai/";
 const ZAI_USAGE_URL = "https://z.ai/manage-apikey/coding-plan/personal/usage";
 const ZAI_API_KEYS_URL = "https://z.ai/manage-apikey/apikey-list";
+const ZCODE_INSTALL_URL = "https://zcode.z.ai";
 const PANEL_FONT_SCALE = 0.95;
 const PANEL_LABEL_SCALE = 0.79;
 const ACTIVITY_TOOLTIP_DELAY_MS = 120;
@@ -368,6 +371,7 @@ class ZUsageApplet extends Applet.Applet {
         this._activityCharts = [];
         this._creditsFit = null;
         this._lastCreditFontSize = null;
+        this._installHelpDialog = null;
         this._closing = false;
         this._lastChartWidths = [];
         this._chartWidthCandidates = [];
@@ -2396,8 +2400,10 @@ class ZUsageApplet extends Applet.Applet {
             _("ZCode"),
             { fileName: "zcode.svg" },
             true,
-            () => Util.spawn(["zcode"]),
-            _("Open the ZCode coding agent")
+            () => this._launchZCode(),
+            GLib.find_program_in_path("zcode")
+                ? _("Open the ZCode coding agent")
+                : _("Set up the ZCode coding agent")
         );
         this._usageButton = this._createLaunchButton(
             _("Usage"),
@@ -2821,6 +2827,47 @@ class ZUsageApplet extends Applet.Applet {
         if (!this._refreshSpinnerTimeoutId) return;
         Mainloop.source_remove(this._refreshSpinnerTimeoutId);
         this._refreshSpinnerTimeoutId = 0;
+    }
+
+    _launchZCode() {
+        if (GLib.find_program_in_path("zcode")) {
+            Util.spawn(["zcode"]);
+            return;
+        }
+        this._showInstallHelp(
+            _("Install ZCode"),
+            _f("The ZCode coding agent was not found. Z.ai's page installs it and signs you into your GLM Coding Plan; this applet then reads the plan usage from its stored credentials. An API key is only needed when that keyless login is unavailable - it stays optional."),
+            ZCODE_INSTALL_URL
+        );
+    }
+
+    _showInstallHelp(title, description, url) {
+        if (this._installHelpDialog) this._installHelpDialog.destroy();
+
+        const dialog = new ModalDialog.ModalDialog();
+        const content = new Dialog.MessageDialogContent({ title, description });
+        dialog.contentLayout.add_child(content);
+        const close = () => {
+            dialog.destroy();
+            if (this._installHelpDialog === dialog) this._installHelpDialog = null;
+        };
+        dialog.setButtons([
+            {
+                label: _("Close"),
+                action: close,
+                key: Clutter.KEY_Escape
+            },
+            {
+                label: _("Open installation guide"),
+                action: () => {
+                    close();
+                    Util.spawn(["xdg-open", url]);
+                },
+                default: true
+            }
+        ]);
+        this._installHelpDialog = dialog;
+        dialog.open();
     }
 
     _launchButtonStyle(state, compact = false, transparent = false, corner = false) {
@@ -4627,6 +4674,10 @@ class ZUsageApplet extends Applet.Applet {
     on_applet_removed_from_panel() {
         this._destroyed = true;
         if (this.menu && this.menu.isOpen) this.menu.close(false);
+        if (this._installHelpDialog) {
+            this._installHelpDialog.destroy();
+            this._installHelpDialog = null;
+        }
         if (this._actionEdgeSyncQueuedId) {
             Mainloop.source_remove(this._actionEdgeSyncQueuedId);
             this._actionEdgeSyncQueuedId = 0;
