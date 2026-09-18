@@ -730,10 +730,30 @@ class ZUsageApplet extends Applet.Applet {
                 this._lastChartWidths[index] = width;
             }
         });
-        // The credits consumption line flows naturally like upstream: the
-        // font fit owns its size (shrinking only when the text would
-        // overflow the grid anchor), and its end lands wherever the fitted
-        // text ends - no right-anchoring, no gap after the balance value.
+        // The credits consumption line flows naturally like upstream and
+        // the font fit owns its size - but its painted end is pinned to
+        // the grid edge: glyph hinting shifts the painted end by a few
+        // pixels depending on the digits (the "manchmal" flush drift), and
+        // this pin rides every sync so the end always finishes with the
+        // buttons. Translations never feed back into the preferred widths
+        // the fit measures.
+        const suffixLabels = this._creditsSuffixLabels;
+        if (suffixLabels && suffixLabels.length) {
+            const last = suffixLabels[suffixLabels.length - 1];
+            if (!last.is_finalized()) {
+                const [suffixX] = last.get_transformed_position();
+                const [suffixWidth] = last.get_transformed_size();
+                if (suffixWidth > 0) {
+                    const delta =
+                        right - (Math.round(suffixX) + Math.round(suffixWidth));
+                    if (delta !== 0 && Math.abs(delta) <= 40) {
+                        for (const label of suffixLabels) {
+                            if (!label.is_finalized()) label.translation_x += delta;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     _rebuildPanel() {
@@ -3107,6 +3127,11 @@ class ZUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
+            this._creditsSuffixLabels = [
+                fitTargets.separatorLabel,
+                fitTargets.expiresLabel,
+                fitTargets.expiryDateLabel
+            ];
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
