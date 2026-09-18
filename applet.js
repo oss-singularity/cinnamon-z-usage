@@ -2240,7 +2240,8 @@ class ZUsageApplet extends Applet.Applet {
                 success: refreshConfirmed
             },
             true,
-            () => this._refreshUsage(true)
+            () => this._refreshUsage(),
+            _("Refresh the usage data now")
         );
         this._refreshButtonIcon = this._refreshButton._usageIcon;
         this._refreshButtonLabel = this._refreshButton._usageLabel;
@@ -2950,7 +2951,9 @@ class ZUsageApplet extends Applet.Applet {
             : null;
         const creditConsumptionEmphasized = Boolean(creditConsumption) &&
             CREDIT_CONSUMPTION_MARKUP_MODE !== "numbers";
-        const creditConsumptionColor = creditConsumption ? this.criticalColor : null;
+        // The AIC consumption IS the plan quota at Z.ai (not an "extra"
+        // like OpenAI credits) - render it in the normal plan color.
+        const creditConsumptionColor = creditConsumption ? this.normalColor : null;
         this._addCreditItem(
             _("Credits"),
             balance,
@@ -3242,14 +3245,10 @@ class ZUsageApplet extends Applet.Applet {
                 this._historySubmenus.push({ id: limitId, submenu });
                 submenu.menu.connect("open-state-changed", (_menu, open) => {
                     if (open) {
-                        // Nested submenu content does not participate in the
-                        // section's height allocation; two open submenus would
-                        // draw over each other. Keep one accordion leaf open.
-                        for (const entry of this._historySubmenus) {
-                            if (entry.submenu !== submenu && entry.submenu.menu.isOpen) {
-                                entry.submenu.menu.close(false);
-                            }
-                        }
+                        // Several leaves may stay open at once - the leaves
+                        // stack in the normal content flow and the popup
+                        // scrolls (Claudiu: multiple comparisons at a glance
+                        // beat the one-leaf accordion).
                         // A previous scroll-viewport pass can leave a stale
                         // height on the reopened leaf; clear it and settle.
                         submenu.menu.actor.set_height(-1);
@@ -3473,7 +3472,7 @@ class ZUsageApplet extends Applet.Applet {
             x_expand: true
         });
         plot.style = `border-bottom: 1px solid ${this._menuColor(0.28)}; padding-top: 2px;`;
-        const creditHighlightColor = this._brightenColor(this.criticalColor);
+        const creditHighlightColor = this._brightenColor(this.normalColor);
         for (let index = 0; index < barCount; index++) {
             const bar = model.bars[index] || null;
             const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
@@ -3523,7 +3522,7 @@ class ZUsageApplet extends Applet.Applet {
                     style = `background-color: ${this._menuColor(0.38)}; border-radius: ${radius};`;
                 } else if (entry.known && isCredit) {
                     const radius = quotaHasVisibleBar ? "2px 2px 0 0" : "2px";
-                    style = `background-gradient-direction: vertical; background-gradient-start: ${creditHighlightColor}; background-gradient-end: ${this.criticalColor}; border-radius: ${radius};`;
+                    style = `background-gradient-direction: vertical; background-gradient-start: ${creditHighlightColor}; background-gradient-end: ${this.normalColor}; border-radius: ${radius};`;
                 } else if (entry.known) {
                     const radius = creditHasVisibleBar && quotaHasVisibleBar && !isCredit
                         ? "0 0 2px 2px"
@@ -3792,7 +3791,7 @@ class ZUsageApplet extends Applet.Applet {
         return `${this.metadata.path}/z_usage.py`;
     }
 
-    _refreshUsage(showConfirmation = false) {
+    _refreshUsage() {
         if (this._destroyed) return;
         if (this._busy) {
             this._refreshQueued = true;
@@ -3874,7 +3873,10 @@ class ZUsageApplet extends Applet.Applet {
                 }
 
                 if (!this._destroyed) {
-                    if (showConfirmation && succeeded) this._showRefreshConfirmation();
+                    // Every successful refresh confirms - the auto-update's
+                    // "Updating…" must resolve to the green "Updated" state
+                    // while the popup is open, not only the button click.
+                    if (succeeded) this._showRefreshConfirmation();
                     this._rebuildPanel();
                     this._scheduleMenuRebuild();
                     if (this._refreshQueued) {

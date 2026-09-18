@@ -16,6 +16,20 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- Every successful refresh confirms green: the auto-update's "Updating…"
+  resolves to the green "Updated" state while the popup is open, not only
+  the manual button click.
+- AIC consumption renders in the normal plan color: the activity-chart
+  AIC bars and the red-by-default "Consumed:" text now use the normal
+  color - at Z.ai the AIC quota IS the plan's core contingent, not an
+  extra like OpenAI's credits.
+- The refresh button carries a tooltip like the other footer buttons.
+- Several "Recent consumption" groups can stay expanded at once - the
+  leaves stack cleanly in the scrollable content instead of behaving
+  like a one-leaf accordion.
+- Reset countdowns are always honest: a window at 100% remaining counts
+  down toward its fixed reset timestamp (Z.ai resets are fixed calendar
+  times) instead of displaying the full window duration.
 - The credits consumption line keeps its exact size across data refreshes:
   the font fit no longer measures the action grid before the footer is
   allocated (a mixed read that shrank the line ~34px short when the first

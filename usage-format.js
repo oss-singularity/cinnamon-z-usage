@@ -227,10 +227,12 @@ function buildResetCountdown(window, nowSeconds = null) {
         };
     }
 
-    const remainingPercent = Number(window && window.remainingPercent);
-    const remainingSeconds = Number.isFinite(remainingPercent) && remainingPercent >= 100
-        ? durationSeconds
-        : clamp(Math.ceil(resetsAt - currentSeconds), 0, durationSeconds);
+    // Z.ai reset timestamps are FIXED calendar times - they exist whether
+    // or not anything was consumed in the window. The countdown therefore
+    // always counts toward resetsAt; the old full-duration display for
+    // 100%-remaining windows was an OpenAI-ism (its resetsAt only appears
+    // with the first usage in a window).
+    const remainingSeconds = clamp(Math.ceil(resetsAt - currentSeconds), 0, durationSeconds);
     let primary = _("now");
     let secondary = "";
     if (remainingSeconds >= 86400) {

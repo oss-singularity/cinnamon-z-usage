@@ -525,6 +525,10 @@ msgstr ""
 msgid "Refresh now"
 msgstr ""
 
+#: applet.js
+msgid "Refresh the usage data now"
+msgstr ""
+
 #: settings-schema.json.js
 msgid "Remaining usage thresholds"
 msgstr ""

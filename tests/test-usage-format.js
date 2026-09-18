@@ -208,6 +208,9 @@ assertClose(
     "Reset progress starts near empty and fills toward reset"
 );
 
+// Z.ai resets are fixed calendar times: a 100%-remaining window still
+// counts down toward its resetsAt (the old full-duration display was an
+// OpenAI-ism whose resetsAt only appears with first usage).
 const unusedFiveHourCountdown = UsageFormat.buildResetCountdown(
     {
         durationMinutes: 300,
@@ -218,13 +221,13 @@ const unusedFiveHourCountdown = UsageFormat.buildResetCountdown(
 );
 assertEqual(
     unusedFiveHourCountdown.label,
-    "5h",
-    "Unused five-hour cycle keeps its full duration"
+    "4h\n59m",
+    "Unused five-hour cycle counts toward its fixed reset"
 );
-assertEqual(
+assertClose(
     unusedFiveHourCountdown.fractionElapsed,
-    0,
-    "Unused five-hour cycle has no reset progress"
+    2 / (5 * 3600),
+    "Unused five-hour cycle shows elapsed window time"
 );
 assertEqual(
     UsageFormat.formatResetCountdownTooltip(
@@ -235,7 +238,7 @@ assertEqual(
         },
         1002
     ),
-    "Reset window: 5h\nElapsed: 0%\nRemaining: 5h",
+    "Reset window: 5h\nElapsed: 0%\nRemaining: 4h 59m",
     "Unused five-hour reset tooltip"
 );
 
@@ -249,13 +252,13 @@ const unusedWeeklyCountdown = UsageFormat.buildResetCountdown(
 );
 assertEqual(
     unusedWeeklyCountdown.label,
-    "7d",
-    "Unused weekly cycle keeps its full duration"
+    "6d\n23h",
+    "Unused weekly cycle counts toward its fixed reset"
 );
-assertEqual(
+assertClose(
     unusedWeeklyCountdown.fractionElapsed,
-    0,
-    "Unused weekly cycle has no reset progress"
+    2 / (7 * 86400),
+    "Unused weekly cycle shows elapsed window time"
 );
 
 assertEqual(
