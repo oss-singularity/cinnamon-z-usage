@@ -1178,8 +1178,18 @@ class ZUsageApplet extends Applet.Applet {
         this._addLaunchButtons();
 
         if (wasOpen) {
-            for (const entry of this._historySubmenus) {
-                if (expandedSubmenus.has(entry.id)) entry.submenu.menu.open(false);
+            // Restoring the open leaves must not auto-scroll to them:
+            // the restore fires each leaf's ensure-visible idle and the
+            // popup jumped to the bottom right after a rebuild-while-open
+            // (Claudiu's "auto-scroll event" on the first open within the
+            // refresh interval). Scrolling is for manual toggles only.
+            this._suppressSectionAutoScroll = true;
+            try {
+                for (const entry of this._historySubmenus) {
+                    if (expandedSubmenus.has(entry.id)) entry.submenu.menu.open(false);
+                }
+            } finally {
+                this._suppressSectionAutoScroll = false;
             }
             if (this.menu.isOpen) this._clampPopupHeight();
         }
@@ -2849,15 +2859,11 @@ class ZUsageApplet extends Applet.Applet {
             ) {
                 return 0;
             }
-            const [rowX] = row.get_transformed_position();
-            const [gridX] = frame.get_transformed_position();
-            const [gridWidth] = frame.get_transformed_size();
-            const [rowWidthTransformed] = row.get_transformed_size();
-            const scale = rowWidthTransformed > 0
-                ? rowWidthTransformed / rowWidth
-                : 1;
-            const width = (gridX + gridWidth - rowX) / scale;
-            return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
+            // The line ends at the row's own right edge - the same
+            // inset from the popup edge as the left side (the symmetric
+            // look Claudiu chose). The old grid-edge cap ended the line
+            // short of that agreement.
+            return rowWidth;
         };
         const fit = () => {
             // The carried start font makes every pass idempotent (the ratio
@@ -4176,7 +4182,7 @@ class ZUsageApplet extends Applet.Applet {
                             // data. A dozen px below the last full row
                             // hides the next section reliably; the lost
                             // strip is the row's own bottom padding.
-                            viewport = Math.max(200, acc - 12);
+                            viewport = Math.max(200, acc - 20);
                         }
                         break;
                     }

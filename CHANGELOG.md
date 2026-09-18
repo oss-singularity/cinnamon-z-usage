@@ -16,6 +16,19 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- Bar heights spread by rank: Z.ai distributions are tiny and lopsided
+  (many 1-3% buckets under one old spike), and every value normalization
+  compressed recent buckets onto the same pixels - 5% vs 3% read
+  identical. Bars now scale mostly by their rank among the known
+  buckets, so every chart uses its full height range (the caption keeps
+  the honest peak value).
+- The consumption line ends at the row's right edge again - the same
+  inset as the left side, the symmetric look chosen earlier - instead
+  of stopping short after the anti-ellipsis reserve.
+- Restoring open leaves after a refresh no longer auto-scrolls the
+  popup to them (the surprise jump within the first refresh interval
+  after opening), and the viewport trim shaves deep enough to hide the
+  next section on live row counts.
 - No more truncated consumption tail: the credits fit reserves the
   markup label's paint slop, so the "1h" value no longer collapses into
   "..." when the line runs long (weekend plans + permanent scrollbar).

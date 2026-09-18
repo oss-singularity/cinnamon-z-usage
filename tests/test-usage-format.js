@@ -362,12 +362,12 @@ assertEqual(chart.bars[3].intensity, 7, "Peak activity intensity");
 const unevenChart = UsageFormat.buildActivityChart([1, 2, 14]);
 assertEqual(
     UsageFormat.activityBarHeight(unevenChart.bars[0], unevenChart.peakPercent),
-    9,
+    6,
     "One-percent activity keeps a distinct bar height"
 );
 assertEqual(
     UsageFormat.activityBarHeight(unevenChart.bars[1], unevenChart.peakPercent),
-    12,
+    16,
     "Two-percent activity keeps a distinct bar height"
 );
 assertEqual(

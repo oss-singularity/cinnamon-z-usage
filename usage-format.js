@@ -348,6 +348,20 @@ function buildActivityChart(values, valueKey = "consumedPercent") {
     const peakPercent = known.length > 0
         ? Math.max(...known.map(bar => bar.consumedPercent))
         : 0;
+    // Rank among the known bars: Z.ai value distributions are tiny and
+    // lopsided (many 1-3% buckets against one old 20%+ spike), and any
+    // value-normalization compresses recent buckets onto the same few
+    // pixels (Claudiu's 5%-vs-3% indistinguishable). The rank spreads
+    // every chart across the full bar range regardless of distribution;
+    // the caption keeps the honest peak value.
+    if (known.length > 1) {
+        const sorted = known.slice().sort(
+            (a, b) => a.consumedPercent - b.consumedPercent
+        );
+        sorted.forEach((bar, index) => {
+            bar.rankFraction = index / (sorted.length - 1);
+        });
+    }
     bars.forEach(bar => {
         if (!bar.known) return;
         const intensity = bar.estimated && bar.consumedPercent > 0
@@ -579,12 +593,16 @@ function activityBarHeight(bar, peakPercent) {
     const fraction = bar.estimated
         ? 0
         : clamp(bar.consumedPercent / peakPercent, 0, 1);
-    // Square-root spread: a linear scale compresses the low end whenever
-    // one bucket dominates the peak (Z.ai windows: recent buckets at
-    // 3-5% against an earlier 20% spike), making 3% and 5% the same
-    // height. The root curve stretches small differences while the peak
-    // still reaches the maximum - visual ranking is preserved.
-    const spread = Math.sqrt(fraction);
+    // Rank-based spread with a value floor: pure value normalization
+    // (linear or root) compresses lopsided Z.ai distributions (many tiny
+    // buckets under one old spike) until 3% and 5% read identical. The
+    // bar's rank among the known buckets drives most of the height, so
+    // every chart uses the full pixel range; the value term keeps bars
+    // from the same rank neighborhood ordered by their real size.
+    const rank = Number.isFinite(bar.rankFraction)
+        ? Math.max(0, Math.min(1, bar.rankFraction))
+        : Math.sqrt(fraction);
+    const spread = 0.15 + 0.85 * rank;
     return Math.min(
         ACTIVITY_BAR_MAX_HEIGHT,
         Math.max(
