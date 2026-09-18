@@ -225,7 +225,24 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         super.open(animate);
         owner._lockPopupLayoutWidth();
         // No post-open clamp: the pre-open clamp already fixed the final
-        // height, and a post-position resize is the visible jump.
+        // height, and a post-position resize is the visible jump. The one
+        // exception runs before the first visible paint: the fold snap
+        // aligns the viewport bottom onto the real row boundary, so the
+        // correction never shows up as a resize.
+        if (freshOpen && typeof Meta !== "undefined" && Meta.later_add) {
+            let attempts = 0;
+            const snapFold = () => {
+                if (owner._destroyed || !owner.menu || !owner.menu.isOpen) return;
+                attempts += 1;
+                // The first frame(s) after the open may run before the
+                // popup's layout pass produced measurable geometry; a
+                // MetaLater does not reliably honor SOURCE_CONTINUE, so
+                // re-arm it explicitly until the fold decision lands.
+                if (owner._snapViewportFoldToRows() || attempts >= 12) return;
+                Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
+            };
+            Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
+        }
         if (freshOpen && this._scroll && this._scroll.get_vscroll_bar) {
             // A fresh open always starts at the header, whatever earlier
             // rebuilds or the previous session left scrolled.
@@ -4184,11 +4201,61 @@ class ZUsageApplet extends Applet.Applet {
             }
             this._popupViewport = viewport;
             this._popupFrameHeight = headerNat + viewport + footerNat + 2;
+            this._popupChromeHeights = [headerNat, footerNat];
+            this._popupFoldSnapped = false;
         }
         this.menu._scroll.set_height(this._popupViewport);
         // A fixed popup height up front: Cinnamon positions the popup once
         // with the final size, so nothing jumps or gets cut at the top.
         this.menu.actor.set_height(this._popupFrameHeight);
+    }
+
+    _snapViewportFoldToRows() {
+        // The pre-open trim guesses the fold from preferred-height sums,
+        // which drift a few px per row against the real allocations (theme
+        // paddings) - enough to leave a sliver of the next row peeking
+        // above the footer. With the popup now allocated, snap the fold
+        // exactly onto the straddling row's real top, before the first
+        // visible paint of the open. Shrinks only: a fold that already
+        // sits between rows needs no correction. Returns false while the
+        // geometry is not measurable yet so the caller can retry on the
+        // next frame.
+        if (this._popupFoldSnapped) return true;
+        if (!this._popupFrameHeight || !this._popupViewport) return true;
+        if (!this.menu || !this.menu.isOpen) return true;
+        if (!this._popupChromeHeights) return true;
+        const scroll = this.menu._scroll;
+        const content = this.menu._content ? this.menu._content.actor : null;
+        if (!scroll || !content) return true;
+        const [, scrollY] = scroll.get_transformed_position();
+        const [, scrollH] = scroll.get_transformed_size();
+        if (!Number.isFinite(scrollY) || !Number.isFinite(scrollH) || scrollH <= 0) {
+            return false;
+        }
+        const fold = scrollY + scrollH;
+        let straddlerTop = null;
+        if (content.get_children) {
+            for (const child of content.get_children()) {
+                if (!child || (child.is_finalized && child.is_finalized())) continue;
+                const [, y] = child.get_transformed_position();
+                const [, h] = child.get_transformed_size();
+                if (!Number.isFinite(y) || !Number.isFinite(h) || h <= 0) continue;
+                if (y < fold - 0.5 && y + h > fold + 0.5) {
+                    straddlerTop = y - scrollY;
+                    break;
+                }
+            }
+        }
+        this._popupFoldSnapped = true;
+        if (!Number.isFinite(straddlerTop)) return true;
+        const viewport = Math.max(200, Math.round(straddlerTop));
+        if (viewport >= this._popupViewport) return true;
+        this._popupViewport = viewport;
+        this._popupFrameHeight = this._popupChromeHeights[0]
+            + viewport + this._popupChromeHeights[1] + 2;
+        scroll.set_height(viewport);
+        this.menu.actor.set_height(this._popupFrameHeight);
+        return true;
     }
 
     _ensureActorVisible(actor) {
