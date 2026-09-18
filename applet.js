@@ -86,10 +86,7 @@ const COMPACT_QUOTA_RING_SIZE = 40;
 const POPUP_HEADER_RING_LEFT_SHIFT = 13;
 const POPUP_RESET_RING_LEFT_SHIFT = 14;
 const SPARK_BADGE_COLOR = "#f2a15f";
-const RESET_EXPIRY_WARNING_COLOR = "#f2a15f";
 const RESET_EXPIRY_CRITICAL_COLOR = "#ff4d8d";
-const RESET_EXPIRY_WARNING_SECONDS = 7 * 24 * 60 * 60;
-const RESET_EXPIRY_CRITICAL_SECONDS = 24 * 60 * 60;
 const RESET_EXPIRY_BREATHING_OPACITY = 150;
 const RESET_EXPIRY_BREATHING_DURATION_MS = 1100;
 const WEEKLY_WINDOW_MINUTES = 10080;
@@ -1045,19 +1042,6 @@ class ZUsageApplet extends Applet.Applet {
         return this.normalColor;
     }
 
-    _resetExpiryColor(expiresAt) {
-        const expiry = Number(expiresAt);
-        if (!Number.isFinite(expiry) || expiry <= 0) return null;
-        const remaining = expiry - GLib.get_real_time() / 1000000;
-        if (remaining <= RESET_EXPIRY_CRITICAL_SECONDS) {
-            return RESET_EXPIRY_CRITICAL_COLOR;
-        }
-        if (remaining <= RESET_EXPIRY_WARNING_SECONDS) {
-            return RESET_EXPIRY_WARNING_COLOR;
-        }
-        return null;
-    }
-
     _startResetExpiryBreathing() {
         if (this._animationsEnabled === false || !St.Settings.get().animations_enabled) {
             this._stopResetExpiryBreathing();
@@ -1279,34 +1263,6 @@ class ZUsageApplet extends Applet.Applet {
         return this._headerRings && !this._headerRings.is_finalized() &&
             Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
             ? this._headerRings.translation_x : null;
-    }
-
-    _applyCarriedRowWidths(widths) {
-        // Fresh rows take their first allocation at their inflated natural
-        // width: the label minimums overflow the clamped item (rows measured
-        // 23..458 instead of 23..396), shoving the rings and charts outward
-        // until a sync corrects them, and letting the credits font fit
-        // converge on the wrong geometry. Pin each fresh row to the width
-        // its predecessor settled at, then unpin after that first allocation
-        // so later reflows stay free.
-        const rows = this._popupRightInsetRows || [];
-        for (let index = 0; index < rows.length; index++) {
-            const row = rows[index];
-            const width = widths ? widths[index] : null;
-            if (!row || row.is_finalized() || typeof width !== "number" || width <= 0) {
-                continue;
-            }
-            this._forceActorWidth(row, width);
-            let pinned = true;
-            row.connect("notify::allocation", () => {
-                if (!pinned || row.is_finalized()) return;
-                pinned = false;
-                row.set_width(-1);
-                row.min_width_set = false;
-                row.natural_width_set = false;
-                row.clip_to_allocation = false;
-            });
-        }
     }
 
     _menuSignature(snapshot) {
@@ -2821,12 +2777,10 @@ class ZUsageApplet extends Applet.Applet {
         suffixEmphasized
     ) {
         let fitting = false;
-        // The fit pass and the edge sync both position this row; running
-        // both at once makes them fight through chart allocations (the
-        // charts get yanked by the relayout chains). The fit pass tracks
-        // its own convergence: once two consecutive passes agree on the
-        // font size it reports converged and stops reacting, and only then
-        // does the edge sync translate the row onto the grid anchor.
+        // The fit tracks its own convergence: once two consecutive passes
+        // agree on the font size it stops reacting to allocation noise
+        // (hover tooltips, scroll churn would otherwise re-apply the base
+        // font and visibly pulse the line).
         let armed = true;
         let converged = false;
         let lastFont = null;
@@ -2948,7 +2902,7 @@ class ZUsageApplet extends Applet.Applet {
                     applyFontSize(fontSize);
                 }
                 // Two passes agreeing on the font size means the fit has
-                // settled: from now on the edge sync owns the placement.
+                // settled and stops reacting to allocation noise.
                 if (lastFont !== null && Math.abs(lastFont - fontSize) < 0.05) {
                     converged = true;
                 }
@@ -3143,11 +3097,6 @@ class ZUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
-            this._creditsSuffixLabels = [
-                fitTargets.separatorLabel,
-                fitTargets.expiresLabel,
-                fitTargets.expiryDateLabel
-            ];
             this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
@@ -3791,11 +3740,6 @@ class ZUsageApplet extends Applet.Applet {
 
     _onLayoutSettingChanged() {
         this._rebuildPanel();
-    }
-
-    _onChatGptAppPathChanged() {
-        this._rebuildMenu();
-        this._refreshUsage();
     }
 
     _onModelVisibilityChanged() {
