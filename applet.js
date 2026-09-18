@@ -1095,10 +1095,10 @@ class ZUsageApplet extends Applet.Applet {
         // right-aligned row shifts right - then everything shifts back
         // when the scrollbar returns. Hold the scrollbar across the whole
         // rebuild so the width never changes mid-flight.
-        if (wasOpen && this.menu._scroll) {
-            this._scrollPolicyHold = true;
-            this.menu._scroll.vscrollbar_policy = St.PolicyType.ALWAYS;
-        }
+        // The scrollbar policy is ALWAYS permanently: the content is
+        // always taller than the viewport, so the automatic policy only
+        // added toggle transients (the scrollbar hiding/reappearing
+        // shifted the whole content by its width on rebuilds).
         // Und den Inhalt selbst hinter einem Opacity-Vorhang halten, bis
         // Layout und Syncs konvergiert sind: die Zwischen-Zustände
         // (unpadded Rows, unforced Charts) werden nie sichtbar.
@@ -1246,8 +1246,7 @@ class ZUsageApplet extends Applet.Applet {
             });
             Mainloop.timeout_add(900, () => {
                 if (this._destroyed) return GLib.SOURCE_REMOVE;
-                this._restoreScrollbarPolicy();
-                if (this._contentCurtain && this.menu && this.menu._content) {
+                    if (this._contentCurtain && this.menu && this.menu._content) {
                     this.menu._content.actor.opacity = 255;
                     this._contentCurtain = false;
                 }
@@ -1310,14 +1309,6 @@ class ZUsageApplet extends Applet.Applet {
         }
     }
 
-    _restoreScrollbarPolicy() {
-        if (!this._scrollPolicyHold) return;
-        this._scrollPolicyHold = false;
-        if (this.menu && this.menu._scroll) {
-            this.menu._scroll.vscrollbar_policy = St.PolicyType.AUTOMATIC;
-        }
-    }
-
     _menuSignature(snapshot) {
         // A refresh returns a fresh snapshot every time even when nothing
         // visible changed; rebuilding the open menu for it blanks the
@@ -1354,7 +1345,6 @@ class ZUsageApplet extends Applet.Applet {
             if (this.menu && !this.menu.isOpen && this.menu.animating) {
                 return GLib.SOURCE_REMOVE;
             }
-            this._restoreScrollbarPolicy();
             // Identical data renders an identical menu - skip the rebuild
             // and the content flicker that comes with it.
             const signature = this._menuSignature(this._snapshot);
@@ -2995,7 +2985,7 @@ class ZUsageApplet extends Applet.Applet {
             this._addCreditItem(_("Plan"), String(credits.plan), true);
         }
         let balance = credits
-            ? UsageFormat.formatCompactNumber(credits.balance)
+            ? UsageFormat.formatCompactNumber(credits.balance, 1)
             : _("unavailable");
         if (credits && credits.unlimited) balance = "unlimited";
         const creditConsumption = credits && !credits.unlimited && history
