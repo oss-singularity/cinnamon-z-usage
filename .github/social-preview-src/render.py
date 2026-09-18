@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a deterministic ChatGPT Usage Monitor social-preview variant."""
+"""Render a deterministic Z Usage Monitor social-preview variant."""
 
 from __future__ import annotations
 
