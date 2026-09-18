@@ -143,6 +143,13 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             if (!this.isOpen) return GLib.SOURCE_REMOVE;
             const focus = global.stage.get_key_focus();
             if (!focus || !this._content.actor.contains(focus)) return GLib.SOURCE_REMOVE;
+            // Items grab the key focus on hover (focusOnHover) without any
+            // keyboard intent. Revealing that "focus" scrolls the popup
+            // under a merely resting pointer - the surprise auto-scroll
+            // when hovering a partially visible section header. Only real
+            // keyboard navigation reveals: its focus lands on items the
+            // pointer is NOT over.
+            if (focus.hover) return GLib.SOURCE_REMOVE;
             const [, top] = this._scroll.get_transformed_position();
             const [, height] = this._scroll.get_transformed_size();
             const [, focusTop] = focus.get_transformed_position();
@@ -1153,10 +1160,13 @@ class ZUsageApplet extends Applet.Applet {
                 }
             }
 
-            this._addHistoryItems();
-
+            // Credits first, the collapsible history graphs below: the
+            // default (collapsed) view then always shows the plan and
+            // balance values without scrolling past graph headers.
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             this._addCreditItems();
+
+            this._addHistoryItems();
         } else if (this._authenticationRequired) {
             this._addStatusItem(AUTH_REQUIRED_TITLE, AUTH_REQUIRED_DESCRIPTION);
         } else {

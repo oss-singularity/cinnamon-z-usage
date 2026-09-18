@@ -16,6 +16,13 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- The collapsible history graphs sit below the plan and credits rows:
+  the default collapsed view always shows the plan, balance and
+  consumption values without scrolling past graph headers.
+- Hovering a partially visible section header no longer auto-scrolls
+  the popup: items grab the key focus on hover, and revealing that
+  focus scrolled the content under a merely resting pointer. Only real
+  keyboard navigation reveals its focus now.
 - Every successful refresh confirms green: the auto-update's "Updating…"
   resolves to the green "Updated" state while the popup is open, not only
   the manual button click.
