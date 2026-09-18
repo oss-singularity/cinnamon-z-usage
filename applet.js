@@ -4154,17 +4154,16 @@ class ZUsageApplet extends Applet.Applet {
             ));
             // Trim to the last fully visible row: when the content
             // overflows, whatever row straddles the viewport bottom pokes
-            // out a few pixels above the footer and reads as a glitch
-            // (Claudiu: the collapsible headers should appear only once
-            // you scroll, not peek). Hiding a straddler up to 56px
-            // (a header/normal ring row) is worth the lost pixels; a tall
-            // straddler (an open leaf) keeps the peek - scrolling past
-            // mid-content is normal, and losing a large chunk of the
-            // viewport would not be. Measure at the width the width lock
-            // actually enforces (the popup's outer width): measuring at
-            // the narrower inner width wraps more text, overreports every
-            // row and left the boundary a few pixels too deep - the next
-            // row still peeked (Claudiu's screenshot).
+            // out above the footer and reads as a glitch. ANY straddler
+            // hides fully (Claudiu's explicit call - the collapsible
+            // areas appear only once you scroll); the earlier size cap
+            // kept tall straddlers (an open leaf) peeking their header
+            // corner. Measure at the width the width lock actually
+            // enforces (the popup's outer width), and shave a constant
+            // strip below the last full row: preferred heights drift a
+            // little per item against the real allocations (theme
+            // paddings), and the drift scales with the row count -
+            // measured 1px in the harness, ~16px on live data.
             if (viewport < contentNat + POPUP_VIEWPORT_PAD) {
                 let acc = 0;
                 const children = this.menu._content.actor.get_children ?
@@ -4172,18 +4171,7 @@ class ZUsageApplet extends Applet.Applet {
                 for (const child of children) {
                     const [, childNat] = child.get_preferred_height(outer);
                     if (acc + childNat > viewport) {
-                        const peek = viewport - acc;
-                        if (peek > 0 && peek <= 56) {
-                            // A constant shave, not a 2px nit: preferred
-                            // heights drift a little per item against the
-                            // real allocations (theme paddings), and the
-                            // drift scales with the number of rows -
-                            // measured 1px here, ~16px on Claudiu's live
-                            // data. A dozen px below the last full row
-                            // hides the next section reliably; the lost
-                            // strip is the row's own bottom padding.
-                            viewport = Math.max(200, acc - 20);
-                        }
+                        viewport = Math.max(200, acc - 20);
                         break;
                     }
                     acc += childNat;
