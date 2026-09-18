@@ -40,7 +40,6 @@ const ZCODE_PLAN_SOURCE = "zcode-plan";
 const ZAI_URL = "https://chat.z.ai/";
 const ZAI_USAGE_URL = "https://z.ai/manage-apikey/coding-plan/personal/usage";
 const ZAI_API_KEYS_URL = "https://z.ai/manage-apikey/apikey-list";
-const ZAI_DOCS_URL = "https://docs.z.ai/devpack/overview";
 const PANEL_FONT_SCALE = 0.95;
 const PANEL_LABEL_SCALE = 0.79;
 const ACTIVITY_TOOLTIP_DELAY_MS = 120;
@@ -2229,11 +2228,6 @@ class ZUsageApplet extends Applet.Applet {
             layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 8 }),
             x_expand: true
         });
-        const webRow = new St.Widget({
-            layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 8 }),
-            x_expand: true
-        });
-
         this._chatButton = this._createLaunchButton(
             _("Z.ai Chat"),
             { fileName: "chat-bubble.svg" },
@@ -2289,37 +2283,12 @@ class ZUsageApplet extends Applet.Applet {
             0
         );
         this._syncRefreshButtonState();
-        const zaiWebButton = this._createLaunchButton(
-            "Z.ai",
-            {
-                fileName: "web-browser-symbolic.svg",
-                symbolic: true,
-                compact: true,
-                transparent: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", ZAI_URL])
-        );
-        const docsButton = this._createLaunchButton(
-            _("Docs"),
-            {
-                fileName: "web-browser-symbolic.svg",
-                symbolic: true,
-                compact: true,
-                transparent: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", ZAI_DOCS_URL])
-        );
         launchRow.add_child(this._chatButton);
         launchRow.add_child(this._zcodeButton);
         utilityRow.add_child(this._refreshButton);
         utilityRow.add_child(this._usageButton);
-        webRow.add_child(zaiWebButton);
-        webRow.add_child(docsButton);
         column.add_child(launchRow);
         column.add_child(utilityRow);
-        column.add_child(webRow);
         item.addActor(actionFrame, { span: -1, expand: true });
         if (this.menu._footer) {
             this.menu._footer.add_child(item.actor);

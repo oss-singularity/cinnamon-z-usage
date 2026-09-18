@@ -365,10 +365,6 @@ msgstr ""
 msgid "Do not read or write history"
 msgstr ""
 
-#: applet.js
-msgid "Docs"
-msgstr ""
-
 #: usage-format.js
 #, javascript-format
 msgid "Elapsed: %s"

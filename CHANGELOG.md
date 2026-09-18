@@ -15,8 +15,8 @@
   the action footer are pinned outside the scroll view - the content scrolls
   beneath them, so title, rings and buttons stay visible in every scroll
   position. The popup never shows an empty chrome strip while scrolling.
-- The action grid (Z.ai Chat / Usage / Refresh now / API Keys / Z.ai / Docs)
-  is a pinned footer at the bottom of the popup: it lives outside the scroll
+- The action grid (Z.ai Chat / ZCode / Refresh now / Usage) is a pinned
+  footer at the bottom of the popup: it lives outside the scroll
   view, so the buttons stay visible and clickable while the quota and history
   content scrolls behind them. The former empty reserve at the popup bottom is
   gone — the footer occupies it.
