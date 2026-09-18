@@ -93,7 +93,6 @@ def main():
         "usage-format.js",
         "metadata.json",
         "settings-schema.json",
-        "path_settings.py",
         "notification_settings.py",
         "tests/assets/cinnamon-teal-background.svg",
     ]

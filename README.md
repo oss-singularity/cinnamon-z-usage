@@ -21,6 +21,28 @@
   <img src=".github/social-preview.png" alt="Z Usage Monitor — quota rings, plan buckets and activity chart" width="720">
 </p>
 
+| Full usage overview with the gradient plan pill                                                 | Every window at once, including Global Build's own 5h quota                                                    |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| ![Usage menu with plan buckets, credits and 24-hour histories](docs/screenshots/usage-menu.png) | ![Usage menu with all four quota rings and expanded plan sections](docs/screenshots/usage-menu-four-rings.png) |
+
+| Horizontal top bar with all plan windows                                  | 40 px vertical panel with all plan windows                                          |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| ![Z.ai plan windows in a horizontal top bar](docs/screenshots/topbar.png) | ![Z.ai plan windows in a 40 px vertical panel](docs/screenshots/vertical-panel.png) |
+
+| Top bar with the credits block                                                     | Vertical panel with the credits block                                                  |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| ![Z.ai credits block in a horizontal top bar](docs/screenshots/topbar-credits.png) | ![Z.ai credits block in a vertical panel](docs/screenshots/vertical-panel-credits.png) |
+
+<p align="center"><strong>Every active quota at a glance</strong></p>
+<p align="center">
+  <img src="docs/screenshots/panel-tooltip.png" width="338" alt="Panel hover summary listing every plan window with its remaining percentage">
+</p>
+<p align="center"><sub>Hovering the panel icon summarizes every plan window with its remaining quota.</sub></p>
+
+| General settings                                                                                  | Colors and thresholds                                                                        |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| ![General settings with quota sources and refresh options](docs/screenshots/settings-general.png) | ![Color settings with warning and critical thresholds](docs/screenshots/settings-colors.png) |
+
 ## Why you will love it
 
 - **Everything at a glance** — 5-hour and weekly quota windows as rings in the
@@ -54,11 +76,11 @@ file `~/.config/cinnamon-z-usage/api-key`.
 
 | Zone               | What you get                                                                                  |
 | ------------------ | --------------------------------------------------------------------------------------------- |
-| Header (pinned)    | Title, last-update stamp and the 5h / 7d quota rings                                          |
+| Header (pinned)    | Title, the gradient plan pill, the last-update stamp and the 5h / 7d quota rings              |
 | Usage limits       | Coding Plan 5h/7d plus ZCode Start Plan and Global Build sections, each with reset countdowns |
-| Recent consumption | 1h/4h/12h/24h observed consumption and a 24-hour activity chart                               |
-| Plan / Credits     | Plan level, remaining credits and observed credit consumption                                 |
-| Footer (pinned)    | Z.ai Chat, Usage dashboard, Refresh, API Keys, Z.ai and Docs                                  |
+| Credits            | Remaining credits plus the "Used:" line with 24h/12h/4h/1h consumption tokens                 |
+| Recent consumption | Per-plan 1h/4h/12h/Today summaries and the 24-hour activity charts                            |
+| Footer (pinned)    | Z.ai Chat, ZCode, Refresh now, Usage dashboard                                                |
 
 ## Links
 
