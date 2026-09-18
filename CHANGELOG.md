@@ -43,6 +43,13 @@
   like every other window; and the viewport trim measures rows at the
   width the lock actually enforces, so the next section hides fully
   below the fold instead of peeking a few pixels (Claudiu's screenshot).
+- The viewport fold snaps onto the real row boundary once the open
+  allocates: the pre-open trim guesses from preferred-height sums, whose
+  cumulative drift against the real allocations (a few px per row of
+  theme paddings) left the next section's corner peeking no matter the
+  shave constant. The snap runs before the first visible paint of the
+  open, shrinks only, and lands the fold exactly between two rows - no
+  sliver, no dead strip.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries
