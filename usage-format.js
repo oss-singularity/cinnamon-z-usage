@@ -147,10 +147,15 @@ function formatConsumedCredits(period) {
 
 // Compact magnitude display (buckets per Claudiu: <0.5k, <1k, 1k, 2k,
 // 3k ... nearest thousand) - keeps the credits line narrow while the raw
-// numbers wiggle every refresh.
-function formatCompactNumber(value) {
+// numbers wiggle every refresh. decimals=1 renders one decimal digit in
+// the k-range (109.3k).
+function formatCompactNumber(value, decimals = 0) {
     const numeric = Math.max(0, Math.round(Number(value)));
-    if (numeric >= 1000) return `${Math.round(numeric / 1000)}k`;
+    if (numeric >= 1000) {
+        const k = numeric / 1000;
+        const text = decimals > 0 ? k.toFixed(decimals) : String(Math.round(k));
+        return `${text}k`;
+    }
     if (numeric >= 500) return "<1k";
     if (numeric >= 1) return "<0.5k";
     return "0";
@@ -168,9 +173,9 @@ function markupBoldCompactToken(value) {
     return prefix + '<span weight="bold">' + digits + "</span>" + suffix;
 }
 
-function formatCompactConsumedCredits(period) {
+function formatCompactConsumedCredits(period, decimals = 0) {
     if (!period || !Number.isFinite(Number(period.consumed))) return "--";
-    return formatCompactNumber(period.consumed);
+    return formatCompactNumber(period.consumed, decimals);
 }
 
 function formatCreditConsumption(periods) {
@@ -188,7 +193,8 @@ function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
     const keys = ["24h", "12h", "4h", "1h"];
     return keys.map(key => {
         const period = italicPart === "periods" ? `<i>${key}</i>` : key;
-        const value = formatCompactConsumedCredits(periods && periods[key]);
+        const decimals = key === "24h" ? 1 : 0;
+        const value = formatCompactConsumedCredits(periods && periods[key], decimals);
         const consumed = italicPart === "credits"
             ? `<i>${value}</i>`
             : italicPart === "numbers"

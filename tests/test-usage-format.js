@@ -608,7 +608,7 @@ assertEqual(
         "4h": { consumed: 880, complete: true },
         "1h": { consumed: 120, complete: true }
     }, "periods"),
-    "<i>24h</i> 6k&#160;&#160;·&#160;&#160;<i>12h</i> 2k&#160;&#160;·&#160;&#160;<i>4h</i> <1k&#160;&#160;·&#160;&#160;<i>1h</i> <0.5k",
+    "<i>24h</i> 6.3k&#160;&#160;·&#160;&#160;<i>12h</i> 2k&#160;&#160;·&#160;&#160;<i>4h</i> <1k&#160;&#160;·&#160;&#160;<i>1h</i> <0.5k",
     "Period labels can be italicized in the credit consumption markup"
 );
 assertEqual(
@@ -618,7 +618,7 @@ assertEqual(
         "4h": { consumed: 880, complete: true },
         "1h": { consumed: 120, complete: true }
     }, "credits"),
-    "24h <i>6k</i>&#160;&#160;·&#160;&#160;12h <i>2k</i>&#160;&#160;·&#160;&#160;4h <i><1k</i>&#160;&#160;·&#160;&#160;1h <i><0.5k</i>",
+    "24h <i>6.3k</i>&#160;&#160;·&#160;&#160;12h <i>2k</i>&#160;&#160;·&#160;&#160;4h <i><1k</i>&#160;&#160;·&#160;&#160;1h <i><0.5k</i>",
     "Credit values can be italicized in the credit consumption markup"
 );
 assertEqual(
@@ -628,7 +628,7 @@ assertEqual(
         "4h": { consumed: 880, complete: true },
         "1h": { consumed: 120, complete: true }
     }, "numbers"),
-    "24h <span weight=\"bold\">6</span>k&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2</span>k&#160;&#160;·&#160;&#160;4h &lt;<span weight=\"bold\">1</span>k&#160;&#160;·&#160;&#160;1h &lt;<span weight=\"bold\">0.5</span>k",
+    "24h <span weight=\"bold\">6.3</span>k&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2</span>k&#160;&#160;·&#160;&#160;4h &lt;<span weight=\"bold\">1</span>k&#160;&#160;·&#160;&#160;1h &lt;<span weight=\"bold\">0.5</span>k",
     "Credit-only emphasis keeps periods and label unbolded"
 );
 assertEqual(
