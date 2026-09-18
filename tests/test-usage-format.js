@@ -572,6 +572,11 @@ assertEqual(
     "Missing fractional credit balance stays unavailable"
 );
 assertEqual(
+    UsageFormat.formatCreditNumber("115785.0"),
+    "115785",
+    "Whole credit balances drop the decimal tail"
+);
+assertEqual(
     UsageFormat.formatCreditConsumption({
         "24h": { consumed: 9, complete: true },
         "12h": { consumed: 4, complete: true },

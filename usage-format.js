@@ -468,7 +468,10 @@ function formatCreditNumber(value) {
     if (value === null || value === undefined || value === "") return _("unavailable");
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return String(value);
-    return numeric === 0 ? "0" : numeric.toFixed(1);
+    if (numeric === 0) return "0";
+    // Whole balances read cleaner without a forced ".0" tail; fractional
+    // balances keep one decimal place.
+    return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
 }
 
 function parseUsageHelperError(value) {
