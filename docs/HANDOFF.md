@@ -505,6 +505,22 @@ Footer = [Z.ai Chat][ZCode] / [Refresh now][Usage]. Live verifiziert
 (Action-Column-Traversal: 2 Reihen), `make check` grün (Translations
 regeneriert, CHANGELOG-Footer-Zeile korrigiert).
 
+## 3k. NACHTRAG 2 (2026-09-18 Nacht, Credits-Dezimalstelle — c492ff8-Folge)
+
+### „Credits: 115785" statt „115785.0" — Dezimalstelle nur bei echten Brüchen
+
+`formatCreditNumber` gab per `toFixed(1)` immer eine Dezimalstelle aus.
+Jetzt: ganzzahlige Balances ohne „.0"-Ende (`Number.isInteger` →
+String), Brüche behalten eine Stelle („239.1"). Test ergänzt. Live
+verifiziert: „Credits: 112153" ohne Tail.
+
+### Einordnung „Applet verschoben" (Claudius Beobachtung während der
+
+Remote-Tests): Das Applet/Panel-Icon wurde nie verschoben — remote
+geöffnete und neu gebaute Popups variierten in der HÖHE (alte Clamp-
+Zustände, gekappte Footer-Reihen). Der Chrome-Padding- und Bottom-
+Reserve-Fix macht die Popup-Geometrie jetzt deterministisch.
+
 ## 4. Debug-Werkzeuge (erprobt)
 
 ### Isolierte Session (IMMER für Animation-/Layout-Analyse nutzen)
