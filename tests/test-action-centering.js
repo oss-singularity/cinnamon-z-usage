@@ -362,3 +362,61 @@ print("Click-close: toggling closed never rebuilds (no fade-time transient).");
 
 
 
+
+// The refresh-rebuild reads a transient chart position mid-relayout and
+// would pin a wrong width onto the chart for a frame (the graph visibly
+// stretching to the right). A jump beyond the trust threshold waits for
+// a pass that measures the settled layout.
+{
+    const menuX = 1461;
+    const chart = {
+        width: 329,
+        x: menuX + 110,
+        is_finalized() { return false; },
+        get_transformed_position() { return [this.x, 0]; },
+        get_theme_node() { return { get_padding() { return 39; } }; },
+        set_width(width) { this.width = width; }
+    };
+    const applet = Object.create(AppletClass.prototype);
+    applet.menu = {
+        actor: {
+            is_finalized() { return false; },
+            get_transformed_position() { return [menuX, 0]; },
+            get_transformed_size() { return [419, 0]; }
+        },
+        isOpen: true
+    };
+    Object.assign(applet, {
+        _actionWidthFrame: {
+            is_finalized() { return false; },
+            get_transformed_position() { return [menuX + 48, 0]; },
+            get_transformed_size() { return [352, 0]; }
+        },
+        _countdownWidgets: [],
+        _lastChartWidths: [329],
+        _activityCharts: [{ chart }]
+    });
+    const right = menuX + 400;
+
+    // Settled: the chart width equals the row-to-edge distance.
+    applet._syncContentRightEdges();
+    if (chart.width !== 329) {
+        throw new Error(`settled chart width wrong: ${chart.width}`);
+    }
+
+    // A mid-relayout pass reads the chart 200px off: the huge width jump
+    // is skipped, the last good width is kept.
+    chart.x = menuX + 310;
+    applet._syncContentRightEdges();
+    if (chart.width !== 329) {
+        throw new Error(`transient chart read was pinned: ${chart.width}`);
+    }
+
+    // The settled pass restores the measurement baseline.
+    chart.x = menuX + 110;
+    applet._syncContentRightEdges();
+    if (chart.width !== 329) {
+        throw new Error(`recovery failed: ${chart.width}`);
+    }
+}
+print("Chart width trust: transient reads never pin a wrong width.");

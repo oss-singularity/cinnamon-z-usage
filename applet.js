@@ -63,6 +63,9 @@ const POPUP_RELATIVE_ANCHOR_TOLERANCE = 24;
 // Ring corrections beyond this size need two agreeing passes before they
 // are applied: honest layout changes repeat, stale reads do not.
 const POPUP_RING_DELTA_TRUST = 32;
+// Chart widths are stable by design (row edge to grid edge); corrections
+// beyond this size between passes are transient reads and get skipped.
+const CHART_WIDTH_DELTA_TRUST = 64;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
@@ -725,6 +728,18 @@ class ZUsageApplet extends Applet.Applet {
             // Charts span from their row to the grid edge; anything wider is
             // a stale read (mid-scroll or mid-relayout), never a real width.
             if (width > chartLimit) return;
+            // A settled layout keeps every chart at a constant width, so a
+            // large jump between passes is a transient read (mid-rebuild the
+            // chart's transformed x drifts). Pinning that width made the
+            // graph visibly stretch for a frame. Wait for a pass that
+            // measures the settled geometry.
+            const last = (this._lastChartWidths || [])[index];
+            if (
+                typeof last === "number" &&
+                Math.abs(width - last) > CHART_WIDTH_DELTA_TRUST
+            ) {
+                return;
+            }
             if (!chart.min_width_set || chart.min_width !== width) {
                 this._forceActorWidth(chart, width);
                 this._lastChartWidths[index] = width;
