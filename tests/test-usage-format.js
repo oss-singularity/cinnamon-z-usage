@@ -653,8 +653,8 @@ assertEqual(
         { consumed: 13400, complete: true, observed: true },
         { consumed: 9600, complete: true, observed: true }
     ]),
-    "13k",
-    "Peak credit consumption uses compact magnitude tokens"
+    "13.4k",
+    "Peak credit consumption uses compact tokens with one decimal"
 );
 assertEqual(
     UsageFormat.formatPeakCredits([

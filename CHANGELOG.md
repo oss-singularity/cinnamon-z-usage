@@ -16,6 +16,15 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
+- The credits consumption line keeps its exact size across data refreshes:
+  the font fit no longer measures the action grid before the footer is
+  allocated (a mixed read that shrank the line ~34px short when the first
+  hour bar rendered and latched until the next refresh), and deferred fit
+  passes after every rebuild re-converge on the settled geometry.
+- Shrinking the refresh interval refreshes immediately when the data is
+  already older than the new interval instead of waiting another full
+  interval.
+- The activity chart's peak label renders one decimal ("7.2k AIC").
 - Hardened against a Cinnamon crash: the credits font-fit callbacks are
   destroy-aware, so queued fit passes after a rebuild can no longer touch
   disposed actors (a Gjs-CRITICAL storm that ended in a libmozjs

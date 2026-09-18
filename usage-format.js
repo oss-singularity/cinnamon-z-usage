@@ -384,7 +384,9 @@ function buildCreditActivityChart(values) {
 function formatPeakCredits(values) {
     const chart = buildCreditActivityChart(values);
     if (chart.knownCount === 0 || chart.peakPercent <= 0) return null;
-    return formatCompactConsumedCredits({ consumed: chart.peakPercent });
+    // One decimal on the k-range token ("7.2k AIC") - matches the credits
+    // balance and the 24h consumption look.
+    return formatCompactConsumedCredits({ consumed: chart.peakPercent }, 1);
 }
 
 function formatActivityBucketRange(

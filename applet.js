@@ -251,6 +251,7 @@ class ZUsageApplet extends Applet.Applet {
 
         this._destroyed = false;
         this._timeoutId = 0;
+        this._lastRefreshAt = 0;
         this._countdownTimeoutId = 0;
         this._countdownWidgets = [];
         this._resetExpiryBreathingLabels = [];
@@ -1187,18 +1188,30 @@ class ZUsageApplet extends Applet.Applet {
         // open; one queued sync can race ahead of the fresh actors' first
         // allocation and skip them. Re-queue on deferred passes so rings,
         // charts and the credits line always converge after a rebuild.
+        // The credits fit rides along on the deferred passes: its early
+        // passes can hit the pre-footer allocation window and need a
+        // settled second chance after the layout wave.
         if (typeof Mainloop !== "undefined") {
             this._queueActionEdgeSync();
             Mainloop.timeout_add(120, () => {
-                if (!this._destroyed) this._queueActionEdgeSync();
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
                 return GLib.SOURCE_REMOVE;
             });
             Mainloop.timeout_add(400, () => {
-                if (!this._destroyed) this._queueActionEdgeSync();
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
                 return GLib.SOURCE_REMOVE;
             });
             Mainloop.timeout_add(900, () => {
-                if (!this._destroyed) this._queueActionEdgeSync();
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
                 return GLib.SOURCE_REMOVE;
             });
         }
@@ -2785,16 +2798,24 @@ class ZUsageApplet extends Applet.Applet {
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return 0;
             const frame = this._actionWidthFrame;
+            // The fit must only run against the SETTLED footer geometry.
+            // During a rebuild's allocation wave the credits row allocates
+            // before the footer does (the scroll view is laid out first),
+            // and an unallocated action frame reports its width PROPERTY
+            // (352) at its unallocated position - a mixed read that shrank
+            // the target by ~44px and latched the font too small until the
+            // next refresh (the first-hour-bar video). Skip instead of
+            // guessing: the deferred refits own the correction.
             if (
                 !frame ||
                 frame.is_finalized() ||
+                !frame.allocation ||
+                !(frame.allocation.x2 > frame.allocation.x1) ||
                 !this.menu ||
                 !this.menu.actor ||
                 this.menu.actor.is_finalized()
             ) {
-                const rowSize = row.get_transformed_size();
-                const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
-                return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
+                return 0;
             }
             const [rowX] = row.get_transformed_position();
             const [gridX] = frame.get_transformed_position();
@@ -2903,7 +2924,8 @@ class ZUsageApplet extends Applet.Applet {
                 }
             },
             isConverged: () => converged,
-            getFontSize: () => lastFont
+            getFontSize: () => lastFont,
+            refit: () => fit()
         };
     }
 
@@ -3736,6 +3758,16 @@ class ZUsageApplet extends Applet.Applet {
             this._timeoutId = 0;
         }
         const minutes = Math.max(1, Number(this.refreshInterval) || 3);
+        // Shrinking the interval (3 -> 1 min) while the data is already
+        // older than the new value must not wait another full interval:
+        // the overdue refresh runs immediately, then the regular cadence
+        // takes over.
+        if (
+            this._lastRefreshAt > 0 &&
+            Date.now() - this._lastRefreshAt >= minutes * 60000
+        ) {
+            this._refreshUsage();
+        }
         this._timeoutId = Mainloop.timeout_add_seconds(minutes * 60, () => {
             this._refreshUsage();
             return GLib.SOURCE_CONTINUE;
@@ -3766,6 +3798,7 @@ class ZUsageApplet extends Applet.Applet {
             this._refreshQueued = true;
             return;
         }
+        this._lastRefreshAt = Date.now();
 
         const python = GLib.find_program_in_path("python3");
         const helper = this._usageHelperPath();
