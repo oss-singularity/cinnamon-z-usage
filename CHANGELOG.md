@@ -16,12 +16,12 @@
 - Chart widths change only when two sync passes agree (beyond 4px noise):
   a transient first read after a rebuild can no longer pin the graph a few
   pixels narrow for a frame.
-- Honest activity bar heights: every percent chart shares the tallest
-  peak in the popup and the minimum bar floor dropped from 8px to 3px -
-  Z.ai percentages are small (1-9%) with very different per-window
-  peaks, so per-chart normalization plus the high floor made a 1% bucket
-  look exactly like the 5% peak. Bars now scale comparably across
-  windows and stay distinguishable at the low end.
+- Honest activity bar heights: the minimum bar floor dropped from 8px
+  to 3px - Z.ai percentages are small (1-9%), and the 8px floor out of
+  a 26px range compressed every sub-30% bucket onto the same height (a
+  1% bucket looked exactly like the 5% peak). Each chart keeps its own
+  peak: a shared popup-wide peak let a mostly-used side plan (e.g. a
+  weekend build at 87%) squash every other chart's bars to minimum.
 - The popup viewport trims to the last fully visible row: a section
   header poking out a few pixels above the footer buttons reads as a
   glitch - collapsible areas now appear only when you actually scroll

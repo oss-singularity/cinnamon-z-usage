@@ -266,7 +266,6 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._activityPercentPeak = 0;
         this._creditsFit = null;
         this._lastCreditFontSize = null;
         this._closing = false;
@@ -1127,7 +1126,6 @@ class ZUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._activityPercentPeak = 0;
         this._creditsFit = null;
         this.menu.removeAll();
         if (this.menu._footer) {
@@ -3194,22 +3192,6 @@ class ZUsageApplet extends Applet.Applet {
 
         const visibleWindows = this._filterModelLimits(history.windows);
         if (visibleWindows.length === 0) return;
-        // One shared peak for every percent chart in the popup: Z.ai
-        // windows carry small percentages (1-9%) with very different
-        // per-window peaks, and per-chart normalization made a 1% bar in
-        // a 2%-peak window tower like a 5% bar in a 9%-peak window. All
-        // percent bars share the tallest peak so their heights compare
-        // honestly; the AIC chart keeps its own absolute-unit scale.
-        let percentPeak = 0;
-        for (const window of visibleWindows) {
-            for (const value of window.activity24h || []) {
-                const pct = value && Number(value.consumedPercent);
-                if (value && value.observed !== false && Number.isFinite(pct)) {
-                    percentPeak = Math.max(percentPeak, pct);
-                }
-            }
-        }
-        this._activityPercentPeak = percentPeak;
         const creditActivityValues = UsageFormat.hasRecentActivity(
             history.creditActivity24h,
             "consumed"
@@ -3520,11 +3502,8 @@ class ZUsageApplet extends Applet.Applet {
                 Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0;
             const creditHasVisibleBar = creditBar && creditBar.known &&
                 Number.isFinite(creditBar.consumedPercent) && creditBar.consumedPercent > 0;
-            const quotaScalePeak = this._activityPercentPeak > model.peakPercent
-                ? this._activityPercentPeak
-                : model.peakPercent;
             const quotaHeight = quotaHasVisibleBar
-                ? UsageFormat.activityBarHeight(bar, quotaScalePeak)
+                ? UsageFormat.activityBarHeight(bar, model.peakPercent)
                 : 0;
             const creditHeight = creditHasVisibleBar
                 ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
@@ -3569,7 +3548,7 @@ class ZUsageApplet extends Applet.Applet {
                 hasCreditModel ? creditModel.peakPercent : 0,
                 true
             );
-            addBar(bar, quotaScalePeak, false);
+            addBar(bar, model.peakPercent, false);
             slot.set_child(bars);
             const tooltipLines = [];
             if (bar && bar.known) {
