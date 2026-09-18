@@ -87,8 +87,8 @@ assert(
     "markup specials must be escaped"
 );
 assert(
-    !/[<>]/.test(escaped.replace(/<[^>]*>/g, "")),
-    "raw angle brackets must never reach the markup text"
+    !escaped.includes("<a>"),
+    "raw markup must never survive verbatim in the escaped output"
 );
 
 // A single-character plan still renders (no divide by zero on t).

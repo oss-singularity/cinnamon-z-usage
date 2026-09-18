@@ -435,7 +435,7 @@ class ZUsageApplet extends Applet.Applet {
     }
 
     _setDefaults() {
-        this.refreshInterval = 3;
+        this.refreshInterval = 1;
         this.activityBucketMinutes = "60";
         this.apiKey = "";
         this.showPanelIcon = true;
@@ -1764,6 +1764,9 @@ class ZUsageApplet extends Applet.Applet {
             item.actor.style = `padding-right: ${POPUP_RIGHT_INSET}px;`;
             item.actor.label_actor = label;
         }
+        // Marks the fold rule: a heading alone at the viewport fold reads
+        // as a broken chart end - the snap tucks the fold above it.
+        item.actor._usageSectionHeading = true;
         menu.addMenuItem(item);
         return item;
     }
@@ -2934,6 +2937,7 @@ class ZUsageApplet extends Applet.Applet {
         });
         label.style = POPUP_HEADING_STYLE;
         item.addActor(label, { expand: true, span: -1 });
+        item.actor._usageSectionHeading = true;
         menu.addMenuItem(item);
         return item;
     }
@@ -3811,14 +3815,17 @@ class ZUsageApplet extends Applet.Applet {
         for (let index = 0; index < barCount; index++) {
             const bar = model.bars[index] || null;
             const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
+            // Known zero buckets keep their smallest-height stub (the gray
+            // rounded-zero bar below): an all-zero window otherwise renders
+            // an empty plot - caption and axis labels with no bars between
+            // them read as a broken chart (Claudiu's first-open report).
+            // Unknown buckets (beyond the data range) stay invisible.
             const quotaVisible = Boolean(
-                bar && bar.known &&
-                Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0
+                bar && bar.known && Number.isFinite(bar.consumedPercent)
             );
             const creditVisible = Boolean(
                 creditBar && creditBar.known &&
-                Number.isFinite(creditBar.consumedPercent) &&
-                creditBar.consumedPercent > 0
+                Number.isFinite(creditBar.consumedPercent)
             );
             slotHeights.push([
                 quotaVisible
@@ -4111,7 +4118,7 @@ class ZUsageApplet extends Applet.Applet {
             Mainloop.source_remove(this._timeoutId);
             this._timeoutId = 0;
         }
-        const minutes = Math.max(1, Number(this.refreshInterval) || 3);
+        const minutes = Math.max(1, Number(this.refreshInterval) || 1);
         // Shrinking the interval (3 -> 1 min) while the data is already
         // older than the new value must not wait another full interval:
         // the overdue refresh runs immediately, then the regular cadence
@@ -4546,6 +4553,7 @@ class ZUsageApplet extends Applet.Applet {
         // the minimum that way). Only skips ABOVE the measured frontier
         // matter - below it, a zero height cannot move the fold.
         const zeroTops = [];
+        const orderedRows = [];
         if (content.get_children) {
             for (const child of content.get_children()) {
                 if (!child || (child.is_finalized && child.is_finalized())) continue;
@@ -4565,6 +4573,7 @@ class ZUsageApplet extends Applet.Applet {
                     crossingTop = relTop;
                     break;
                 }
+                orderedRows.push({ actor: child, relTop });
                 // Transforms are not guaranteed monotonic (stale actors);
                 // the content end is the deepest bottom, not the last one.
                 if (lastBottom === null || relBottom > lastBottom) {
@@ -4575,6 +4584,19 @@ class ZUsageApplet extends Applet.Applet {
         let target = null;
         let pending = false;
         if (Number.isFinite(crossingTop)) {
+            // A section heading alone at the fold reads as a broken chart
+            // end: the heading stays visible while its whole section body
+            // hides below the fold (Claudiu's first-open report). Tuck the
+            // fold above the heading run instead, so the section hides
+            // completely and the fold lands under the previous section.
+            let index = orderedRows.length;
+            while (
+                index > 0 &&
+                orderedRows[index - 1].actor._usageSectionHeading
+            ) {
+                index -= 1;
+            }
+            if (index < orderedRows.length) crossingTop = orderedRows[index].relTop;
             target = crossingTop;
         } else if (Number.isFinite(lastBottom)) {
             // The content box's natural height is stable from the start

@@ -2,6 +2,18 @@
 
 ## Unreleased — 1.0.0 (planned)
 
+- All-zero windows render their chart completely: known zero buckets keep
+  their smallest-height gray stub instead of collapsing to nothing, so the
+  end of the popup no longer shows a caption and axis labels around an
+  empty plot (which read as a broken graph on the first open). Buckets
+  beyond the data range stay invisible.
+- The viewport fold never strands a section heading: a heading alone at
+  the fold with its whole section body below it looked like a cut-off
+  graph. The fold now tucks above the heading run, hiding the section
+  completely - collapsible areas still appear only when you scroll.
+- The initial refresh interval defaults to 1 minute (was 3): fresh setups
+  see live data right away; existing installations keep their chosen
+  value.
 - The plan pill's first letter keeps its gradient color: the label's own
   foreground won over the markup's first span at glyph 0, leaving the "P"
   white while every later letter took its blue-to-green ramp. An invisible
