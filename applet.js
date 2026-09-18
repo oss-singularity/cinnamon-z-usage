@@ -4047,10 +4047,15 @@ class ZUsageApplet extends Applet.Applet {
         const inner = this._menuInnerWidth(outer);
         // Pinned chrome naturals: header on top, footer at the bottom, both
         // outside the scroll view.
+        // The chrome naturals from the preferred heights miss the theme
+        // padding of the PopupBaseMenuItems (~16px per item). Without the
+        // padding the reserved chrome is too small and the pinned footer
+        // overflows the popup bottom, pushing the button rows below the
+        // screen edge.
         const headerNat = this.menu._header ?
-            this.menu._header.get_preferred_height(inner)[1] : 0;
+            this.menu._header.get_preferred_height(inner)[1] + 16 : 0;
         const footerNat = this.menu._footer ?
-            this.menu._footer.get_preferred_height(inner)[1] : 0;
+            this.menu._footer.get_preferred_height(inner)[1] + 16 : 0;
 
         // The content's natural height at the real inner width (children are
         // freshly built by the rebuild, so this is the true laid-out size).
@@ -4066,7 +4071,11 @@ class ZUsageApplet extends Applet.Applet {
         // PanelLoc.bottom = 1), so a too-tall popup bottom-clamps to the
         // monitor and its header hides under the top panel.
         let topReserve = 16;
-        let bottomReserve = 0;
+        // Without a bottom panel nothing reserved the monitor's bottom
+        // edge: the popup was allowed to end flush at the screen bottom
+        // (or below it, depending on the icon anchor), pushing the pinned
+        // button rows out of view. Always keep a small bottom safety.
+        let bottomReserve = 16;
         try {
             const panels = typeof Main.panelManager.getPanelsInMonitor === "function"
                 ? Main.panelManager.getPanelsInMonitor(monitor.index)
