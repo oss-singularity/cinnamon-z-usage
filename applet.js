@@ -2931,14 +2931,15 @@ class ZUsageApplet extends Applet.Applet {
                 applyFontSize(fontSize);
                 // Trim both ways: the ratio estimate carries the fixed
                 // paddings only approximately, so walk the last pixels
-                // until the line ends exactly at the grid anchor. The
-                // markup suffix label paints wider than its preferred
-                // width (nbsp entities + bold spans, ~20-40px): fitting
-                // preferred-to-target left the LAST label's sub-allocation
-                // short and its ellipsize ate the "1h" tail ("1h ..." on
-                // Claudiu's live data). Reserve the slop so the allocated
-                // line fits too, not just the preferred one.
-                const paintSlop = 20;
+                // until the line ends exactly at the row's right edge.
+                // The markup suffix label paints slightly wider than its
+                // preferred width (nbsp entities + bold spans) - reserve a
+                // small slop so the allocated line fits too. The old 20px
+                // reserve dated from a wider-painting markup: today's
+                // excess measures ~0-3px, and the leftover slop stayed as
+                // a visible gap before the row edge (Claudiu's "too far
+                // left" line end).
+                const paintSlop = 6;
                 while (
                     fontSize > CREDIT_CONSUMPTION_MIN_FONT_SIZE &&
                     preferredWidth(row) > targetWidth - paintSlop
@@ -4202,6 +4203,14 @@ class ZUsageApplet extends Applet.Applet {
             this._popupViewport = viewport;
             this._popupFrameHeight = headerNat + viewport + footerNat + 2;
             this._popupChromeHeights = [headerNat, footerNat];
+            // The monitor-budget viewport without the preferred-based trim:
+            // the post-open fold snap replays this limit against the REAL
+            // row geometry (preferred sums drift per row against the real
+            // allocations, in both directions).
+            this._popupMonitorViewport = Math.max(
+                200,
+                maxMenu - headerNat - footerNat - 2
+            );
             this._popupFoldSnapped = false;
         }
         this.menu._scroll.set_height(this._popupViewport);
@@ -4213,15 +4222,20 @@ class ZUsageApplet extends Applet.Applet {
     _snapViewportFoldToRows() {
         // The pre-open trim guesses the fold from preferred-height sums,
         // which drift a few px per row against the real allocations (theme
-        // paddings) - enough to leave a sliver of the next row peeking
-        // above the footer. With the popup now allocated, snap the fold
-        // exactly onto the straddling row's real top, before the first
-        // visible paint of the open. Shrinks only: a fold that already
-        // sits between rows needs no correction. Returns false while the
-        // geometry is not measurable yet so the caller can retry on the
-        // next frame.
+        // paddings) - in BOTH directions: a drifted fold either cut into
+        // the next row (the peeking corner) or sat above a row that still
+        // fit the monitor budget (the 7d graph vanishing below the fold).
+        // With the popup now allocated, replay the budget against the REAL
+        // geometry: every row that fits the monitor budget stays visible,
+        // the first row that does not hides fully, and the fold lands
+        // exactly on that boundary. Runs once per open before the first
+        // visible paint, so growing and shrinking are both invisible.
+        // Returns false while the geometry is not measurable yet so the
+        // caller can retry on the next frame.
         if (this._popupFoldSnapped) return true;
         if (!this._popupFrameHeight || !this._popupViewport) return true;
+        if (!Number.isFinite(this._popupMonitorViewport) ||
+            !(this._popupMonitorViewport > 0)) return true;
         if (!this.menu || !this.menu.isOpen) return true;
         if (!this._popupChromeHeights) return true;
         const scroll = this.menu._scroll;
@@ -4232,28 +4246,40 @@ class ZUsageApplet extends Applet.Applet {
         if (!Number.isFinite(scrollY) || !Number.isFinite(scrollH) || scrollH <= 0) {
             return false;
         }
-        const fold = scrollY + scrollH;
-        let straddlerTop = null;
+        const monitorLimit = this._popupMonitorViewport;
+        let crossingTop = null;
+        let lastBottom = null;
         if (content.get_children) {
             for (const child of content.get_children()) {
                 if (!child || (child.is_finalized && child.is_finalized())) continue;
                 const [, y] = child.get_transformed_position();
                 const [, h] = child.get_transformed_size();
                 if (!Number.isFinite(y) || !Number.isFinite(h) || h <= 0) continue;
-                if (y < fold - 0.5 && y + h > fold + 0.5) {
-                    straddlerTop = y - scrollY;
+                const relTop = y - scrollY;
+                const relBottom = relTop + h;
+                if (relBottom > monitorLimit + 0.5) {
+                    crossingTop = relTop;
                     break;
                 }
+                lastBottom = relBottom;
             }
         }
         this._popupFoldSnapped = true;
-        if (!Number.isFinite(straddlerTop)) return true;
-        const viewport = Math.max(200, Math.round(straddlerTop));
-        if (viewport >= this._popupViewport) return true;
-        this._popupViewport = viewport;
+        let target = null;
+        if (Number.isFinite(crossingTop)) {
+            target = crossingTop;
+        } else if (Number.isFinite(lastBottom)) {
+            // Everything fits the monitor budget: the fold is the real
+            // content end (the preferred sums over- or under-reported it).
+            target = lastBottom;
+        }
+        if (target === null) return true;
+        target = Math.max(200, Math.round(target));
+        if (Math.abs(target - this._popupViewport) < 1) return true;
+        this._popupViewport = target;
         this._popupFrameHeight = this._popupChromeHeights[0]
-            + viewport + this._popupChromeHeights[1] + 2;
-        scroll.set_height(viewport);
+            + target + this._popupChromeHeights[1] + 2;
+        scroll.set_height(target);
         this.menu.actor.set_height(this._popupFrameHeight);
         return true;
     }

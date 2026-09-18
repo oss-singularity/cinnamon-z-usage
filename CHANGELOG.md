@@ -43,13 +43,20 @@
   like every other window; and the viewport trim measures rows at the
   width the lock actually enforces, so the next section hides fully
   below the fold instead of peeking a few pixels (Claudiu's screenshot).
-- The viewport fold snaps onto the real row boundary once the open
-  allocates: the pre-open trim guesses from preferred-height sums, whose
-  cumulative drift against the real allocations (a few px per row of
-  theme paddings) left the next section's corner peeking no matter the
-  shave constant. The snap runs before the first visible paint of the
-  open, shrinks only, and lands the fold exactly between two rows - no
-  sliver, no dead strip.
+- The viewport fold replays the monitor budget against the real row
+  geometry once the open allocates: the pre-open trim guesses from
+  preferred-height sums, whose cumulative drift against the real
+  allocations (a few px per row of theme paddings) either cut a corner
+  into the next row or hid a section that still fit the screen (the 7d
+  graph vanishing below the fold). The replay keeps every row that
+  fits, hides the first one that does not, and lands the fold exactly
+  between two rows before the first visible paint - no sliver, no dead
+  strip, no lost section.
+- The "Consumed:" line ends at the row's right edge again: the
+  anti-ellipsis slop shrank from 20px (sized for an older, wider
+  painting markup) to 6px - today's markup paints barely wider than its
+  preferred width, so the leftover slop had been reading as a visible
+  gap before the row edge.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries
