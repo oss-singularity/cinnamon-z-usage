@@ -51,12 +51,18 @@
   graph vanishing below the fold). The replay keeps every row that
   fits, hides the first one that does not, and lands the fold exactly
   between two rows before the first visible paint - no sliver, no dead
-  strip, no lost section.
-- The "Consumed:" line ends at the row's right edge again: the
-  anti-ellipsis slop shrank from 20px (sized for an older, wider
-  painting markup) to 6px - today's markup paints barely wider than its
-  preferred width, so the leftover slop had been reading as a visible
-  gap before the row edge.
+  strip, no lost section. Collapsible areas stay hidden until you
+  scroll: the fold also tucks below the first closed history leaf,
+  while open leaves count as normal content. The geometry walk skips
+  unmapped children with stale transforms (a closed leaf's inner box)
+  and tracks the deepest row bottom, so partially settled or collapsed
+  layouts cannot distort the fold.
+- The "Consumed:" line ends at the row's right edge without ever
+  ellipsizing its tail: the fit measures the value label's TRUE Pango
+  paint width (markup with non-breaking spaces paints wider than its
+  preferred width) instead of reserving a constant slop - too small a
+  slop cut the "1h" tail into "...", too large left a visible gap -
+  and the label never ellipsizes.
 - Compact consumption layout: the plan rides the header title line, the
   per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
   the duplicated 24h window total is gone (the chart caption carries

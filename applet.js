@@ -238,7 +238,7 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
                 // popup's layout pass produced measurable geometry; a
                 // MetaLater does not reliably honor SOURCE_CONTINUE, so
                 // re-arm it explicitly until the fold decision lands.
-                if (owner._snapViewportFoldToRows() || attempts >= 12) return;
+                if (owner._snapViewportFoldToRows(attempts) || attempts >= 12) return;
                 Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
             };
             Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
@@ -2847,6 +2847,29 @@ class ZUsageApplet extends Applet.Applet {
             );
         };
         const preferredWidth = actor => actor.get_preferred_width(-1)[1];
+        // The markup label paints wider than its preferred width reports
+        // (nbsp entities + bold spans): measure the real Pango layout so
+        // the fit targets the true paint, not an undershooting estimate.
+        // A constant slop can never serve both - too small and the tail
+        // ellipsizes, too large and the line ends short of the row edge.
+        const paintWidth = actor => {
+            if (actor.clutter_text && actor.clutter_text.get_layout) {
+                try {
+                    const layout = actor.clutter_text.get_layout();
+                    if (layout) {
+                        const extents = layout.get_pixel_extents();
+                        const logical = extents && extents[1];
+                        if (logical && Number.isFinite(logical.width) && logical.width > 0) {
+                            return Math.ceil(logical.width);
+                        }
+                    }
+                } catch { /* fall back to the preferred width */ }
+            }
+            return actor.get_preferred_width(-1)[1];
+        };
+        const rowNeedWidth = () => preferredWidth(labelActor) +
+            preferredWidth(valueLabel) + preferredWidth(separatorLabel) +
+            preferredWidth(expiresLabel) + paintWidth(expiryDateLabel);
         // The fit target is the button grid's right edge, measured from the
         // stable action frame - never from the activity plots: fresh plots
         // allocate at their natural geometry and only the edge sync pulls
@@ -2901,13 +2924,12 @@ class ZUsageApplet extends Applet.Applet {
                 applyFontSize(startFont);
                 const fixedWidth = preferredWidth(labelActor) +
                     preferredWidth(valueLabel) + preferredWidth(separatorLabel);
-                // The suffix width comes from the ALLOCATED labels when they
-                // exist: the markup label paints wider than its preferred
-                // width reports (nbsp entities + bold spans), and the
-                // preferred-based ratio undershot the font so the line end
-                // fell short of the anchor.
-                const suffixWidth = expiresLabel.get_width() +
-                    expiryDateLabel.get_width();
+                // The suffix width pairs the plain label's preferred width
+                // with the markup label's TRUE paint width - the ratio then
+                // lands the line end at the row edge, and the walk loops
+                // below finish the job against the same measurement.
+                const suffixWidth = preferredWidth(expiresLabel) +
+                    paintWidth(expiryDateLabel);
                 const targetWidth = availableWidth();
                 // An unpositioned or mid-teardown menu reports no usable
                 // target; fitting against it would clamp to the minimum.
@@ -2929,20 +2951,15 @@ class ZUsageApplet extends Applet.Applet {
                     )
                 );
                 applyFontSize(fontSize);
-                // Trim both ways: the ratio estimate carries the fixed
-                // paddings only approximately, so walk the last pixels
-                // until the line ends exactly at the row's right edge.
-                // The markup suffix label paints slightly wider than its
-                // preferred width (nbsp entities + bold spans) - reserve a
-                // small slop so the allocated line fits too. The old 20px
-                // reserve dated from a wider-painting markup: today's
-                // excess measures ~0-3px, and the leftover slop stayed as
-                // a visible gap before the row edge (Claudiu's "too far
-                // left" line end).
-                const paintSlop = 6;
+                // Trim both ways against the TRUE paint width: the ratio
+                // estimate carries the fixed paddings only approximately,
+                // so walk the last pixels until the line ends exactly at
+                // the row's right edge. The small slop only covers layout
+                // lag between a font step and the Pango measurement.
+                const paintSlop = 4;
                 while (
                     fontSize > CREDIT_CONSUMPTION_MIN_FONT_SIZE &&
-                    preferredWidth(row) > targetWidth - paintSlop
+                    rowNeedWidth() > targetWidth - paintSlop
                 ) {
                     fontSize = Math.max(
                         CREDIT_CONSUMPTION_MIN_FONT_SIZE,
@@ -2952,7 +2969,7 @@ class ZUsageApplet extends Applet.Applet {
                 }
                 while (
                     fontSize < CREDIT_CONSUMPTION_BASE_FONT_SIZE &&
-                    preferredWidth(row) < targetWidth - paintSlop - 1
+                    rowNeedWidth() < targetWidth - paintSlop - 1
                 ) {
                     fontSize = Math.min(
                         CREDIT_CONSUMPTION_BASE_FONT_SIZE,
@@ -3134,6 +3151,10 @@ class ZUsageApplet extends Applet.Applet {
                         .replace(/>/g, "&gt;")
                         .replace(/\x20{2}·\x20{2}/g, "&#160;&#160;·&#160;&#160;");
                 expiryDateLabel.clutter_text.set_markup(markup);
+                // The credit fit bounds the true paint to the row edge;
+                // never let a preferred-width allocation (or theme CSS)
+                // ellipsize the value tail ("1h ..." on live data).
+                expiryDateLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
             }
             if (suffixBreathing && suffixColor === RESET_EXPIRY_CRITICAL_COLOR) {
                 this._resetExpiryBreathingLabels.push(expiryDateLabel);
@@ -4219,7 +4240,7 @@ class ZUsageApplet extends Applet.Applet {
         this.menu.actor.set_height(this._popupFrameHeight);
     }
 
-    _snapViewportFoldToRows() {
+    _snapViewportFoldToRows(attempts = 1) {
         // The pre-open trim guesses the fold from preferred-height sums,
         // which drift a few px per row against the real allocations (theme
         // paddings) - in BOTH directions: a drifted fold either cut into
@@ -4249,29 +4270,97 @@ class ZUsageApplet extends Applet.Applet {
         const monitorLimit = this._popupMonitorViewport;
         let crossingTop = null;
         let lastBottom = null;
+        // Skipped children read as height 0 while their allocation is
+        // still pending: treating that pass as final mistook a partial
+        // walk for the whole content (a probe run collapsed the fold to
+        // the minimum that way). Only skips ABOVE the measured frontier
+        // matter - below it, a zero height cannot move the fold.
+        const zeroTops = [];
         if (content.get_children) {
             for (const child of content.get_children()) {
                 if (!child || (child.is_finalized && child.is_finalized())) continue;
+                // Unmapped children report stale transforms at the scroll
+                // origin (a closed leaf's inner box sits at the top with
+                // its last open height): they must not shape the fold.
+                if (child.mapped === false) continue;
                 const [, y] = child.get_transformed_position();
                 const [, h] = child.get_transformed_size();
-                if (!Number.isFinite(y) || !Number.isFinite(h) || h <= 0) continue;
+                if (!Number.isFinite(y) || !Number.isFinite(h) || h <= 0) {
+                    zeroTops.push(Number.isFinite(y) ? y - scrollY : null);
+                    continue;
+                }
                 const relTop = y - scrollY;
                 const relBottom = relTop + h;
                 if (relBottom > monitorLimit + 0.5) {
                     crossingTop = relTop;
                     break;
                 }
-                lastBottom = relBottom;
+                // Transforms are not guaranteed monotonic (stale actors);
+                // the content end is the deepest bottom, not the last one.
+                if (lastBottom === null || relBottom > lastBottom) {
+                    lastBottom = relBottom;
+                }
             }
         }
-        this._popupFoldSnapped = true;
         let target = null;
+        let pending = false;
         if (Number.isFinite(crossingTop)) {
             target = crossingTop;
         } else if (Number.isFinite(lastBottom)) {
-            // Everything fits the monitor budget: the fold is the real
-            // content end (the preferred sums over- or under-reported it).
-            target = lastBottom;
+            // The content box's natural height is stable from the start
+            // (preferred stack) while the children lag a frame or two:
+            // lastBottom well below it means rows are still settling. The
+            // box's ALLOCATED height is useless here - a short content
+            // expands to the locked viewport.
+            const contentNat = content.get_preferred_height(-1)[1];
+            if (!Number.isFinite(contentNat) || lastBottom < contentNat - 4) {
+                pending = true;
+            } else {
+                // Everything fits the monitor budget: the fold is the real
+                // content end (the preferred sums over- or under-reported
+                // it).
+                target = lastBottom;
+            }
+        } else {
+            pending = true;
+        }
+        // In the overflow case there is no content-height bound above the
+        // crossing: a not-yet allocated row there would seat the crossing
+        // too high. Only the first frames count - a permanently collapsed
+        // child must not block the snap forever.
+        if (Number.isFinite(crossingTop) && attempts <= 4) {
+            for (const zeroTop of zeroTops) {
+                if (zeroTop === null || zeroTop <= crossingTop + 0.5) {
+                    pending = true;
+                    break;
+                }
+            }
+        }
+        if (pending) return false;
+        this._popupFoldSnapped = true;
+        // Collapsible areas appear only when you scroll (Claudiu's rule):
+        // the default fold hides CLOSED leaf headers even when the monitor
+        // budget would still fit them. Open leaves count as normal
+        // content - their header and chart stay visible.
+        let leafLimit = null;
+        for (const entry of this._historySubmenus || []) {
+            const leaf = entry && entry.submenu;
+            if (!leaf || !leaf.actor) continue;
+            if (leaf.actor.is_finalized && leaf.actor.is_finalized()) continue;
+            if (!leaf.actor.mapped) continue;
+            if (leaf.menu && leaf.menu.isOpen) continue;
+            const [, leafY] = leaf.actor.get_transformed_position();
+            if (!Number.isFinite(leafY)) continue;
+            const relTop = leafY - scrollY;
+            if (leafLimit === null || relTop < leafLimit) leafLimit = relTop;
+        }
+        if (
+            target !== null &&
+            leafLimit !== null &&
+            leafLimit >= 200 &&
+            leafLimit < target
+        ) {
+            target = leafLimit;
         }
         if (target === null) return true;
         target = Math.max(200, Math.round(target));
