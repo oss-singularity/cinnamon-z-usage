@@ -7,11 +7,5 @@
   "version": "1.0.1",
   "author": "OSS Singularity",
   "max-instances": 1,
-  "cinnamon-version": [
-    "5.8",
-    "6.0",
-    "6.2",
-    "6.4",
-    "6.6"
-  ]
+  "cinnamon-version": ["5.8", "6.0", "6.2", "6.4", "6.6"]
 }
