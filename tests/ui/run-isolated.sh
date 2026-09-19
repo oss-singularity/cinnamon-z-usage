@@ -190,7 +190,8 @@ export XDG_CONFIG_HOME="$private_config"
 export XDG_DATA_HOME="$private_data"
 export XDG_CACHE_HOME="$private_cache"
 export XDG_STATE_HOME="$private_home/.local/state"
-export CODEX_HOME="$private_home/.codex"
+# No fake Codex home needed: the Z applet runs its demo fixture without
+# account-backed requests.
 export XDG_RUNTIME_DIR="$private_runtime"
 export DCONF_PROFILE="$private_dconf_profile"
 export GSETTINGS_BACKEND=dconf

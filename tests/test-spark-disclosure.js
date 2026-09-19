@@ -14,7 +14,7 @@ new Function("module", "imports", read("usage-format.js"))(localModule, imports)
 const Clutter = { KEY_Left: 1, KEY_Right: 2 };
 const Atk = { StateType: { EXPANDABLE: 1, EXPANDED: 2 } };
 const AppletClass = new Function("imports", "require",
-    `${read("applet.js")}\nreturn ChatGptUsageApplet;`
+    `${read("applet.js")}\nreturn ZUsageApplet;`
 )(
     {
         gettext: imports.gettext, format: imports.format, ui: {
@@ -37,7 +37,7 @@ Object.assign(applet, {
     menu: { isOpen: false, removeAll() {}, addMenuItem() {} },
     _historySubmenus: [],
     _limitSections: [],
-    _snapshot: { limits: [{ id: "spark", label: "GPT-5.3-Codex-Spark",
+    _snapshot: { limits: [{ id: "spark", label: "Start Plan · GLM-5.3",
         windows: [{ usedPercent: 0 }, { usedPercent: 0 }] }] },
     _addIconHeading() {
         const states = new Set();
@@ -59,13 +59,13 @@ for (const method of ["_stopResetExpiryBreathing", "_stopRefreshSpinner",
 
 applet._rebuildMenu();
 let section = applet._limitSections[0];
-const sparkRing = { limitId: "spark", limitLabel: "GPT-5.3-Codex-Spark" };
+const sparkRing = { limitId: "spark", limitLabel: "Start Plan · GLM-5.3" };
 assert(applet._quotaRingOpacity(sparkRing) === 128,
-    "Unused Spark header rings must be muted");
-assert(applet._quotaRingOpacity({ limitId: "codex" }) === 255,
-    "Codex header rings must retain their normal opacity");
+    "Unused secondary plan rings must be muted");
+assert(applet._quotaRingOpacity({ limitId: "zai" }) === 255,
+    "Z.ai header rings must retain their normal opacity");
 assert(!section.expanded && section.rows.every(row => !row.actor.visible),
-    "Unused Spark must start collapsed with both rows hidden");
+    "Unused secondary plan must start collapsed with both rows hidden");
 assert(section.heading.states.has(Atk.StateType.EXPANDABLE),
     "Assistive technology must recognize the disclosure");
 applet.menu.isOpen = true;

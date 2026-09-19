@@ -23,7 +23,8 @@
       "keys": [
         "refresh-interval",
         "activity-bucket-minutes",
-        "installation-paths"
+        "api-key",
+        "api-keys-page-button"
       ]
     },
     "display-section": {
@@ -33,8 +34,9 @@
         "show-panel-icon",
         "show-window-labels",
         "show-model-specific-limits",
+        "show-zcode-plan-quotas",
+        "expand-zcode-plan-sections",
         "show-model-limits-in-panel",
-        "show-credits-in-panel",
         "show-weekly-with-five-hour",
         "font-size",
         "separator"
@@ -79,7 +81,7 @@
   },
   "refresh-interval": {
     "type": "spinbutton",
-    "default": 3,
+    "default": 1,
     "min": 1,
     "max": 60,
     "step": 1,
@@ -95,17 +97,19 @@
       "2 hours": "120"
     }
   },
-  "codex-path": {
-    "type": "entry",
+  "api-key": {
+    "type": "custom",
+    "file": "api_key_settings.py",
+    "widget": "ApiKeyEntryWidget",
     "default": "",
-    "description": "codex-cli path (optional)",
-    "tooltip": "Leave empty to find Codex CLI or the ChatGPT app's bundled backend automatically. Set an executable path only to override detection. Example: /home/user/.local/bin/codex"
+    "description": "Z.ai API key (optional)",
+    "tooltip": "Leave empty for automatic detection: the applet reuses the Coding Plan API key of the signed-in ZCode app, then falls back to the ZAI_API_KEY environment variable and the ~/.config/cinnamon-z-usage/api-key file."
   },
-  "chatgpt-app-path": {
-    "type": "entry",
-    "default": "",
-    "description": "ChatGPT path (optional)",
-    "tooltip": "Leave empty for automatic detection. Otherwise enter the ChatGPT executable path, such as ~/Applications/ChatGPT/chatgpt, without quotes or arguments. Used to launch the app and find its bundled backend when no Codex CLI is installed. An explicit Codex backend path takes priority."
+  "api-keys-page-button": {
+    "type": "button",
+    "description": "Open the Z.ai API keys page",
+    "callback": "on_open_api_keys_page_pressed",
+    "tooltip": "Opens the Z.ai API key management page in your browser."
   },
   "show-panel-icon": {
     "type": "switch",
@@ -129,11 +133,18 @@
     "dependency": "show-model-specific-limits",
     "description": "Show model-specific limits in the panel"
   },
-  "show-credits-in-panel": {
+  "show-zcode-plan-quotas": {
     "type": "switch",
-    "default": false,
-    "description": "Show credits in the panel",
-    "tooltip": "Show the available AIC credit balance as an additional compact panel value."
+    "default": true,
+    "description": "Show ZCode plan quotas",
+    "tooltip": "Show the collapsible ZCode Start Plan and Global Build token buckets next to the coding plan limits. They are read from the signed-in ZCode app's billing balance endpoint."
+  },
+  "expand-zcode-plan-sections": {
+    "type": "switch",
+    "default": true,
+    "dependency": "show-zcode-plan-quotas",
+    "description": "Keep ZCode plan sections expanded",
+    "tooltip": "Open the ZCode plan sections by default whenever the popup is rebuilt. Manual collapsing still works per popup."
   },
   "show-weekly-with-five-hour": {
     "type": "switch",
@@ -151,7 +162,7 @@
   },
   "separator": {
     "type": "entry",
-    "default": "\u00b7",
+    "default": "·",
     "description": "Separator in horizontal panels",
     "tooltip": "Separators are hidden automatically in vertical panels."
   },
@@ -337,10 +348,5 @@
     "step": 1,
     "units": "%",
     "description": "7d critical at or below"
-  },
-  "installation-paths": {
-    "type": "custom",
-    "file": "path_settings.py",
-    "widget": "InstallationPaths"
   }
 }

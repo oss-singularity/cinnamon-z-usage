@@ -39,14 +39,14 @@ function assertClose(actual, expected, message, tolerance = 1e-9) {
 
 const summaries = UsageFormat.summarizeWindows([
     {
-        id: "codex",
-        label: "Codex",
+        id: "zai",
+        label: "Z.ai",
         windows: [
             { durationMinutes: 10080, remainingPercent: 87, resetsAt: 100 }
         ]
     },
     {
-        id: "codex_model",
+        id: "zai_model",
         label: "Model",
         windows: [
             { durationMinutes: 300, remainingPercent: 100, resetsAt: 200 },
@@ -62,8 +62,8 @@ assertEqual(summaries[1].remainingPercent, 87, "Most constrained weekly bucket")
 assertEqual(
     UsageFormat.summarizeWindows([
         {
-            id: "codex",
-            label: "Codex",
+            id: "zai",
+            label: "Z.ai",
             windows: [{ durationMinutes: 10080, remainingPercent: 87, lastResetAt: 123456 }]
         }
     ])[0].lastResetAt,
@@ -72,14 +72,14 @@ assertEqual(
 );
 const quotaWindows = UsageFormat.listQuotaWindows([
     {
-        id: "codex",
-        label: "Codex",
+        id: "zai",
+        label: "Z.ai",
         windows: [
             { durationMinutes: 10080, remainingPercent: 87, resetsAt: 100 }
         ]
     },
     {
-        id: "codex_model",
+        id: "zai_model",
         label: "Model",
         windows: [
             { durationMinutes: 10080, remainingPercent: 92, resetsAt: 300 },
@@ -89,8 +89,8 @@ const quotaWindows = UsageFormat.listQuotaWindows([
 ]);
 assertEqual(quotaWindows.length, 3, "Keep quota windows from every limit");
 assertEqual(quotaWindows[0].durationMinutes, 300, "Sort model windows shortest first");
-assertEqual(quotaWindows[1].limitId, "codex_model", "Keep duplicate durations");
-assertEqual(quotaWindows[2].limitId, "codex", "Place account limits after models");
+assertEqual(quotaWindows[1].limitId, "zai_model", "Keep duplicate durations");
+assertEqual(quotaWindows[2].limitId, "zai", "Place account limits after models");
 assertEqual(
     UsageFormat.selectPanelWindows(summaries, false).length,
     1,
@@ -208,6 +208,9 @@ assertClose(
     "Reset progress starts near empty and fills toward reset"
 );
 
+// Z.ai resets are fixed calendar times: a 100%-remaining window still
+// counts down toward its resetsAt (the old full-duration display was an
+// OpenAI-ism whose resetsAt only appears with first usage).
 const unusedFiveHourCountdown = UsageFormat.buildResetCountdown(
     {
         durationMinutes: 300,
@@ -218,13 +221,13 @@ const unusedFiveHourCountdown = UsageFormat.buildResetCountdown(
 );
 assertEqual(
     unusedFiveHourCountdown.label,
-    "5h",
-    "Unused five-hour cycle keeps its full duration"
+    "4h\n59m",
+    "Unused five-hour cycle counts toward its fixed reset"
 );
-assertEqual(
+assertClose(
     unusedFiveHourCountdown.fractionElapsed,
-    0,
-    "Unused five-hour cycle has no reset progress"
+    2 / (5 * 3600),
+    "Unused five-hour cycle shows elapsed window time"
 );
 assertEqual(
     UsageFormat.formatResetCountdownTooltip(
@@ -235,7 +238,7 @@ assertEqual(
         },
         1002
     ),
-    "Reset window: 5h\nElapsed: 0%\nRemaining: 5h",
+    "Reset window: 5h\nElapsed: 0%\nRemaining: 4h 59m",
     "Unused five-hour reset tooltip"
 );
 
@@ -249,13 +252,13 @@ const unusedWeeklyCountdown = UsageFormat.buildResetCountdown(
 );
 assertEqual(
     unusedWeeklyCountdown.label,
-    "7d",
-    "Unused weekly cycle keeps its full duration"
+    "6d\n23h",
+    "Unused weekly cycle counts toward its fixed reset"
 );
-assertEqual(
+assertClose(
     unusedWeeklyCountdown.fractionElapsed,
-    0,
-    "Unused weekly cycle has no reset progress"
+    2 / (7 * 86400),
+    "Unused weekly cycle shows elapsed window time"
 );
 
 assertEqual(
@@ -308,20 +311,21 @@ assertEqual(
 const exactLastResetTooltip = UsageFormat.formatLastResetTooltip(
     { durationMinutes: 10080 },
     1700000000,
-    true,
-    false
+    true
 );
 if (!exactLastResetTooltip.startsWith("Last 7d reset: ") || /estimated/.test(exactLastResetTooltip)) {
     throw new Error(`Expected exact last-reset tooltip, got ${exactLastResetTooltip}`);
 }
-const estimatedLastResetTooltip = UsageFormat.formatLastResetTooltip(
+if (!/ · \d+[smhd] ago$/.test(exactLastResetTooltip)) {
+    throw new Error(`Expected human-readable ago suffix, got ${exactLastResetTooltip}`);
+}
+const exactRecentResetTooltip = UsageFormat.formatLastResetTooltip(
     { durationMinutes: 10080 },
-    1700000000,
-    true,
+    GLib.get_real_time() / 1000000 - 90,
     true
 );
-if (!estimatedLastResetTooltip.includes("(estimated from next reset)")) {
-    throw new Error(`Expected estimated last-reset tooltip, got ${estimatedLastResetTooltip}`);
+if (!exactRecentResetTooltip.includes("1m ago") && !exactRecentResetTooltip.includes("90s ago")) {
+    throw new Error(`Expected a fresh relative suffix, got ${exactRecentResetTooltip}`);
 }
 assertEqual(
     UsageFormat.formatLastResetTooltip({ durationMinutes: 10080 }, null),
@@ -359,12 +363,12 @@ assertEqual(chart.bars[3].intensity, 7, "Peak activity intensity");
 const unevenChart = UsageFormat.buildActivityChart([1, 2, 14]);
 assertEqual(
     UsageFormat.activityBarHeight(unevenChart.bars[0], unevenChart.peakPercent),
-    9,
+    6,
     "One-percent activity keeps a distinct bar height"
 );
 assertEqual(
     UsageFormat.activityBarHeight(unevenChart.bars[1], unevenChart.peakPercent),
-    11,
+    16,
     "Two-percent activity keeps a distinct bar height"
 );
 assertEqual(
@@ -377,6 +381,19 @@ assertEqual(
     UsageFormat.activityBarHeight(unevenChart.bars[2], unevenChart.peakPercent),
     26,
     "Activity peak keeps the maximum bar height"
+);
+
+const tieChart = UsageFormat.buildActivityChart([1, 1, 5]);
+assertEqual(
+    UsageFormat.activityBarHeight(tieChart.bars[0], tieChart.peakPercent),
+    UsageFormat.activityBarHeight(tieChart.bars[1], tieChart.peakPercent),
+    "Equal activity values render at equal bar heights"
+);
+assertEqual(
+    UsageFormat.activityBarHeight(tieChart.bars[0], tieChart.peakPercent) <=
+        UsageFormat.activityBarHeight(tieChart.bars[2], tieChart.peakPercent) - 10,
+    true,
+    "Tied small buckets stay clearly below the chart peak"
 );
 
 const partialChart = UsageFormat.buildActivityChart([
@@ -423,8 +440,8 @@ assertEqual(
 );
 assertEqual(
     UsageFormat.historyPeriodKeys(300).join(","),
-    "1h,4h,24h",
-    "Five-hour history replaces reset-spanning periods with a rolling day"
+    "1h,4h,12h,today",
+    "Five-hour history shows the same periods as every window"
 );
 assertEqual(
     UsageFormat.historyPeriodKeys(10080).join(","),
@@ -542,14 +559,29 @@ assertEqual(
     "Missing credit balance stays unavailable"
 );
 assertEqual(
-    UsageFormat.formatConsumedCredits({ consumed: 2.4, complete: true }),
-    "2",
-    "Consumed credits show whole numbers"
+    UsageFormat.formatCompactConsumedCredits({ consumed: 2.4, complete: true }),
+    "<0.5k",
+    "Consumed credits use compact magnitude tokens"
 );
 assertEqual(
-    UsageFormat.formatConsumedCredits({ consumed: 2.4, complete: false }),
-    "2",
-    "Partial consumed credits show whole numbers without approximation markers"
+    UsageFormat.formatCompactConsumedCredits({ consumed: 7849, complete: true }),
+    "8k",
+    "Thousands round to the nearest k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 2499, complete: false }),
+    "2k",
+    "Partial consumed credits round to the nearest k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 999, complete: true }),
+    "<1k",
+    "Sub-thousand consumed credits keep the below-one-k token"
+);
+assertEqual(
+    UsageFormat.formatCompactConsumedCredits({ consumed: 249, complete: true }),
+    "<0.5k",
+    "Sub-half-k consumed credits keep the below-half token"
 );
 assertEqual(
     UsageFormat.formatCreditNumber("158.04"),
@@ -572,43 +604,48 @@ assertEqual(
     "Missing fractional credit balance stays unavailable"
 );
 assertEqual(
+    UsageFormat.formatCreditNumber("115785.0"),
+    "115785",
+    "Whole credit balances drop the decimal tail"
+);
+assertEqual(
     UsageFormat.formatCreditConsumption({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }),
-    "24h 9  ·  12h 4  ·  4h 2  ·  1h 1",
+    "24h 6k  ·  12h 2k  ·  4h <1k  ·  1h <0.5k",
     "Credit consumption periods use the requested order"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "periods"),
-    "<i>24h</i> 9&#160;&#160;·&#160;&#160;<i>12h</i> 4&#160;&#160;·&#160;&#160;<i>4h</i> 2&#160;&#160;·&#160;&#160;<i>1h</i> 1",
+    "<i>24h</i> 6.3k&#160;&#160;·&#160;&#160;<i>12h</i> 2k&#160;&#160;·&#160;&#160;<i>4h</i> <1k&#160;&#160;·&#160;&#160;<i>1h</i> <0.5k",
     "Period labels can be italicized in the credit consumption markup"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "credits"),
-    "24h <i>9</i>&#160;&#160;·&#160;&#160;12h <i>4</i>&#160;&#160;·&#160;&#160;4h <i>2</i>&#160;&#160;·&#160;&#160;1h <i>1</i>",
+    "24h <i>6.3k</i>&#160;&#160;·&#160;&#160;12h <i>2k</i>&#160;&#160;·&#160;&#160;4h <i><1k</i>&#160;&#160;·&#160;&#160;1h <i><0.5k</i>",
     "Credit values can be italicized in the credit consumption markup"
 );
 assertEqual(
     UsageFormat.formatCreditConsumptionMarkup({
-        "24h": { consumed: 9, complete: true },
-        "12h": { consumed: 4, complete: true },
-        "4h": { consumed: 2, complete: true },
-        "1h": { consumed: 1, complete: true }
+        "24h": { consumed: 6296, complete: true },
+        "12h": { consumed: 2499, complete: true },
+        "4h": { consumed: 880, complete: true },
+        "1h": { consumed: 120, complete: true }
     }, "numbers"),
-    "24h <span weight=\"bold\">9</span>&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">4</span>&#160;&#160;·&#160;&#160;4h <span weight=\"bold\">2</span>&#160;&#160;·&#160;&#160;1h <span weight=\"bold\">1</span>",
+    "24h <span weight=\"bold\">6.3</span>k&#160;&#160;·&#160;&#160;12h <span weight=\"bold\">2</span>k&#160;&#160;·&#160;&#160;4h &lt;<span weight=\"bold\">1</span>k&#160;&#160;·&#160;&#160;1h &lt;<span weight=\"bold\">0.5</span>k",
     "Credit-only emphasis keeps periods and label unbolded"
 );
 assertEqual(
@@ -629,12 +666,12 @@ assertEqual(creditActivityChart.totalPercent, 3, "Credit activity total");
 assertEqual(creditActivityChart.bars[1].known, true, "Credit activity bucket is known");
 assertEqual(
     UsageFormat.formatPeakCredits([
-        { consumed: 4.4, complete: true, observed: true },
-        { consumed: 13.4, complete: true, observed: true },
-        { consumed: 9.6, complete: true, observed: true }
+        { consumed: 4400, complete: true, observed: true },
+        { consumed: 13400, complete: true, observed: true },
+        { consumed: 9600, complete: true, observed: true }
     ]),
-    "13",
-    "Peak credit consumption uses whole AIC values"
+    "13.4k",
+    "Peak credit consumption uses compact tokens with one decimal"
 );
 assertEqual(
     UsageFormat.formatPeakCredits([
@@ -700,7 +737,7 @@ assertEqual(
     "Whole reset count omits decimal zeroes"
 );
 const authenticationError = UsageFormat.parseUsageHelperError(
-    "AUTH_REQUIRED: Sign in to ChatGPT with the ChatGPT App or Codex CLI."
+    "AUTH_REQUIRED: Add a Z.ai API key with Coding Plan access in the applet settings."
 );
 assertEqual(
     authenticationError.authenticationRequired,
@@ -709,7 +746,7 @@ assertEqual(
 );
 assertEqual(
     authenticationError.message,
-    "Sign in to ChatGPT with the ChatGPT App or Codex CLI.",
+    "Add a Z.ai API key with Coding Plan access in the applet settings.",
     "Authentication marker is hidden from the user"
 );
 const refreshError = UsageFormat.parseUsageHelperError("Network unavailable");
@@ -827,7 +864,7 @@ assertEqual(
 assertEqual(
     UsageFormat.formatAppTooltip(true, "codex-cli 0.152.0", "", "01.09.2026"),
     "codex-cli 0.152.0 — 01.09.2026",
-    "Installed Codex tooltip includes release date"
+    "Installed app tooltip includes release date"
 );
 assertEqual(
     UsageFormat.formatAppTooltip(true, "new-version", "chatgpt", null),
@@ -875,8 +912,8 @@ function notificationSnapshot(codexFive, codexWeekly, sparkFive, sparkWeekly, re
     return {
         limits: [
             {
-                id: "codex",
-                label: "Codex",
+                id: "zai",
+                label: "Z.ai",
                 windows: [
                     {
                         durationMinutes: 300,
@@ -891,8 +928,8 @@ function notificationSnapshot(codexFive, codexWeekly, sparkFive, sparkWeekly, re
                 ]
             },
             {
-                id: "codex_spark",
-                label: "GPT-5.3-Codex-Spark",
+                id: "zai_spark",
+                label: "GLM-Spark",
                 windows: [
                     {
                         durationMinutes: 300,
@@ -1029,7 +1066,7 @@ const resetEvents = UsageFormat.buildUsageNotificationEvents(
         enableWeeklyLowNotifications: false
     }
 );
-assertEqual(resetEvents.length, 2, "Master reset switch covers Codex and Spark");
+assertEqual(resetEvents.length, 2, "Master reset switch covers the account limit and Spark");
 assertEqual(resetEvents[0].kind, "reset", "Weekly refresh event kind");
 assertEqual(
     UsageFormat.buildUsageNotificationEvents(

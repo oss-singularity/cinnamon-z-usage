@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a deterministic ChatGPT Usage Monitor social-preview variant."""
+"""Render a deterministic Z Usage Monitor social-preview variant."""
 
 from __future__ import annotations
 
@@ -45,8 +45,9 @@ def main() -> int:
 
     background = source_dir / "background.png"
     icon = repo_dir / "icons/usage-white.png"
-    if not background.is_file() or not icon.is_file():
-        raise SystemExit("Social-preview background or usage icon is missing.")
+    popup = repo_dir / "docs/screenshots/usage-menu.png"
+    if not background.is_file() or not icon.is_file() or not popup.is_file():
+        raise SystemExit("Social-preview background, usage icon or popup capture is missing.")
 
     replacements = {
         "{{TAGLINE}}": html.escape(str(variant["tagline"])),
@@ -79,11 +80,52 @@ def main() -> int:
             command + [str(icon), "-filter", "Lanczos", "-resize", "82x82", str(app_icon)],
             check=True,
         )
+        # The applet popup rides the right side: the panel slice that the
+        # capture crop leaves at its east edge is removed, the shot gets a
+        # dark bezel with the accent color and lands vertically centered.
+        popup_scaled = work_dir / "popup.png"
+        subprocess.run(
+            command
+            + [
+                str(popup),
+                "-gravity",
+                "East",
+                "-chop",
+                "40x0+0+0",
+                "-resize",
+                "x560",
+                "-bordercolor",
+                "#10141c",
+                "-border",
+                "3",
+                "-bordercolor",
+                "#62c7f5",
+                "-border",
+                "1",
+                str(popup_scaled),
+            ],
+            check=True,
+        )
+        popup_size = subprocess.run(
+            command + [str(popup_scaled), "-format", "%wx%h", "info:"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        popup_width = int(popup_size.split("x")[0])
+        popup_height = int(popup_size.split("x")[1])
+        popup_x = WIDTH - popup_width - 52
+        popup_y = max(8, (HEIGHT - popup_height) // 2)
+
         subprocess.run(
             command
             + [
                 str(canvas),
                 str(overlay_png),
+                "-composite",
+                str(popup_scaled),
+                "-geometry",
+                f"+{popup_x}+{popup_y}",
                 "-composite",
                 str(app_icon),
                 "-geometry",

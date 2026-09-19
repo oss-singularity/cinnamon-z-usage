@@ -30,7 +30,7 @@ for (const path of ARGV) {
             'this._addSectionHeading(_("Usage limits"))',
             'this._addSectionHeading(_("Recent consumption"))',
             "this._addIconHeading(\n                window,",
-            "_resolveBundledCodexPath()"
+            "_usageHelperPath()"
         ];
         for (const snippet of requiredUiPaths) {
             if (!source.includes(snippet)) {

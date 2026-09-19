@@ -1,7 +1,6 @@
 {
   "applet.js": "applet.js",
   "usage-format.js": "usage-format.js",
-  "chatgpt_usage.py": "chatgpt_usage.py",
   "metadata.json": "metadata.json",
   "settings-schema.json": "settings-schema.json",
   "icon.png": "icon.png",
@@ -12,16 +11,16 @@
   "icons/ATTRIBUTION.md": "icons/ATTRIBUTION.md",
   "icons/LICENSE-CC-BY-SA-4.0.txt": "icons/LICENSE-CC-BY-SA-4.0.txt",
   "icons/usage-white.png": "icons/usage-white.png",
-  "icons/terminal-bot.png": "icons/terminal-bot.png",
   "icons/applet.svg": "icons/applet.svg",
   "icons/usage.svg": "icons/usage.svg",
-  "icons/terminal-bot.svg": "icons/terminal-bot.svg",
-  "icons/chat-bubble.svg": "icons/chat-bubble.svg",
+  "icons/zai-chat.svg": "icons/zai-chat.svg",
   "icons/emblem-ok-symbolic.svg": "icons/emblem-ok-symbolic.svg",
   "icons/utilities-system-monitor-symbolic.svg": "icons/utilities-system-monitor-symbolic.svg",
   "icons/view-refresh-symbolic.svg": "icons/view-refresh-symbolic.svg",
   "icons/web-browser-symbolic.svg": "icons/web-browser-symbolic.svg",
-  "path_settings.py": "path_settings.py",
   "notification_settings.py": "notification_settings.py",
-  "po/chatgpt-usage@oss-singularity.pot": "po/chatgpt-usage@oss-singularity.pot"
+  "z_usage.py": "z_usage.py",
+  "po/z-usage@oss-singularity.pot": "po/z-usage@oss-singularity.pot",
+  "icons/zcode.svg": "icons/zcode.svg",
+  "api_key_settings.py": "api_key_settings.py"
 }

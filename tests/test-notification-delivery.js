@@ -23,7 +23,7 @@ class Notification {
     setTransient(value) { this.isTransient = value; }
 }
 const AppletClass = new Function("imports", "require",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     { gettext: imports.gettext, format: imports.format, ui: {
         applet: { Applet: class {}, AppletPopupMenu: class {} },
@@ -45,7 +45,7 @@ for (const [key, property] of [
     if (schema[key].default !== true || applet[property] !== true) throw new Error(`${key} must default on`);
 }
 function snapshot(value, reset = 100000) {
-    return { limits: ["codex", "spark"].map(id => ({ id, label: id, windows: [300, 10080].map(durationMinutes =>
+    return { limits: ["zai", "spark"].map(id => ({ id, label: id, windows: [300, 10080].map(durationMinutes =>
         ({ durationMinutes, remainingPercent: value, resetsAt: reset })) })) };
 }
 applet._showUsageNotifications(null, snapshot(40));

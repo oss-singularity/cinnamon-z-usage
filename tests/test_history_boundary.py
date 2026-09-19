@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from chatgpt_usage import update_usage_history
+from z_usage import update_usage_history
 
 
 class HistoryBoundaryTests(unittest.TestCase):
@@ -15,8 +15,8 @@ class HistoryBoundaryTests(unittest.TestCase):
                 "updatedAt": now,
                 "limits": [
                     {
-                        "id": "codex",
-                        "label": "Codex",
+                        "id": "zai",
+                        "label": "Z.ai",
                         "windows": [
                             {
                                 "durationMinutes": 300,

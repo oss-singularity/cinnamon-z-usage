@@ -1,0 +1,999 @@
+{
+  "capturedAt": 1789773799,
+  "snapshot": {
+    "updatedAt": 1789773790,
+    "limits": [
+      {
+        "id": "zai",
+        "label": "Z.ai Coding Plan",
+        "planType": "max",
+        "windows": [
+          {
+            "durationMinutes": 300,
+            "usedPercent": 7,
+            "remainingPercent": 93,
+            "resetsAt": 1789785925,
+            "lastResetAt": null,
+            "usedCredits": 2199,
+            "totalCredits": 28000
+          },
+          {
+            "durationMinutes": 10080,
+            "usedPercent": 54,
+            "remainingPercent": 46,
+            "resetsAt": 1790064603,
+            "lastResetAt": null,
+            "usedCredits": 76378,
+            "totalCredits": 140000
+          }
+        ]
+      },
+      {
+        "id": "zai-weekend-build-glm-5-3-flash",
+        "label": "Weekend Build · GLM-5.3-Flash",
+        "planType": "Weekend Build",
+        "source": "zcode-plan",
+        "windows": [
+          {
+            "durationMinutes": 2279,
+            "usedPercent": 23.058224666666668,
+            "remainingPercent": 76.94177533333334,
+            "resetsAt": 1789866000,
+            "lastResetAt": 1789729267,
+            "usedCredits": 69174674,
+            "totalCredits": 300000000,
+            "unit": "token"
+          }
+        ]
+      },
+      {
+        "id": "zai-start-plan-glm-5-3",
+        "label": "Start Plan · GLM-5.3",
+        "planType": "Start Plan",
+        "source": "zcode-plan",
+        "windows": [
+          {
+            "durationMinutes": 1440,
+            "usedPercent": 0,
+            "remainingPercent": 100,
+            "resetsAt": 1789833599,
+            "lastResetAt": 1789747200,
+            "usedCredits": 0,
+            "totalCredits": 3000000,
+            "unit": "token"
+          }
+        ]
+      },
+      {
+        "id": "zai-start-plan-glm-5-3-flash",
+        "label": "Start Plan · GLM-5.3-Flash",
+        "planType": "Start Plan",
+        "source": "zcode-plan",
+        "windows": [
+          {
+            "durationMinutes": 1440,
+            "usedPercent": 100,
+            "remainingPercent": 0,
+            "resetsAt": 1789833599,
+            "lastResetAt": 1789747200,
+            "usedCredits": 5000000,
+            "totalCredits": 5000000,
+            "unit": "token"
+          }
+        ]
+      }
+    ],
+    "credits": {
+      "availableResetCount": 0,
+      "nextResetExpiresAt": null,
+      "resetCredits": null,
+      "balance": "63622.0",
+      "hasCredits": true,
+      "unlimited": false,
+      "plan": "max",
+      "showLimitResets": false
+    },
+    "history": {
+      "trackedSince": 1789486454,
+      "activityBucketMinutes": 60,
+      "activityEndAt": 1789776000,
+      "creditPeriods": {
+        "1h": {
+          "consumed": 0,
+          "complete": true
+        },
+        "4h": {
+          "consumed": 7211,
+          "complete": true
+        },
+        "12h": {
+          "consumed": 28259,
+          "complete": true
+        },
+        "24h": {
+          "consumed": 52722,
+          "complete": true
+        },
+        "today": {
+          "consumed": 924,
+          "complete": true
+        }
+      },
+      "creditActivity24h": [
+        {
+          "consumed": 0,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 294,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2837,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2761,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 3468,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 3271,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 6711,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2734,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 941,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 0,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 0,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 1722,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2177,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 527,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2706,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2146,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 4602,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 3863,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2391,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 2916,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 586,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 3926,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 924,
+          "complete": true,
+          "observed": true
+        },
+        {
+          "consumed": 0,
+          "complete": false,
+          "observed": true
+        }
+      ],
+      "windows": [
+        {
+          "id": "zai",
+          "label": "Z.ai Coding Plan",
+          "durationMinutes": 300,
+          "source": "coding-plan",
+          "trackedSince": 1789486454,
+          "periods": {
+            "1h": {
+              "consumedPercent": 0,
+              "complete": true
+            },
+            "4h": {
+              "consumedPercent": 25,
+              "complete": true
+            },
+            "12h": {
+              "consumedPercent": 99,
+              "complete": true
+            },
+            "24h": {
+              "consumedPercent": 186,
+              "complete": true
+            },
+            "today": {
+              "consumedPercent": 3,
+              "complete": true
+            }
+          },
+          "activity24h": [
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 10,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 10,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 12,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 12,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 23,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 10,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 4,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 5,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 8,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 9,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 8,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 16,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 13,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 9,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 10,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 14,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 3,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": true
+            }
+          ]
+        },
+        {
+          "id": "zai",
+          "label": "Z.ai Coding Plan",
+          "durationMinutes": 10080,
+          "source": "coding-plan",
+          "trackedSince": 1789486454,
+          "periods": {
+            "1h": {
+              "consumedPercent": 0,
+              "complete": true
+            },
+            "4h": {
+              "consumedPercent": 5,
+              "complete": true
+            },
+            "12h": {
+              "consumedPercent": 20,
+              "complete": true
+            },
+            "24h": {
+              "consumedPercent": 38,
+              "complete": true
+            },
+            "today": {
+              "consumedPercent": 1,
+              "complete": true
+            }
+          },
+          "activity24h": [
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 3,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 3,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 5,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 4,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 1,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": true
+            }
+          ]
+        },
+        {
+          "id": "zai-weekend-build-glm-5-3-flash",
+          "label": "Weekend Build · GLM-5.3-Flash",
+          "durationMinutes": 2279,
+          "source": "zcode-plan",
+          "trackedSince": 1789743602,
+          "periods": {
+            "1h": {
+              "consumedPercent": 23.06,
+              "complete": true
+            },
+            "4h": {
+              "consumedPercent": 23.06,
+              "complete": true
+            },
+            "12h": {
+              "consumedPercent": 23.06,
+              "complete": false
+            },
+            "24h": {
+              "consumedPercent": 23.06,
+              "complete": false
+            },
+            "today": {
+              "consumedPercent": 23.06,
+              "complete": true
+            }
+          },
+          "activity24h": [
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": false
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 12.69,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 10.37,
+              "complete": false,
+              "observed": true
+            }
+          ]
+        },
+        {
+          "id": "zai-start-plan-glm-5-3",
+          "label": "Start Plan · GLM-5.3",
+          "durationMinutes": 1440,
+          "source": "zcode-plan",
+          "trackedSince": 1789488326,
+          "periods": {
+            "1h": {
+              "consumedPercent": 0,
+              "complete": true
+            },
+            "4h": {
+              "consumedPercent": 6,
+              "complete": true
+            },
+            "12h": {
+              "consumedPercent": 6,
+              "complete": true
+            },
+            "today": {
+              "consumedPercent": 6,
+              "complete": true
+            }
+          },
+          "activity24h": [
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 4,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 2,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": true
+            }
+          ]
+        },
+        {
+          "id": "zai-start-plan-glm-5-3-flash",
+          "label": "Start Plan · GLM-5.3-Flash",
+          "durationMinutes": 1440,
+          "source": "zcode-plan",
+          "trackedSince": 1789488326,
+          "periods": {
+            "1h": {
+              "consumedPercent": 36.87,
+              "complete": true
+            },
+            "4h": {
+              "consumedPercent": 100,
+              "complete": true
+            },
+            "12h": {
+              "consumedPercent": 100,
+              "complete": true
+            },
+            "24h": {
+              "consumedPercent": 100,
+              "complete": true
+            },
+            "today": {
+              "consumedPercent": 100,
+              "complete": true
+            }
+          },
+          "activity24h": [
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 100,
+              "complete": true,
+              "observed": true
+            },
+            {
+              "consumedPercent": 0,
+              "complete": false,
+              "observed": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

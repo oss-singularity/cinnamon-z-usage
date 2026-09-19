@@ -1,5 +1,288 @@
 # Changelog
 
+## 1.0.0 — 2026-09-19
+
+- The header reads "Z.ai Coding Usage", with the "Z.ai" brand riding the
+  plan pill's blue-to-green gradient: the label's own color doubles as the
+  gradient start (the Clutter layer paints glyph 0 with it), the remaining
+  brand letters interpolate, and the description keeps a softened menu
+  gray. Both gradient markups are built by tested helpers.
+- The Z.ai Chat button trades the carried purple bubble for original
+  Z-ai artwork in the ZCode icon's design language: the dark rounded
+  square with the blue edge now hosts a green gradient speech bubble
+  with a "Z." - the two footer launch icons read as one family.
+- The AIC panel block is retired: Z.ai expresses credits as percentages,
+  so the "Show credits in the panel" switch and the compact AIC balance
+  block are removed from the settings and the panel rendering.
+- Freshly opened history leaves paint their charts at the correct width
+  from the first frame: the leaf-open path re-pins its charts to the
+  carried width and runs deferred edge-sync passes, so the two-pass width
+  vote no longer waited for the NEXT leaf's open to correct the previous
+  one (each newly opened chart stayed too wide until then). The sync also
+  skips charts of closed leaves instead of recording their stale
+  transforms.
+- All-zero windows render their chart completely: known zero buckets keep
+  their smallest-height gray stub instead of collapsing to nothing, so the
+  end of the popup no longer shows a caption and axis labels around an
+  empty plot (which read as a broken graph on the first open). Buckets
+  beyond the data range stay invisible.
+- The viewport fold never strands a section heading: a heading alone at
+  the fold with its whole section body below it looked like a cut-off
+  graph. The fold now tucks above the heading run, hiding the section
+  completely - collapsible areas still appear only when you scroll.
+- The initial refresh interval defaults to 1 minute (was 3): fresh setups
+  see live data right away; existing installations keep their chosen
+  value.
+- The plan pill's first letter keeps its gradient color: the label's own
+  foreground won over the markup's first span at glyph 0, leaving the "P"
+  white while every later letter took its blue-to-green ramp. An invisible
+  leading space inside the first span absorbs the override (Pango itself
+  renders the spans correctly), and the per-letter markup is built by one
+  tested helper.
+- The credits line shares one baseline: the fit scaled only the "Used:"
+  suffix while the row mixed alignment modes, so the whole suffix block
+  rode visibly lower than "Credits:". Every label now measures its Pango
+  layout baseline and is translation-corrected onto the prefix baseline
+  (translations never touch layout, so the width fit stays independent),
+  with mid-relayout garbage reads skipped.
+- The ZCode button helps with the initial setup: when the coding agent
+  is not installed it opens a modal with Z.ai's installation page and
+  explains that the applet reads plan usage from the agent's stored
+  credentials - an API key stays optional. The button tooltip reflects
+  the install state, and the modal is covered by automated tests.
+- No more intermittent open/refresh jump: the action grid is statically
+  centered (the popup width is locked and the grid width is fixed, so the
+  layout placement alone holds the design offset) instead of being
+  re-centered by a sync that read mid-relayout geometry - the old dynamic
+  centering latched the whole grid, the buttons and the graph edge ~33px
+  against the popup edge after a rebuild while open, and the fight between
+  the two states was the visible ~20px two-frame jump.
+- Rebuilds while the popup is open allocate in the settled geometry from
+  the first frame: the width lock now reproduces the settled layout width
+  instead of a 24px narrower first pass, so rows, rings and charts no
+  longer collapse for one or two frames mid-rebuild.
+- Chart widths change only when two sync passes agree (beyond 4px noise):
+  a transient first read after a rebuild can no longer pin the graph a few
+  pixels narrow for a frame.
+- Bar heights spread by rank: Z.ai distributions are tiny and lopsided
+  (many 1-3% buckets under one old spike), and every value normalization
+  compressed recent buckets onto the same pixels - 5% vs 3% read
+  identical. Bars now scale mostly by their rank among the known
+  buckets, so every chart uses its full height range (the caption keeps
+  the honest peak value).
+- The consumption line ends at the row's right edge again - the same
+  inset as the left side, the symmetric look chosen earlier - instead
+  of stopping short after the anti-ellipsis reserve.
+- Restoring open leaves after a refresh no longer auto-scrolls the
+  popup to them (the surprise jump within the first refresh interval
+  after opening), and the viewport trim shaves deep enough to hide the
+  next section on live row counts.
+- No more truncated consumption tail: the credits fit reserves the
+  markup label's paint slop, so the "1h" value no longer collapses into
+  "..." when the line runs long (weekend plans + permanent scrollbar).
+  The bar heights spread on a square-root curve, so a 3% bucket next to
+  a 5% one reads clearly even under a dominant chart peak. The viewport
+  trim shaves a constant strip below the last full row - preferred
+  heights drift per item against real allocations (theme paddings), and
+  the drift scaled with the row count on live data, leaving the next
+  section peeking.
+- The header plan renders as a small rounded pill, vertically centered
+  on the title line; the 5h window's consumption rows show 12h/Today
+  like every other window; and the viewport trim measures rows at the
+  width the lock actually enforces, so the next section hides fully
+  below the fold instead of peeking a few pixels (Claudiu's screenshot).
+- The viewport fold replays the monitor budget against the real row
+  geometry once the open allocates: the pre-open trim guesses from
+  preferred-height sums, whose cumulative drift against the real
+  allocations (a few px per row of theme paddings) either cut a corner
+  into the next row or hid a section that still fit the screen (the 7d
+  graph vanishing below the fold). The replay keeps every row that
+  fits, hides the first one that does not, and lands the fold exactly
+  between two rows before the first visible paint - no sliver, no dead
+  strip, no lost section. Collapsible areas stay hidden until you
+  scroll: the fold also tucks below the first closed history leaf,
+  while open leaves count as normal content. The geometry walk skips
+  unmapped children with stale transforms (a closed leaf's inner box)
+  and tracks the deepest row bottom, so partially settled or collapsed
+  layouts cannot distort the fold.
+- The "Consumed:" line ends at the row's right edge without ever
+  ellipsizing its tail: the fit measures the value label's TRUE Pango
+  paint width (markup with non-breaking spaces paints wider than its
+  preferred width) instead of reserving a constant slop - too small a
+  slop cut the "1h" tail into "...", too large left a visible gap -
+  and the label never ellipsizes.
+- The open animation plays from the popup's final geometry: the fold
+  snap's decision needs the popup's real allocations, which only exist
+  2-3 frames into the open - the height correction painted as a visible
+  jump mid-fade (the popup grew ~240px after two frames). A fresh
+  animated open now stays invisible (still mapped, so the layout pass
+  runs) until the fold snap lands, then replays Cinnamon's slide+fade
+  from the settled size; a 400ms fallback releases the hold even if
+  the snap never fires.
+- Equal activity buckets render at equal heights: the bar ranks now use
+  competition ranking (ties share one rank). Sorting equal values into
+  arbitrary consecutive ranks stacked quota and credit lottery heights
+  onto same-value buckets - a 1% bucket ended up as tall as the 5% peak
+  in the 7d chart. The chart also scales every slot's quota+credit
+  stack by ONE global factor instead of clamping each slot to the chart
+  height - the per-slot clamp pressed every tall stack onto exactly the
+  maximum, erasing the difference between a big bucket and the peak.
+- Ring repaint healing: GJS blocks JS callbacks that fire during a GC
+  sweep, and a freshly rebuilt ring whose first repaint gets blocked
+  stays blank (the one-time all-rings-vanished popup after an
+  auto-update). Deferred repaint passes after every rebuild and open
+  heal any blocked drawing area.
+- The weekly ring tooltip drops the "(estimated from next reset)"
+  caveat - Z.ai resets sit on a fixed grid, so the computed timestamp
+  is exact - and appends a human-readable "· 6d ago" after the
+  timestamp.
+- The credits consumption prefix reads "Used:" instead of "Consumed:"
+  - four characters shorter, and the prefix no longer squeezes into
+    "Consume..." on tight rows.
+- The plan pill in the title renders bold with a per-letter
+  blue-to-green gradient.
+- Compact consumption layout: the plan rides the header title line, the
+  per-window rows are one line ("1h 2 · 4h 9 · 12h 21 · Today 26") and
+  the duplicated 24h window total is gone (the chart caption carries
+  it, uncapped - a 138% overage day no longer reads as "100%"). The
+  popup shrinks by two rows.
+- Honest activity bar heights: the minimum bar floor dropped from 8px
+  to 3px - Z.ai percentages are small (1-9%), and the 8px floor out of
+  a 26px range compressed every sub-30% bucket onto the same height (a
+  1% bucket looked exactly like the 5% peak). Each chart keeps its own
+  peak: a shared popup-wide peak let a mostly-used side plan (e.g. a
+  weekend build at 87%) squash every other chart's bars to minimum.
+- The popup viewport trims to the last fully visible row: a section
+  header poking out a few pixels above the footer buttons reads as a
+  glitch - collapsible areas now appear only when you actually scroll
+  (small straddlers hide fully; tall open leaves keep the peek).
+- The collapsible history graphs sit below the plan and credits rows:
+  the default collapsed view always shows the plan, balance and
+  consumption values without scrolling past graph headers.
+- Hovering a partially visible section header no longer auto-scrolls
+  the popup: items grab the key focus on hover, and revealing that
+  focus scrolled the content under a merely resting pointer. Only real
+  keyboard navigation reveals its focus now.
+- Every successful refresh confirms green: the auto-update's "Updating…"
+  resolves to the green "Updated" state while the popup is open, not only
+  the manual button click.
+- AIC consumption renders in the normal plan color: the activity-chart
+  AIC bars and the red-by-default "Consumed:" text now use the normal
+  color - at Z.ai the AIC quota IS the plan's core contingent, not an
+  extra like OpenAI's credits.
+- The refresh button carries a tooltip like the other footer buttons.
+- Several "Recent consumption" groups can stay expanded at once - the
+  leaves stack cleanly in the scrollable content instead of behaving
+  like a one-leaf accordion.
+- Reset countdowns are always honest: a window at 100% remaining counts
+  down toward its fixed reset timestamp (Z.ai resets are fixed calendar
+  times) instead of displaying the full window duration.
+- The credits consumption line keeps its exact size across data refreshes:
+  the font fit no longer measures the action grid before the footer is
+  allocated (a mixed read that shrank the line ~34px short when the first
+  hour bar rendered and latched until the next refresh), and deferred fit
+  passes after every rebuild re-converge on the settled geometry.
+- Shrinking the refresh interval refreshes immediately when the data is
+  already older than the new interval instead of waiting another full
+  interval.
+- The activity chart's peak label renders one decimal ("7.2k AIC").
+- Hardened against a Cinnamon crash: the credits font-fit callbacks are
+  destroy-aware, so queued fit passes after a rebuild can no longer touch
+  disposed actors (a Gjs-CRITICAL storm that ended in a libmozjs
+  segfault during rapid open/refresh cycles).
+- Stable credits consumption line: the fit measures the suffix from the
+  allocated labels, sizes the line to end exactly at the grid anchor and
+  starts from the previously converged size - rebuilds while the popup is
+  open no longer rescale, shift or delay the red consumption text.
+- No scrollbar-induced shifts: the vertical scrollbar policy is always
+  "always" for this content (it is taller than the viewport by design), so
+  the content width never changes under a rebuild.
+- Deterministic popup geometry: the height clamp reserves the real theme
+  paddings of the header and footer items and a 16 px bottom safety, so the
+  popup ends above the screen edge with the button rows fully visible.
+- Compact magnitude tokens everywhere: the credits balance, the consumed
+  windows and the peak-AIC label render as "109.3k", "11k", "<1k", "<0.5k"
+  - only the digits are bold, the "k" and "<" stay in the regular weight.
+- The API key settings row keeps keyboard focus when clicks land on
+  labels or empty UI, and the API keys page button renders right below the
+  entry.
+- The launch footer is two rows (Z.ai Chat / ZCode, Refresh now / Usage) -
+  the legacy transparent Z.ai/Docs row that sat clipped below the screen
+  edge is removed.
+- Deterministic popup height: the height clamp computes the header, scroll
+  viewport and footer sizes from the real naturals before Cinnamon positions
+  the popup, and menu items are clamped to the inner width - so toggling
+  plan sections, scrolling and reopening can no longer shift the popup, cut
+  the header at the screen top or push the rings under the panel.
+- Remove the collapsible section disclosure arrows entirely: their flash
+  during collapse and the sideways ring shift were the last animation
+  artifacts. The expand/collapse state is shown by the section rows
+  themselves.
+- Sticky popup chrome: the header (title, updated stamp, quota rings) and
+  the action footer are pinned outside the scroll view - the content scrolls
+  beneath them, so title, rings and buttons stay visible in every scroll
+  position. The popup never shows an empty chrome strip while scrolling.
+- The action grid (Z.ai Chat / ZCode / Refresh now / Usage) is a pinned
+  footer at the bottom of the popup: it lives outside the scroll
+  view, so the buttons stay visible and clickable while the quota and history
+  content scrolls behind them. The former empty reserve at the popup bottom is
+  gone — the footer occupies it.
+- Remove the content height pin entirely: the forced height disabled the
+  scroll view's own adjustment (upper stayed 0), so nothing below the fold
+  ever rendered. The scroll view now works on the content's natural height
+  with clipping disabled on the content actor.
+- Menu items are clamped to the popup's inner width: their inflated minimum
+  widths (measured 492 px in a 419 px popup) made the scroll view allocate
+  them past the popup edge, painting the countdown rings on the panel. The
+  popup actor keeps its full outer width while scroll, content and footer are
+  clamped to the inner width (outer minus the theme padding reserve).
+- Countdown rings, disclosure arrows and plot widths align to a stable
+  geometric anchor - the popup's own content right edge - instead of the
+  footer action grid, whose allocation-dependent geometry let the rings
+  wander under the popup scrollbar. Repeated syncs are idempotent.
+- Flush scroll bottom: after the allocation pass the pinned content height is
+  corrected to the real extent of its rows, so a fully scrolled popup ends
+  directly above the footer instead of carrying an empty reserve.
+- Root fix for the clipped action rows: the scroll view allocated the popup
+  content at the viewport height, so everything below the fold (the button
+  grid) was cut off entirely. The clamp now pins the content to its natural
+  height measured at the real popup width (wrapping included), which makes
+  the full action area scrollable.
+- Second layout pass: the popup height is clamped before Cinnamon positions
+  it so a fully expanded popup stays on screen, a fresh open starts at the
+  header (the upstream active-Spark auto-open no longer fires for the new
+  Start Plan badges), expanding a section scrolls its rows into view, and the
+  recent-consumption accordion resets stale leaf heights on reopen.
+- Popup layout hardening from live testing: the header rings stay the coding
+  plan's 5h/7d overview (plan badges no longer collide with ring labels), the
+  ZCode plan sections are expanded by default with a "Keep ZCode plan sections
+  expanded" switch, the popup height is clamped to the monitor so the action
+  rows scroll into view instead of disappearing, and recent-consumption
+  submenus behave as an accordion so expanded content never overdraws.
+
+- Show the stacked ZCode quota sources: Start Plan and Global Build token
+  buckets are read from the signed-in ZCode app's billing balance endpoint and
+  rendered as collapsible per-model limits with G/S badges below the coding
+  plan limits. A new "Show ZCode plan quotas" switch controls them.
+- Reverse-engineered the exact client header set ZCode sends
+  (User-Agent, X-Title, X-Platform, X-Os-Category, X-Client-\*,
+  X-Device-Mid) so the applet reads the same data keylessly; the balance
+  endpoint stays optional and never breaks the coding plan snapshot.
+
+## 0.1.0 — 2026-09-15 (Z fork)
+
+- Forked cinnamon-chatgpt-usage 1.0.6 into the Z Usage Monitor
+  (`z-usage@oss-singularity`) with shared git history for upstream backports.
+- New `z_usage.py` backend reading the Z.ai usage monitor API
+  (`/api/monitor/usage/quota/limit`) with 5h and weekly credit windows,
+  reset timestamps and the plan level.
+- API-key-less credential resolution: applet setting, `ZAI_API_KEY`,
+  `~/.config/cinnamon-z-usage/api-key`, then the Coding Plan API key cached by
+  the signed-in ZCode app.
+- Z.ai launch buttons, Plan/Credits rows, original Z ribbon icons; dropped the
+  Codex app-server plumbing, ChatGPT path settings and the ChatGPT-only
+  reset-credit flow.
+
 ## 1.0.6 — 2026-09-15
 
 - Keep limit remaining percentages at the integer precision exposed by the

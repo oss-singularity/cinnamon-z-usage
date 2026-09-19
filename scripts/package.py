@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-UUID = "chatgpt-usage@oss-singularity"
+UUID = "z-usage@oss-singularity"
 UPSTREAM = "0fa36ed070daa26d51ced6ea87a08066b342eca4"
 VALIDATOR_SHA256 = "3b74a9b8360314ebb42ece78fe3215513144f8b64078e327ca0c03c9d8b63928"
 RETIRED_ARTWORK = {
@@ -132,7 +132,7 @@ def main():
     package.add_argument("--validate", action="store_true")
     args = parser.parse_args()
     if args.command == "install":
-        print(f"ChatGPT Usage Monitor installed: {install(args.data_root)}")
+        print(f"Z Usage Monitor installed: {install(args.data_root)}")
     else:
         output = export(args.output)
         if args.validate:

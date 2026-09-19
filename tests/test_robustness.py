@@ -1,60 +1,70 @@
 """Invalid input and rolling time boundaries, independent of chart alignment."""
 
-import datetime as dt
-import os
-import time
 import unittest
 from unittest.mock import patch
 
-from chatgpt_usage import _normalise_window, build_usage_history, normalise_rate_limits
+from z_usage import normalise_quota_limits
 
 
 class RobustnessTests(unittest.TestCase):
     def test_invalid_usage_never_becomes_full_availability(self):
         for used in [None, float("nan"), float("inf"), -1, 101, True, "bad"]:
-            for field in ["rateLimits", "rateLimitsByLimitId"]:
-                with self.subTest(used=used, field=field):
-                    bucket = {"primary": {"windowDurationMins": 300, "usedPercent": used}}
-                    result = {field: {"codex": bucket} if field.endswith("Id") else bucket}
-                    self.assertEqual(normalise_rate_limits(result)["limits"], [])
-        self.assertIsNone(_normalise_window({"windowDurationMins": 300}))
+            with self.subTest(used=used):
+                data = {"limits": [{"unit": 3, "number": 5, "percentage": used}]}
+                self.assertEqual(normalise_quota_limits(data)["limits"], [])
 
-    def test_nonfinite_times_are_unavailable(self):
-        for bad in [float("inf"), float("-inf"), float("nan"), True]:
-            self.assertIsNone(_normalise_window({"windowDurationMins": bad, "usedPercent": 5}))
-            window = _normalise_window({"windowDurationMins": 300, "usedPercent": 5, "resetsAt": bad})
-            self.assertIsNone(window["resetsAt"])
+    def test_invalid_reset_times_never_crash(self):
+        for bad in [float("inf"), float("-inf"), float("nan"), True, "soon"]:
+            with self.subTest(bad=bad):
+                data = {"limits": [{"unit": 3, "number": 5, "percentage": 5, "nextResetTime": bad}]}
+                snapshot = normalise_quota_limits(data)
+                self.assertEqual(len(snapshot["limits"]), 1)
+                self.assertIsNone(snapshot["limits"][0]["windows"][0]["resetsAt"])
 
-    def test_rolling_day_is_independent_of_buckets_midnight_and_dst(self):
-        original = os.environ.get("TZ")
-        self.addCleanup(self.restore_timezone, original)
-        for zone in ["UTC", "Europe/Berlin"]:
-            with patch.dict(os.environ, {"TZ": zone}):
-                time.tzset()
-                for date in [
-                    "2026-09-05T12:30:00+00:00",
-                    "2026-03-29T01:30:00+00:00",
-                    "2026-10-25T01:30:00+00:00",
-                    "2026-09-05T22:30:00+00:00",
-                ]:
-                    now = int(dt.datetime.fromisoformat(date).timestamp())
-                    samples = [
-                        {"timestamp": timestamp, "windows": {"codex:300": {"usedPercent": used}}}
-                        for timestamp, used in [(now - 90000, 0), (now - 85500, 10), (now, 10)]
-                    ]
-                    snapshot = {"updatedAt": now, "limits": [{"id": "codex", "windows": [{"durationMinutes": 300}]}]}
-                    for minutes in [60, 120]:
-                        history = build_usage_history(snapshot, samples, minutes)
-                        self.assertEqual(
-                            history["windows"][0]["periods"]["24h"], {"consumedPercent": 10, "complete": True}
-                        )
-                        incomplete = build_usage_history(snapshot, samples[1:], minutes)
-                        self.assertFalse(incomplete["windows"][0]["periods"]["24h"]["complete"])
+    def test_balance_ignores_negative_and_missing_credit_windows(self):
+        data = {
+            "limits": [
+                {
+                    "unit": 3,
+                    "number": 5,
+                    "percentage": 50,
+                    "currentValue": 10,
+                    "usage": 4,
+                }
+            ]
+        }
+        self.assertIsNone(normalise_quota_limits(data)["credits"]["balance"])
 
-    @staticmethod
-    def restore_timezone(value):
-        if value is None:
-            os.environ.pop("TZ", None)
-        else:
-            os.environ["TZ"] = value
-        time.tzset()
+        data = {
+            "limits": [
+                {
+                    "unit": 3,
+                    "number": 5,
+                    "percentage": 50,
+                    "currentValue": 4,
+                    "usage": 10,
+                }
+            ]
+        }
+        self.assertEqual(normalise_quota_limits(data)["credits"]["balance"], "6.0")
+
+    def test_zero_usage_reports_a_full_window(self):
+        data = {"limits": [{"unit": 3, "number": 5, "percentage": 0}]}
+        windows = normalise_quota_limits(data)["limits"][0]["windows"]
+        self.assertEqual(windows[0]["remainingPercent"], 100)
+
+    def test_normalisation_is_pure_in_the_seconds_domain(self):
+        data = {
+            "limits": [
+                {
+                    "unit": 6,
+                    "number": 1,
+                    "percentage": 3,
+                    "nextResetTime": 1790064603989,
+                }
+            ]
+        }
+        with patch("z_usage.time.time", return_value=1789474928.0):
+            snapshot = normalise_quota_limits(data)
+        self.assertEqual(snapshot["updatedAt"], 1789474928)
+        self.assertEqual(snapshot["limits"][0]["windows"][0]["resetsAt"], 1790064603)

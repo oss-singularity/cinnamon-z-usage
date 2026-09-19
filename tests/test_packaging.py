@@ -25,7 +25,10 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual((first / name).read_bytes(), (second / name).read_bytes())
             with zipfile.ZipFile(first / "install.zip") as archive:
                 files = package.payload()
-                self.assertEqual(set(archive.namelist()), {f"{package.UUID}/{name}" for name in files})
+                self.assertEqual(
+                    set(archive.namelist()),
+                    {f"{package.UUID}/{name}" for name in files},
+                )
                 extracted = Path(directory) / "extract"
                 archive.extractall(extracted)
                 for name, content in files.items():
@@ -53,7 +56,11 @@ class PackageTests(unittest.TestCase):
             self.assertTrue((target / "unmanaged.txt").exists())
             subprocess.run(
                 [str(package.ROOT / "uninstall.sh")],
-                env={**os.environ, "XDG_DATA_HOME": str(data), "XDG_STATE_HOME": str(state)},
+                env={
+                    **os.environ,
+                    "XDG_DATA_HOME": str(data),
+                    "XDG_STATE_HOME": str(state),
+                },
                 check=True,
                 stdout=subprocess.DEVNULL,
             )
@@ -77,19 +84,26 @@ class PackageTests(unittest.TestCase):
         metadata = json.loads(files["metadata.json"])
         self.assertTrue(json.dumps(metadata, ensure_ascii=False).isascii())
         self.assertFalse({"icon", "dangerous", "last-edited"}.intersection(metadata))
-        for name in ["ATTRIBUTION.md", "SECURITY.md", "icons/ATTRIBUTION.md", "icons/LICENSE-CC-BY-SA-4.0.txt"]:
+        for name in [
+            "ATTRIBUTION.md",
+            "SECURITY.md",
+            "icons/ATTRIBUTION.md",
+            "icons/LICENSE-CC-BY-SA-4.0.txt",
+        ]:
             self.assertIn(name, files)
 
     def test_original_artwork_sources_and_no_retired_assets(self):
         files = package.payload()
         self.assertFalse({"icons/codex.png", "icons/chatgpt-white.png"}.intersection(files))
-        for name in ["applet", "usage", "terminal-bot", "chat-bubble"]:
+        for name in ["applet", "usage", "zai-chat", "zcode"]:
             self.assertIn(f"icons/{name}.svg", files)
             self.assertIn(b"SPDX-License-Identifier: GPL-3.0-or-later", files[f"icons/{name}.svg"])
-        for name in ["icons/usage-white.png", "icons/terminal-bot.png"]:
-            self.assertIn(name, files)
-        self.assertIn(b'fileName: "chat-bubble.svg"', files["applet.js"])
-        self.assertIn(b'fileName: "terminal-bot.png"', files["applet.js"])
+        self.assertNotIn("icons/terminal-bot.svg", files)
+        self.assertNotIn("icons/terminal-bot.png", files)
+        self.assertNotIn("icons/chat-bubble.svg", files)
+        self.assertIn("icons/usage-white.png", files)
+        self.assertIn(b'fileName: "zai-chat.svg"', files["applet.js"])
+        self.assertNotIn(b'fileName: "terminal-bot.png"', files["applet.js"])
 
     def test_upgrade_removes_only_known_retired_artwork(self):
         with TemporaryDirectory() as directory:

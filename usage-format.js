@@ -4,9 +4,12 @@
 
 const GLib = imports.gi.GLib;
 
+// The single account-level limit the Z.ai monitor API reports.
+const ACCOUNT_LIMIT_ID = "zai";
+
 const Gettext = imports.gettext;
 function _(text) {
-    return Gettext.dgettext("chatgpt-usage@oss-singularity", text);
+    return Gettext.dgettext("z-usage@oss-singularity", text);
 }
 function _f(text, ...args) {
     return imports.format.format.apply(_(text), args);
@@ -14,7 +17,7 @@ function _f(text, ...args) {
 
 
 Gettext.bindtextdomain(
-    "chatgpt-usage@oss-singularity",
+    "z-usage@oss-singularity",
     GLib.build_filenamev([GLib.get_user_data_dir(), "locale"])
 );
 
@@ -60,8 +63,8 @@ function listQuotaWindows(limits) {
     const windows = [];
     const sourceLimits = Array.from(limits || []);
     const orderedLimits = sourceLimits
-        .filter(limit => limit.id !== "codex")
-        .concat(sourceLimits.filter(limit => limit.id === "codex"));
+        .filter(limit => limit.id !== ACCOUNT_LIMIT_ID)
+        .concat(sourceLimits.filter(limit => limit.id === ACCOUNT_LIMIT_ID));
 
     for (const limit of orderedLimits) {
         const limitWindows = [];
@@ -142,6 +145,39 @@ function formatConsumedCredits(period) {
     return String(Math.round(value));
 }
 
+// Compact magnitude display (buckets per Claudiu: <0.5k, <1k, 1k, 2k,
+// 3k ... nearest thousand) - keeps the credits line narrow while the raw
+// numbers wiggle every refresh. decimals=1 renders one decimal digit in
+// the k-range (109.3k).
+function formatCompactNumber(value, decimals = 0) {
+    const numeric = Math.max(0, Math.round(Number(value)));
+    if (numeric >= 1000) {
+        const k = numeric / 1000;
+        const text = decimals > 0 ? k.toFixed(decimals) : String(Math.round(k));
+        return `${text}k`;
+    }
+    if (numeric >= 500) return "<1k";
+    if (numeric >= 1) return "<0.5k";
+    return "0";
+}
+
+// Pango markup for a compact token: only the digits are bold; the "<"
+// prefix and the "k" suffix keep the regular weight (Claudiu). The "<"
+// is escaped for the Pango parser.
+function markupBoldCompactToken(value) {
+    const match = /^(<)?([\d.]+)(k?)$/.exec(value);
+    if (!match) return value.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const prefix = match[1] ? "&lt;" : "";
+    const digits = match[2];
+    const suffix = match[3] || "";
+    return prefix + '<span weight="bold">' + digits + "</span>" + suffix;
+}
+
+function formatCompactConsumedCredits(period, decimals = 0) {
+    if (!period || !Number.isFinite(Number(period.consumed))) return "--";
+    return formatCompactNumber(period.consumed, decimals);
+}
+
 function formatCreditConsumption(periods) {
     const keys = ["24h", "12h", "4h", "1h"];
     const hasConsumption = keys.some(key => {
@@ -149,7 +185,7 @@ function formatCreditConsumption(periods) {
         return Number.isFinite(value) && value > 0;
     });
     if (!hasConsumption) return null;
-    return keys.map(key => _f("%s %s", key, formatConsumedCredits(periods[key]))).join("  ·  ");
+    return keys.map(key => _f("%s %s", key, formatCompactConsumedCredits(periods[key]))).join("  ·  ");
 }
 
 function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
@@ -157,11 +193,12 @@ function formatCreditConsumptionMarkup(periods, italicPart = "periods") {
     const keys = ["24h", "12h", "4h", "1h"];
     return keys.map(key => {
         const period = italicPart === "periods" ? `<i>${key}</i>` : key;
-        const value = formatConsumedCredits(periods && periods[key]);
+        const decimals = key === "24h" ? 1 : 0;
+        const value = formatCompactConsumedCredits(periods && periods[key], decimals);
         const consumed = italicPart === "credits"
             ? `<i>${value}</i>`
             : italicPart === "numbers"
-                ? `<span weight="bold">${value}</span>`
+                ? markupBoldCompactToken(value)
                 : value;
         return `${period} ${consumed}`;
     // Keep separators unstyled so only the consumed values receive emphasis.
@@ -190,10 +227,12 @@ function buildResetCountdown(window, nowSeconds = null) {
         };
     }
 
-    const remainingPercent = Number(window && window.remainingPercent);
-    const remainingSeconds = Number.isFinite(remainingPercent) && remainingPercent >= 100
-        ? durationSeconds
-        : clamp(Math.ceil(resetsAt - currentSeconds), 0, durationSeconds);
+    // Z.ai reset timestamps are FIXED calendar times - they exist whether
+    // or not anything was consumed in the window. The countdown therefore
+    // always counts toward resetsAt; the old full-duration display for
+    // 100%-remaining windows was an OpenAI-ism (its resetsAt only appears
+    // with the first usage in a window).
+    const remainingSeconds = clamp(Math.ceil(resetsAt - currentSeconds), 0, durationSeconds);
     let primary = _("now");
     let secondary = "";
     if (remainingSeconds >= 86400) {
@@ -240,15 +279,20 @@ function formatResetCountdownTooltip(window, nowSeconds = null) {
     ].join("\n");
 }
 
-function formatLastResetTooltip(window, lastResetAt, use24Hour = true, estimated = false) {
+function formatLastResetTooltip(window, lastResetAt, use24Hour = true) {
     const durationLabel = formatDuration(window && window.durationMinutes);
     const timestamp = formatTimestamp(lastResetAt, use24Hour);
     if (timestamp === _("unknown")) {
         return _f("Last %s reset: unavailable", durationLabel);
     }
-    return estimated
-        ? _f("Last %s reset: %s (estimated from next reset)", durationLabel, timestamp)
-        : _f("Last %s reset: %s", durationLabel, timestamp);
+    // Z.ai resets sit on a fixed grid: the last reset is exactly one
+    // window duration before the next one, so the computed timestamp
+    // needs no estimation caveat - just a human-readable "how long ago".
+    const ago = formatRelativeTime(lastResetAt);
+    if (ago === _("unknown")) {
+        return _f("Last %s reset: %s", durationLabel, timestamp);
+    }
+    return _f("Last %s reset: %s · %s", durationLabel, timestamp, ago);
 }
 
 function buildQuotaIndicator(window) {
@@ -309,6 +353,35 @@ function buildActivityChart(values, valueKey = "consumedPercent") {
     const peakPercent = known.length > 0
         ? Math.max(...known.map(bar => bar.consumedPercent))
         : 0;
+    // Rank among the known bars: Z.ai value distributions are tiny and
+    // lopsided (many 1-3% buckets against one old 20%+ spike), and any
+    // value-normalization compresses recent buckets onto the same few
+    // pixels (Claudiu's 5%-vs-3% indistinguishable). The rank spreads
+    // every chart across the full bar range regardless of distribution;
+    // the caption keeps the honest peak value. Competition ranking:
+    // EQUAL values share one rank, so equal buckets render at equal
+    // heights. Sorting ties into arbitrary consecutive ranks made
+    // same-value buckets tower at random heights - stacked with the
+    // credit series, a 1% bucket ended up as tall as the 5% peak
+    // (Claudiu's 7d chart).
+    if (known.length > 1) {
+        const sorted = known.slice().sort(
+            (a, b) => a.consumedPercent - b.consumedPercent
+        );
+        let start = 0;
+        while (start < sorted.length) {
+            let end = start;
+            while (
+                end < sorted.length &&
+                sorted[end].consumedPercent === sorted[start].consumedPercent
+            ) {
+                end += 1;
+            }
+            const rankFraction = start / (sorted.length - 1);
+            for (let k = start; k < end; k++) sorted[k].rankFraction = rankFraction;
+            start = end;
+        }
+    }
     bars.forEach(bar => {
         if (!bar.known) return;
         const intensity = bar.estimated && bar.consumedPercent > 0
@@ -347,7 +420,9 @@ function buildCreditActivityChart(values) {
 function formatPeakCredits(values) {
     const chart = buildCreditActivityChart(values);
     if (chart.knownCount === 0 || chart.peakPercent <= 0) return null;
-    return formatConsumedCredits({ consumed: chart.peakPercent });
+    // One decimal on the k-range token ("7.2k AIC") - matches the credits
+    // balance and the 24h consumption look.
+    return formatCompactConsumedCredits({ consumed: chart.peakPercent }, 1);
 }
 
 function formatActivityBucketRange(
@@ -465,7 +540,10 @@ function formatCreditNumber(value) {
     if (value === null || value === undefined || value === "") return _("unavailable");
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return String(value);
-    return numeric === 0 ? "0" : numeric.toFixed(1);
+    if (numeric === 0) return "0";
+    // Whole balances read cleaner without a forced ".0" tail; fractional
+    // balances keep one decimal place.
+    return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
 }
 
 function parseUsageHelperError(value) {
@@ -490,10 +568,11 @@ function hasRecentActivity(activity24h, valueKey = "consumedPercent") {
     });
 }
 
-function historyPeriodKeys(durationMinutes) {
-    return Number(durationMinutes) <= 300
-        ? ["1h", "4h", "24h"]
-        : ["1h", "4h", "12h", "today"];
+function historyPeriodKeys() {
+    // Every window shows the same period set (Claudiu): the 5h window's
+    // rows used to stop at 1h/4h once the duplicated 24h total was
+    // dropped from the rows - 12h/today carry the rolling context now.
+    return ["1h", "4h", "12h", "today"];
 }
 
 function buildActivityTotalPeriod(activity24h) {
@@ -512,7 +591,11 @@ function activityValue(bucket) {
 }
 
 const ACTIVITY_BAR_EMPTY_HEIGHT = 2;
-const ACTIVITY_BAR_MIN_HEIGHT = 8;
+// A tiny floor: Z.ai percentages are small (1-9%), and an 8px floor out
+// of a 26px range compressed every sub-30% bucket onto the same height
+// ("all bars equal"). Three pixels keeps known-nonzero bars visible
+// while low fractions stay distinguishable.
+const ACTIVITY_BAR_MIN_HEIGHT = 3;
 const ACTIVITY_BAR_MAX_HEIGHT = 26;
 
 function activityBarHeight(bar, peakPercent) {
@@ -530,12 +613,22 @@ function activityBarHeight(bar, peakPercent) {
     const fraction = bar.estimated
         ? 0
         : clamp(bar.consumedPercent / peakPercent, 0, 1);
+    // Rank-based spread with a value floor: pure value normalization
+    // (linear or root) compresses lopsided Z.ai distributions (many tiny
+    // buckets under one old spike) until 3% and 5% read identical. The
+    // bar's rank among the known buckets drives most of the height, so
+    // every chart uses the full pixel range; the value term keeps bars
+    // from the same rank neighborhood ordered by their real size.
+    const rank = Number.isFinite(bar.rankFraction)
+        ? Math.max(0, Math.min(1, bar.rankFraction))
+        : Math.sqrt(fraction);
+    const spread = 0.15 + 0.85 * rank;
     return Math.min(
         ACTIVITY_BAR_MAX_HEIGHT,
         Math.max(
             ACTIVITY_BAR_MIN_HEIGHT,
             ACTIVITY_BAR_MIN_HEIGHT + Math.round(
-                fraction * (ACTIVITY_BAR_MAX_HEIGHT - ACTIVITY_BAR_MIN_HEIGHT)
+                spread * (ACTIVITY_BAR_MAX_HEIGHT - ACTIVITY_BAR_MIN_HEIGHT)
             )
         )
     );
@@ -623,7 +716,7 @@ function isSparkLimit(limit) {
 function resetNotificationEnabled(limit, options) {
     if (options.notifyAllWeeklyResets === true) return true;
     if (isSparkLimit(limit)) return options.notifySparkWeeklyReset === true;
-    return limit.id === "codex" && options.notifyCodexWeeklyReset === true;
+    return limit.id === ACCOUNT_LIMIT_ID && options.notifyCodexWeeklyReset === true;
 }
 
 function resetWasObserved(previousWindow, currentWindow) {
@@ -933,6 +1026,7 @@ function formatAppTooltip(installed, version = null, prefix = "", releaseDate = 
 }
 
 module.exports = {
+    ACCOUNT_LIMIT_ID,
     hasQuotaUsage,
     summarizeWindows,
     listQuotaWindows,
@@ -942,6 +1036,8 @@ module.exports = {
     formatPercent,
     formatPanelPercent,
     formatConsumedPercent,
+    formatCompactConsumedCredits,
+    formatCompactNumber,
     formatConsumedCredits,
     formatCreditConsumption,
     formatCreditConsumptionMarkup,

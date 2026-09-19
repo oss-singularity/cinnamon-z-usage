@@ -10,40 +10,39 @@ const PopupMenu = imports.ui.popupMenu;
 const Tooltips = imports.ui.tooltips;
 const Main = imports.ui.main;
 const MessageTray = imports.ui.messageTray;
-const ModalDialog = imports.ui.modalDialog;
-const Dialog = imports.ui.dialog;
-const CheckBox = imports.ui.checkBox;
 const Mainloop = imports.mainloop;
 const Util = imports.misc.util;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const St = imports.gi.St;
 const Clutter = imports.gi.Clutter;
+const Meta = imports.gi.Meta;
 const Pango = imports.gi.Pango;
 const GdkPixbuf = imports.gi.GdkPixbuf;
 const Cairo = imports.cairo;
 const Atk = imports.gi.Atk;
 const Cinnamon = imports.gi.Cinnamon;
+const ModalDialog = imports.ui.modalDialog;
+const Dialog = imports.ui.dialog;
 
 const UsageFormat = require("./usage-format");
 
 const Gettext = imports.gettext;
 function _(text) {
-    return Gettext.dgettext("chatgpt-usage@oss-singularity", text);
+    return Gettext.dgettext("z-usage@oss-singularity", text);
 }
 function _f(text, ...args) {
     return imports.format.format.apply(_(text), args);
 }
 
 
-const UUID = "chatgpt-usage@oss-singularity";
-const CHATGPT_URL = "https://chatgpt.com/";
-const CODEX_CLOUD_URL = "https://chatgpt.com/codex/cloud";
-const ANALYTICS_URL = "https://chatgpt.com/codex/cloud/settings/analytics#usage";
-const CHATGPT_LINUX_INSTALL_URL = "https://learn.chatgpt.com/docs/linux/linux-app";
-const CODEX_CLI_INSTALL_URL = "https://learn.chatgpt.com/docs/codex/cli#getting-started";
-const CODEX_RELEASE_VERSION = "codex-cli 0.152.0";
-const CODEX_RELEASE_DATE = "01.09.2026";
+const UUID = "z-usage@oss-singularity";
+const ACCOUNT_LIMIT_ID = "zai";
+const ZCODE_PLAN_SOURCE = "zcode-plan";
+const ZAI_URL = "https://chat.z.ai/";
+const ZAI_USAGE_URL = "https://z.ai/manage-apikey/coding-plan/personal/usage";
+const ZAI_API_KEYS_URL = "https://z.ai/manage-apikey/apikey-list";
+const ZCODE_INSTALL_URL = "https://zcode.z.ai";
 const PANEL_FONT_SCALE = 0.95;
 const PANEL_LABEL_SCALE = 0.79;
 const ACTIVITY_TOOLTIP_DELAY_MS = 120;
@@ -51,8 +50,23 @@ const LAUNCH_TOOLTIP_DELAY_MS = 420;
 const POPUP_ACTION_GRID_WIDTH = 352;
 // Cinnamon's one-pixel menu edge brings the visible popup width to 420 px.
 const POPUP_WIDTH = 419;
+// Cancels Cinnamon's MENU_ANIMATION_OFFSET when set as margin_left during
+// the close ease (target x = x - margin_left + OFFSET + margin_right).
+// Headroom between the locked viewport and the natural content height: the
+// frame is frozen once per open, and content that grows a few pixels after
+// the lock (countdown ticks, refresh labels) must not spawn a scrollbar.
+const POPUP_VIEWPORT_PAD = 8;
+// While the popup is open the button grid's right edge rides a constant
+// distance from the popup's own right edge: slides move both together and
+// the centering compensates footer label changes. A sync pass that reads a
+// different distance happened mid-relayout and must not write alignments.
+// Honest deviations are ±2px (label widths); anything beyond 24px was a
+// garbage read that put the rings flush against the popup edge.
+const POPUP_RELATIVE_ANCHOR_TOLERANCE = 24;
+// Ring corrections beyond this size need two agreeing passes before they
+// are applied: honest layout changes repeat, stale reads do not.
+const POPUP_RING_DELTA_TRUST = 32;
 const PANEL_VERTICAL_LABEL_WIDTH = 40;
-const POPUP_RIGHT_PANEL_CLOSE_WIDTH_TRIM = 1;
 const POPUP_RIGHT_INSET = 17;
 const POPUP_CHART_RIGHT_INSET = 39;
 const POPUP_NESTED_CHART_LEFT_SHIFT = 5;
@@ -72,19 +86,17 @@ const COMPACT_QUOTA_RING_SIZE = 40;
 const POPUP_HEADER_RING_LEFT_SHIFT = 13;
 const POPUP_RESET_RING_LEFT_SHIFT = 14;
 const SPARK_BADGE_COLOR = "#f2a15f";
-const RESET_EXPIRY_WARNING_COLOR = "#f2a15f";
 const RESET_EXPIRY_CRITICAL_COLOR = "#ff4d8d";
-const RESET_EXPIRY_WARNING_SECONDS = 7 * 24 * 60 * 60;
-const RESET_EXPIRY_CRITICAL_SECONDS = 24 * 60 * 60;
 const RESET_EXPIRY_BREATHING_OPACITY = 150;
 const RESET_EXPIRY_BREATHING_DURATION_MS = 1100;
 const WEEKLY_WINDOW_MINUTES = 10080;
 const WEEKLY_WINDOW_SECONDS = WEEKLY_WINDOW_MINUTES * 60;
 const WEEKLY_RESET_HISTORY_VERSION = 1;
 const POPUP_HEADING_STYLE = "font-size: 100%; font-weight: bold;";
-const AUTH_REQUIRED_TITLE = _("No ChatGPT login found");
-const AUTH_REQUIRED_DESCRIPTION =
-    _("Sign in to ChatGPT with the ChatGPT App or Codex CLI, then choose Refresh now.");
+const AUTH_REQUIRED_TITLE = _("No Z.ai API key found");
+const AUTH_REQUIRED_DESCRIPTION = _(
+    "Add a Z.ai API key with Coding Plan access in the applet settings, then choose Refresh now."
+);
 
 // Only our own menu is specialized. Cinnamon retains ownership of its
 // menu stack, focus handling, positioning and animation completion.
@@ -102,7 +114,14 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
         this._scroll.set_policy(St.PolicyType.NEVER, St.PolicyType.AUTOMATIC);
         this._scroll._delegate = this._content;
         this._scroll.add_actor(this._content.actor);
+        // Pinned header (title, updated stamp, quota rings) and pinned action
+        // footer: both live outside the scroll view so they stay visible while
+        // the content scrolls behind them.
+        this._header = new St.BoxLayout({ vertical: true });
+        this.box.add_child(this._header);
         this.box.add_child(this._scroll);
+        this._footer = new St.BoxLayout({ vertical: true });
+        this.box.add_child(this._footer);
         this._focusSignalId = global.stage.connect("notify::key-focus", () => {
             this._revealFocus();
         });
@@ -127,6 +146,13 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
             if (!this.isOpen) return GLib.SOURCE_REMOVE;
             const focus = global.stage.get_key_focus();
             if (!focus || !this._content.actor.contains(focus)) return GLib.SOURCE_REMOVE;
+            // Items grab the key focus on hover (focusOnHover) without any
+            // keyboard intent. Revealing that "focus" scrolls the popup
+            // under a merely resting pointer - the surprise auto-scroll
+            // when hovering a partially visible section header. Only real
+            // keyboard navigation reveals: its focus lands on items the
+            // pointer is NOT over.
+            if (focus.hover) return GLib.SOURCE_REMOVE;
             const [, top] = this._scroll.get_transformed_position();
             const [, height] = this._scroll.get_transformed_size();
             const [, focusTop] = focus.get_transformed_position();
@@ -160,28 +186,171 @@ class UsagePopupMenu extends Applet.AppletPopupMenu {
 
     open(animate) {
         const owner = this._usageOwner;
+        const freshOpen = !this.isOpen;
+        if (this._closePositionFrozen) {
+            // A leftover close freeze (the close animation was interrupted):
+            // drop it so this open positions from the live geometry again.
+            delete this._calculatePosition;
+            this._closePositionFrozen = null;
+        }
+        if (this._closeEaseRestore) {
+            delete this.actor.ease;
+            this._closeEaseRestore = false;
+        }
+        owner._closing = false;
+        if (freshOpen && owner._creditsFit) {
+            // Re-arm the one-shot credit font fit for this open cycle; the
+            // edge sync disarms it again once the alignment converges.
+            owner._creditsFit.setArmed(true);
+        }
         owner._applyPopupWidth();
-        owner._openActiveSparkHistory();
-        if (!this.isOpen) {
-            for (const section of owner._limitSections) {
-                section.setExpanded(UsageFormat.hasQuotaUsage(section.limit.windows));
+        if (freshOpen) {
+            // The default expansion on open must not yank the scroll position
+            // away from the header; auto-scrolling is for manual toggles only.
+            owner._suppressSectionAutoScroll = true;
+            try {
+                for (const section of owner._limitSections) {
+                    if (section._usageUserToggled) continue;
+                    section.setExpanded(owner._defaultSectionExpanded(section.limit));
+                }
+            } finally {
+                owner._suppressSectionAutoScroll = false;
             }
         }
-        super.open(animate);
+        // Clamp BEFORE the base positioning pass: Cinnamon places the popup
+        // from its preferred height, so a late clamp would leave the top of
+        // a taller-than-monitor popup off-screen.
+        owner._popupFrameHeight = 0;
+        // The anchor-stability baseline is per open: the first sync pass of
+        // this open establishes where the grid edge rides.
+        owner._stableRelativeAnchor = null;
+        owner._clampPopupHeight(owner.actor);
+        // The fold snap needs the popup's REAL allocations, which exist only
+        // once the open has laid out - on live data that decision lands 2-3
+        // frames into Cinnamon's animation, and the height correction then
+        // painted as a visible jump (the popup grew ~240px mid-fade). Hold
+        // the popup invisible (still mapped, so the layout pass runs) and
+        // replay the regular slide+fade from the FINAL geometry once the
+        // snap lands. Without the hold the open proceeds untouched.
+        const holdForSnap = freshOpen && animate &&
+            Main.wm && Main.wm.desktop_effects_menus &&
+            typeof Meta !== "undefined" && Meta.later_add;
+        this._foldHoldActive = false;
+        if (holdForSnap) {
+            this._foldHoldActive = true;
+            super.open(false);
+            this.actor.opacity = 0;
+            this._foldHoldTimer = Mainloop.timeout_add(400, () => {
+                this._foldHoldTimer = 0;
+                this._releaseFoldHold();
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            super.open(animate);
+        }
         owner._lockPopupLayoutWidth();
+        if (freshOpen && typeof Meta !== "undefined" && Meta.later_add) {
+            let attempts = 0;
+            const snapFold = () => {
+                if (owner._destroyed || !owner.menu || !owner.menu.isOpen) {
+                    this._releaseFoldHold();
+                    return;
+                }
+                attempts += 1;
+                // The first frame(s) after the open may run before the
+                // popup's layout pass produced measurable geometry; a
+                // MetaLater does not reliably honor SOURCE_CONTINUE, so
+                // re-arm it explicitly until the fold decision lands.
+                if (owner._snapViewportFoldToRows(attempts) || attempts >= 12) {
+                    this._releaseFoldHold();
+                    return;
+                }
+                Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
+            };
+            Meta.later_add(Meta.LaterType.BEFORE_REDRAW, snapFold);
+        }
+        if (freshOpen && this._scroll && this._scroll.get_vscroll_bar) {
+            // A fresh open always starts at the header, whatever earlier
+            // rebuilds or the previous session left scrolled.
+            this._scroll.get_vscroll_bar().get_adjustment().set_value(0);
+        }
+        if (freshOpen) owner._healRingRepaints();
+    }
+
+    _releaseFoldHold() {
+        if (!this._foldHoldActive) return;
+        this._foldHoldActive = false;
+        if (this._foldHoldTimer) {
+            Mainloop.source_remove(this._foldHoldTimer);
+            this._foldHoldTimer = 0;
+        }
+        if (!this.isOpen || !this.actor || this.actor.is_finalized()) return;
+        // Replay Cinnamon's animated open (popupMenu.js open(animate)):
+        // slide MENU_ANIMATION_OFFSET from the panel plus the fade, now
+        // from the settled final geometry.
+        this.animating = true;
+        const easeParams = {
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            duration: Main.wm.MENU_ANIMATION_TIME,
+            opacity: 255,
+            onComplete: () => {
+                this.animating = false;
+            }
+        };
+        let [xPos, yPos] = this._calculatePosition();
+        switch (this._orientation) {
+            case St.Side.TOP:
+            case St.Side.BOTTOM:
+                this.actor.x = xPos;
+                easeParams.y = yPos;
+                yPos -= this.actor.margin_top;
+                if (this.sideFlipped) {
+                    this.actor.y = yPos + 12 + this.actor.margin_top;
+                } else {
+                    this.actor.y = yPos - 12 + this.actor.margin_bottom;
+                }
+                break;
+            case St.Side.LEFT:
+            case St.Side.RIGHT:
+            default:
+                this.actor.y = yPos;
+                easeParams.x = xPos;
+                xPos -= this.actor.margin_left;
+                if (this.sideFlipped) {
+                    this.actor.x = xPos + 12 + this.actor.margin_left;
+                } else {
+                    this.actor.x = xPos - 12 + this.actor.margin_right;
+                }
+                break;
+        }
+        this.actor.ease(easeParams);
     }
 
     close(animate) {
         const owner = this._usageOwner;
+        if (this._foldHoldActive) {
+            // The hold never released (fast toggle): drop it at full
+            // opacity so the close fade starts from a sane state.
+            this._foldHoldActive = false;
+            if (this._foldHoldTimer) {
+                Mainloop.source_remove(this._foldHoldTimer);
+                this._foldHoldTimer = 0;
+            }
+            if (this.actor && !this.actor.is_finalized()) this.actor.opacity = 255;
+        }
         if (owner._isRightPanel && this.isOpen) {
             owner._rightPanelPopupLockedWidth = owner._popupWidth();
-            owner._normalizeRightPanelPopupCloseWidth(POPUP_RIGHT_PANEL_CLOSE_WIDTH_TRIM);
+            owner._normalizeRightPanelPopupCloseWidth();
         }
+        // Freeze every deferred alignment for the fade: the close is a pure
+        // opacity fade at the frozen position, and any post-rebuild
+        // re-alignment landing mid-fade would read as the rings jumping.
+        owner._closing = true;
         super.close(animate);
     }
 }
 
-class ChatGptUsageApplet extends Applet.Applet {
+class ZUsageApplet extends Applet.Applet {
     constructor(metadata, orientation, panelHeight, instanceId) {
         super(orientation, panelHeight, instanceId);
 
@@ -192,6 +361,7 @@ class ChatGptUsageApplet extends Applet.Applet {
 
         this._destroyed = false;
         this._timeoutId = 0;
+        this._lastRefreshAt = 0;
         this._countdownTimeoutId = 0;
         this._countdownWidgets = [];
         this._resetExpiryBreathingLabels = [];
@@ -199,7 +369,14 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._submenuTriangles = [];
+        this._creditsFit = null;
+        this._lastCreditFontSize = null;
+        this._installHelpDialog = null;
+        this._closing = false;
+        this._lastChartWidths = [];
+        this._chartWidthCandidates = [];
+        this._actionEdgeSyncQueuedId = 0;
+        this._stableRelativeAnchor = null;
         this._isRightPanel = this._orientationIsRight(orientation);
         this._rightPanelPopupCloseInProgress = false;
         this._rightPanelPopupCloseSeq = 0;
@@ -207,16 +384,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._rightPanelMenuBaseMarginRight = 0;
         this._refreshConfirmationTimeoutId = 0;
         this._refreshSpinnerTimeoutId = 0;
-        this._resetCancellable = null;
-        this._resetProcess = null;
         this._usageProcess = null;
-        this._backendInfo = null;
-        this._backendDiscovery = null;
-        this._backendCacheKey = null;
-        this._backendCachedAt = 0;
-        this._pendingReset = null;
-        this._resetJournalError = null;
-        this._resetJournalReady = false;
         this._weeklyResetHistory = {};
         this._weeklyResetHistoryDirty = false;
         this._weeklyResetHistoryReady = false;
@@ -243,9 +411,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._actionColumn = null;
         this._actionColumnWidth = POPUP_ACTION_GRID_WIDTH;
         this._installHelpDialog = null;
-        this._resetConfirmationDialog = null;
-        this._resetConsumeBusy = false;
-        this._resetFeedback = null;
         this._refreshQueued = false;
         this._refreshConfirmed = false;
         this._busy = false;
@@ -258,7 +423,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._clockChangedId = 0;
         this._use24HourClock = true;
 
-        this._loadResetAttempt();
         this._loadWeeklyResetHistory();
         this._setDefaults();
         this._bindSystemClockFormat();
@@ -271,15 +435,15 @@ class ChatGptUsageApplet extends Applet.Applet {
     }
 
     _setDefaults() {
-        this.refreshInterval = 3;
+        this.refreshInterval = 1;
         this.activityBucketMinutes = "60";
-        this.codexPath = "";
-        this.chatGptAppPath = "";
+        this.apiKey = "";
         this.showPanelIcon = true;
         this.showWindowLabels = true;
         this.showModelSpecificLimits = true;
+        this.showZcodePlanQuotas = true;
+        this.expandZcodePlanSections = true;
         this.showModelLimitsInPanel = false;
-        this.showCreditsInPanel = false;
         this.showWeeklyWithFiveHour = true;
         this.fontSize = 100;
         this.separator = "·";
@@ -317,19 +481,15 @@ class ChatGptUsageApplet extends Applet.Applet {
             "activityBucketMinutes",
             this._refreshUsage.bind(this)
         );
-        this.settings.bind("codex-path", "codexPath", this._refreshUsage.bind(this));
-        this.settings.bind("chatgpt-app-path", "chatGptAppPath", this._onChatGptAppPathChanged.bind(this));
+        this.settings.bind("api-key", "apiKey", this._refreshUsage.bind(this));
         this.settings.bind("show-panel-icon", "showPanelIcon", layoutChanged);
         this.settings.bind("show-window-labels", "showWindowLabels", layoutChanged);
         this.settings.bind("show-model-specific-limits", "showModelSpecificLimits", this._onModelVisibilityChanged.bind(this));
+        this.settings.bind("show-zcode-plan-quotas", "showZcodePlanQuotas", this._onModelVisibilityChanged.bind(this));
+        this.settings.bind("expand-zcode-plan-sections", "expandZcodePlanSections", this._onModelVisibilityChanged.bind(this));
         this.settings.bind(
             "show-model-limits-in-panel",
             "showModelLimitsInPanel",
-            layoutChanged
-        );
-        this.settings.bind(
-            "show-credits-in-panel",
-            "showCreditsInPanel",
             layoutChanged
         );
         this.settings.bind(
@@ -471,6 +631,16 @@ class ChatGptUsageApplet extends Applet.Applet {
     _buildMenu(orientation) {
         this.menuManager = new PopupMenu.PopupMenuManager(this);
         this.menu = new UsagePopupMenu(this, orientation);
+        this.menu._scroll.connect("captured-event", (_actor, event) => {
+            // Capture-phase wheel handling: nested scroll views (accordion
+            // leaves) consume wheel events even when their own adjustment
+            // cannot move, dead-zoning scrolling under the pointer. Handle
+            // every wheel step here instead - uniform scrolling everywhere.
+            if (event.type() === Clutter.EventType.SCROLL) {
+                return this._forwardContentWheel(event);
+            }
+            return Clutter.EVENT_PROPAGATE;
+        });
         this.menuManager.addMenu(this.menu);
         this._rightPanelMenuStyleBase = this.menu.actor.get_style() || "";
         this._rightPanelMenuBaseMarginRight = this.menu.actor.margin_right;
@@ -488,8 +658,16 @@ class ChatGptUsageApplet extends Applet.Applet {
         );
         this._rightPanelPopupClosedId = this.menu.connect("menu-animated-closed", () => {
             this.menu.actor.translation_x = 0;
+            if (this.menu._closeEaseRestore) {
+                delete this.menu.actor.ease;
+                this.menu._closeEaseRestore = false;
+            }
             this.menu.actor.margin_right = this._rightPanelMenuBaseMarginRight;
             this._applyPopupWidth();
+            if (this.menu._closePositionFrozen) {
+                delete this.menu._calculatePosition;
+                this.menu._closePositionFrozen = null;
+            }
         });
         this._rebuildMenu();
     }
@@ -521,59 +699,144 @@ class ChatGptUsageApplet extends Applet.Applet {
     _syncActionColumnCentering() {
         if (
             !this.menu ||
+            !this.menu.isOpen ||
             !this._actionWidthFrame ||
-            !this._actionWidthFrame.get_stage()
+            this._actionWidthFrame.is_finalized() ||
+            this.menu.actor.is_finalized() ||
+            !this._actionWidthFrame.get_stage() ||
+            this._closing
         ) return;
+        // The grid is statically centered and stays that way: the popup
+        // width is locked and the grid width is fixed, so the BinLayout
+        // placement alone puts it at the design offset in every allocation
+        // pass. The former dynamic centering read mid-relayout geometry
+        // (the frame still at its natural position before the expand
+        // allocation) and wrote a translation that doubled with the
+        // BinLayout centering once the layout settled - latching the whole
+        // grid flush against the popup edge (the bistable +33px button
+        // jump). No translation is written anymore; this pass only
+        // refreshes the content edge alignment that anchors to the grid.
         this._actionWidthFrame.translation_x = 0;
+        this._syncContentRightEdges();
+    }
+
+    // Allocation notifications fire mid-relayout, when the actor tree holds
+    // mixed old/new allocations. Syncing from those reads can latch a bogus
+    // ring/grid offset with no later correction (the wild-scroll ring shift).
+    // Queue the work for an idle instead: one run per frame, only on the
+    // settled layout, coalescing allocation storms.
+    _queueActionEdgeSync() {
+        if (typeof Mainloop === "undefined" || this._actionEdgeSyncQueuedId) return;
+        this._actionEdgeSyncQueuedId = Mainloop.idle_add(() => {
+            this._actionEdgeSyncQueuedId = 0;
+            if (this._destroyed || this._closing) return GLib.SOURCE_REMOVE;
+            this._syncActionColumnCentering();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _syncContentRightEdges() {
+        if (!this.menu || !this.menu.isOpen || this._closing) return;
+        if (!this._actionWidthFrame) return;
+        if (this._actionWidthFrame.is_finalized() || this.menu.actor.is_finalized()) return;
+        // Anchor: the button grid's right edge - rings and charts close
+        // flush with it (the original design).
         const [menuX] = this.menu.actor.get_transformed_position();
         const [menuWidth] = this.menu.actor.get_transformed_size();
         const [gridX] = this._actionWidthFrame.get_transformed_position();
         const [gridWidth] = this._actionWidthFrame.get_transformed_size();
-        // Transformed coordinates can differ by tiny float errors between
-        // opening and rebuilding. Snap to pixels before the half-width math
-        // so an odd popup width cannot flip the translation by one pixel.
-        const menuCenter = Math.round(menuX) + Math.round(menuWidth) / 2;
-        const gridCenter = Math.round(gridX) + Math.round(gridWidth) / 2;
-        this._actionWidthFrame.translation_x = Math.round(menuCenter - gridCenter);
-        this._syncContentRightEdges();
-    }
-
-    _syncContentRightEdges() {
-        if (!this._actionWidthFrame) return;
-        const [gridX] = this._actionWidthFrame.get_transformed_position();
-        const [gridWidth] = this._actionWidthFrame.get_transformed_size();
-        if (gridWidth <= 0) return;
+        if (gridWidth <= 0 || menuWidth <= 0) return;
         const right = Math.round(gridX + gridWidth);
-        // Native menu columns change their natural width when a model section
-        // disappears. Anchor our visuals to the actual button edge instead.
+        // While open, the grid edge rides a constant distance from the
+        // popup's own right edge: slides move both together and the
+        // centering compensates footer label changes. A pass reading a
+        // different distance is mid-relayout - writing its deltas shifts
+        // every ring toward the panel (the refresh jump), and repeated
+        // shifts accumulate past the per-ring guard, whose skip then
+        // leaves the rings invisible for good (the vanished rings).
+        const relative = Math.round(menuX + menuWidth) - right;
+        if (this._stableRelativeAnchor === null || this._stableRelativeAnchor === undefined) {
+            this._stableRelativeAnchor = relative;
+        } else if (
+            Math.abs(relative - this._stableRelativeAnchor) > POPUP_RELATIVE_ANCHOR_TOLERANCE
+        ) {
+            return;
+        }
         const rings = (this._countdownWidgets || []).map(entry => entry.actor);
         if (this._headerRings) rings.push(this._headerRings);
         for (const actor of rings) {
-            const [x] = actor.get_transformed_position();
+            if (actor.is_finalized()) continue;
             const [width] = actor.get_transformed_size();
             if (width <= 0) continue;
-            // The circular glow ends one pixel inside its drawing allocation.
-            const shift = Math.round(right - (x + width - 1));
-            if (shift) actor.translation_x += shift;
+            // Per-ring absolute alignment: the painted right edge (the glow
+            // ends one pixel inside) goes to the anchor, so repeated syncs
+            // converge instead of drifting. A delta beyond the popup width
+            // cannot come from an honest layout - the ring was flung out by
+            // earlier stale passes. Snap it to its designed offset instead
+            // of skipping: a skip left it invisible forever.
+            const current = actor.get_transformed_position()[0] + width - 1;
+            const delta = right - Math.round(current);
+            if (Math.abs(delta) > POPUP_WIDTH) {
+                if (actor._usageHomeTx !== undefined) actor.translation_x = actor._usageHomeTx;
+                actor._usagePendingDelta = null;
+                continue;
+            }
+            if (Math.abs(delta) <= POPUP_RING_DELTA_TRUST) {
+                actor._usagePendingDelta = null;
+                actor.translation_x += delta;
+                continue;
+            }
+            // One pass can read a garbage transformed position while the
+            // rebuild's allocation waves are still in flight; writing that
+            // delta WAS the visible refresh jump (a whole-poll flash of the
+            // rings hundreds of pixels off). An honest layout change shows
+            // the same delta again on the next pass - apply only then.
+            const pending = actor._usagePendingDelta;
+            if (pending !== null && pending !== undefined && Math.abs(pending - delta) <= 4) {
+                actor._usagePendingDelta = null;
+                actor.translation_x += delta;
+            } else {
+                actor._usagePendingDelta = delta;
+            }
         }
-        const arrows = (this._submenuTriangles || []).concat(
-            (this._limitSections || []).map(section => section.heading.arrow)
-        );
-        for (const actor of arrows) {
-            const [width] = actor.get_transformed_size();
-            if (width <= 0) continue;
-            // The transformed origin is not the bounding-box left edge after
-            // Cinnamon rotates the disclosure. Measure the actual vertices.
-            const edge = Math.max(...actor.get_abs_allocation_vertices().map(vertex => vertex.x));
-            const shift = Math.round(right - edge);
-            if (shift) actor.translation_x += shift;
-        }
-        for (const { chart } of this._activityCharts || []) {
+        const chartLimit = this._popupWidth() + 96;
+        (this._activityCharts || []).forEach(({ chart }, index) => {
+            if (chart.is_finalized()) return;
+            // A closed leaf's chart reports stale transforms (its inner box
+            // sits at the scroll origin with its last-open height): reading
+            // it would write garbage widths into the carried hints.
+            if (chart.mapped === false) return;
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
             const width = Math.max(1, Math.round(right - x + padding));
-            if (!chart.min_width_set || chart.min_width !== width) this._forceActorWidth(chart, width);
-        }
+            // Charts span from their row to the grid edge; anything wider is
+            // a stale read (mid-scroll or mid-relayout), never a real width.
+            if (width > chartLimit) return;
+            // A settled layout keeps every chart at a constant width, so a
+            // jump between passes is a transient read (mid-rebuild the
+            // chart's transformed x drifts; the first pass after a rebuild
+            // measured the graph ~10px narrow and pinned that for a frame).
+            // Width changes beyond noise must survive two agreeing passes
+            // before they are written; small drifts apply immediately.
+            const last = (this._lastChartWidths || [])[index];
+            if (typeof last === "number" && Math.abs(width - last) > 4) {
+                if ((this._chartWidthCandidates || [])[index] !== width) {
+                    if (!this._chartWidthCandidates) this._chartWidthCandidates = [];
+                    this._chartWidthCandidates[index] = width;
+                    return;
+                }
+            }
+            if (this._chartWidthCandidates) this._chartWidthCandidates[index] = null;
+            if (!chart.min_width_set || chart.min_width !== width) {
+                this._forceActorWidth(chart, width);
+                this._lastChartWidths[index] = width;
+            }
+        });
+        // The credits consumption line flows naturally like upstream and
+        // the font fit owns its size - but its painted end is pinned to
+        // the grid edge. No suffix translation here - moving the group per
+        // translation detached it from the balance value and made the line
+        // visibly jump whenever the fit and the pin disagreed on timing.
     }
 
     _rebuildPanel() {
@@ -583,7 +846,7 @@ class ChatGptUsageApplet extends Applet.Applet {
 
         let panelLimits = this._filterModelLimits(this._snapshot ? this._snapshot.limits : []);
         if (!this.showModelLimitsInPanel) {
-            const accountLimits = panelLimits.filter(limit => limit.id === "codex");
+            const accountLimits = panelLimits.filter(limit => limit.id === ACCOUNT_LIMIT_ID);
             if (accountLimits.length > 0) panelLimits = accountLimits;
         }
         const allSummaries = UsageFormat.summarizeWindows(panelLimits);
@@ -616,31 +879,30 @@ class ChatGptUsageApplet extends Applet.Applet {
             });
         }
 
-        const panelCredits = this._panelCreditsValue();
-        if (panelCredits !== null) {
-            if (this.separator && !this._isVertical) {
-                this._root.add_child(new St.Label({
-                    text: this.separator,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `padding-left: 4px; padding-right: 4px; color: ${this.panelTextColor};`
-                }));
-            }
-            this._root.add_child(this._createPanelCreditsActor(panelCredits));
-        }
-
         this._updateTooltip(summaries);
     }
 
     _filterModelLimits(limits) {
+        let list = Array.from(limits || []);
+        if (this.showZcodePlanQuotas === false) {
+            list = list.filter(limit => limit.source !== ZCODE_PLAN_SOURCE);
+        }
         return this.showModelSpecificLimits === false
-            ? limits.filter(limit => (limit.id || "codex") === "codex")
-            : limits;
+            ? list.filter(limit => (limit.id || ACCOUNT_LIMIT_ID) === ACCOUNT_LIMIT_ID)
+            : list;
+    }
+
+    _defaultSectionExpanded(limit) {
+        return this.expandZcodePlanSections === true ||
+            UsageFormat.hasQuotaUsage(limit.windows);
     }
 
     _modelBadge(limit) {
-        if (!limit || limit.limitId === "codex" || limit.id === "codex") return null;
+        if (!limit || limit.limitId === ACCOUNT_LIMIT_ID || limit.id === ACCOUNT_LIMIT_ID) return null;
         const label = String(limit.limitLabel || limit.label || "");
-        return /spark/i.test(label) ? "S" : "M";
+        if (/global/i.test(label)) return "G";
+        if (/start/i.test(label)) return "S";
+        return "M";
     }
 
     _modelBadgeStyle(fontPercent) {
@@ -737,56 +999,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         return actor;
     }
 
-    _panelCreditsValue() {
-        const credits = this._snapshot ? this._snapshot.credits : null;
-        if (!this.showCreditsInPanel || !credits) return null;
-        if (credits.unlimited) return "∞";
-        return UsageFormat.formatCreditNumber(credits.balance);
-    }
-
-    _createPanelCreditsActor(value) {
-        const fontSize = this._panelFontSize();
-        const labelFontSize = Math.max(60, Math.round(fontSize * PANEL_LABEL_SCALE));
-        const actor = new St.BoxLayout({
-            reactive: false,
-            vertical: true
-        });
-        actor.x_align = Clutter.ActorAlign.CENTER;
-        actor.y_align = Clutter.ActorAlign.CENTER;
-        actor.style = this._isVertical ? "padding: 1px 0px;" : "";
-
-        const labelRow = new St.BoxLayout({
-            reactive: false,
-            vertical: false,
-            x_align: Clutter.ActorAlign.CENTER
-        });
-        if (this.showPanelIcon) {
-            labelRow.add_child(this._createPanelIcon());
-            if (this._isVertical) labelRow.style = `min-width: ${PANEL_VERTICAL_LABEL_WIDTH}px;`;
-        }
-        const label = new St.Label({
-            text: _("AIC"),
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            style: `font-size: ${labelFontSize}%; color: ${this.panelTextColor};`
-        });
-        label.clutter_text.set_line_alignment(Pango.Alignment.CENTER);
-        labelRow.add_child(label);
-        actor.add_child(labelRow);
-
-        const balance = new St.Label({
-            text: value,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            style: `font-size: ${fontSize}%; color: ${this.panelTextColor};`
-        });
-        balance.clutter_text.set_line_alignment(Pango.Alignment.CENTER);
-        if (!this._isVertical) balance.translation_y = 1;
-        actor.add_child(balance);
-        actor.accessible_name = _f("Credits: %s", value);
-        return actor;
-    }
-
     _panelFontSize() {
         return Math.round(this.fontSize * PANEL_FONT_SCALE);
     }
@@ -822,8 +1034,6 @@ class ChatGptUsageApplet extends Applet.Applet {
                 );
             }).join(" • ");
         }
-        const panelCredits = this._panelCreditsValue();
-        if (panelCredits !== null) text += `\n${_f("Credits: %s", panelCredits)}`;
         if (this._lastError) text += `\n${this._lastError}`;
         this.set_applet_tooltip(text);
     }
@@ -858,19 +1068,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         return this.normalColor;
     }
 
-    _resetExpiryColor(expiresAt) {
-        const expiry = Number(expiresAt);
-        if (!Number.isFinite(expiry) || expiry <= 0) return null;
-        const remaining = expiry - GLib.get_real_time() / 1000000;
-        if (remaining <= RESET_EXPIRY_CRITICAL_SECONDS) {
-            return RESET_EXPIRY_CRITICAL_COLOR;
-        }
-        if (remaining <= RESET_EXPIRY_WARNING_SECONDS) {
-            return RESET_EXPIRY_WARNING_COLOR;
-        }
-        return null;
-    }
-
     _startResetExpiryBreathing() {
         if (this._animationsEnabled === false || !St.Settings.get().animations_enabled) {
             this._stopResetExpiryBreathing();
@@ -903,6 +1100,15 @@ class ChatGptUsageApplet extends Applet.Applet {
     _rebuildMenu() {
         if (!this.menu) return;
         const wasOpen = this.menu.isOpen;
+        // Rebuilds empty the content for a moment: the automatic scrollbar
+        // hides, the scroll content widens by its width and every
+        // right-aligned row shifts right - then everything shifts back
+        // when the scrollbar returns. Hold the scrollbar across the whole
+        // rebuild so the width never changes mid-flight.
+        // The scrollbar policy is ALWAYS permanently: the content is
+        // always taller than the viewport, so the automatic policy only
+        // added toggle transients (the scrollbar hiding/reappearing
+        // shifted the whole content by its width on rebuilds).
         const expandedSubmenus = new Set();
         const limitStates = new Map(
             this._limitSections.map(section => [section.limit.id, section.expanded])
@@ -942,13 +1148,30 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._actionFrame = null;
         this._actionWidthFrame = null;
         this._actionColumn = null;
+        // Carry the aligned ring translations across the rebuild so the
+        // refreshed menu opens pre-aligned instead of visibly jumping when
+        // the deferred sync catches up. Captured BEFORE resetting anything;
+        // translations beyond the popup width are poison from earlier stale
+        // passes and are dropped so they cannot haunt the fresh build.
+        const carriedRingTranslations = this._captureCarriedRingTranslations();
+        const carriedHeaderTx = this._captureCarriedHeaderTranslation();
+        this._carriedRingTranslations = carriedRingTranslations;
+        this._carriedHeaderTx = carriedHeaderTx;
+        this._carriedRingTranslations = carriedRingTranslations;
+        this._carriedHeaderTx = carriedHeaderTx;
         this._countdownWidgets = [];
         this._quotaWidgets = [];
         this._activityTooltips = [];
         this._popupRightInsetRows = [];
         this._activityCharts = [];
-        this._submenuTriangles = [];
+        this._creditsFit = null;
         this.menu.removeAll();
+        if (this.menu._footer) {
+            this.menu._footer.remove_all_children();
+        }
+        if (this.menu._header) {
+            this.menu._header.remove_all_children();
+        }
 
         this._addHeaderItem();
         if (this._snapshot) {
@@ -958,12 +1181,12 @@ class ChatGptUsageApplet extends Applet.Applet {
             usageTitle.actor.style = "padding-bottom: 2px;";
             const showLimitLabels = limits.length > 1;
             for (const limit of limits) {
-                if (this._modelBadge(limit) === "S") {
+                if (limit.id !== ACCOUNT_LIMIT_ID) {
                     this._addCollapsibleLimit(
                         limit,
                         wasOpen && limitStates.has(limit.id)
                             ? limitStates.get(limit.id)
-                            : UsageFormat.hasQuotaUsage(limit.windows)
+                            : this._defaultSectionExpanded(limit)
                     );
                     continue;
                 }
@@ -975,16 +1198,13 @@ class ChatGptUsageApplet extends Applet.Applet {
                 }
             }
 
-            this._addHistoryItems();
-
+            // Credits first, the collapsible history graphs below: the
+            // default (collapsed) view then always shows the plan and
+            // balance values without scrolling past graph headers.
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             this._addCreditItems();
-            if (this._resetFeedback) {
-                this._addStatusItem(
-                    this._resetFeedback.title,
-                    this._resetFeedback.description
-                );
-            }
+
+            this._addHistoryItems();
         } else if (this._authenticationRequired) {
             this._addStatusItem(AUTH_REQUIRED_TITLE, AUTH_REQUIRED_DESCRIPTION);
         } else {
@@ -992,15 +1212,117 @@ class ChatGptUsageApplet extends Applet.Applet {
         }
 
         if (this._lastError) this._addStatusItem(_("Last refresh failed"), this._lastError);
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
         this._addLaunchButtons();
 
         if (wasOpen) {
-            for (const entry of this._historySubmenus) {
-                if (expandedSubmenus.has(entry.id)) entry.submenu.menu.open(false);
+            // Restoring the open leaves must not auto-scroll to them:
+            // the restore fires each leaf's ensure-visible idle and the
+            // popup jumped to the bottom right after a rebuild-while-open
+            // (Claudiu's "auto-scroll event" on the first open within the
+            // refresh interval). Scrolling is for manual toggles only.
+            this._suppressSectionAutoScroll = true;
+            try {
+                for (const entry of this._historySubmenus) {
+                    if (expandedSubmenus.has(entry.id)) entry.submenu.menu.open(false);
+                }
+            } finally {
+                this._suppressSectionAutoScroll = false;
             }
+            if (this.menu.isOpen) this._clampPopupHeight();
         }
+        this._builtMenuSignature = this._menuSignature(this._snapshot);
+        // Freshly rebuilt rings can lose their first repaint to a GC
+        // sweep block; the deferred repaint passes heal that.
+        this._healRingRepaints();
+        // Fresh items must be width-locked BEFORE their first allocation:
+        // without the lock they allocate at their inflated natural width
+        // (ring rows measured 458px instead of 373) and nothing ever
+        // re-allocates them while the popup stays open - the rings, charts
+        // and the credits fit all measure the overflow geometry.
+        if (wasOpen && this.menu.isOpen && this.menu.actor) {
+            this._lockPopupLayoutWidth();
+        }
+
+
+        // A rebuild replaces every aligned actor while the popup may be
+        // open; one queued sync can race ahead of the fresh actors' first
+        // allocation and skip them. Re-queue on deferred passes so rings,
+        // charts and the credits line always converge after a rebuild.
+        // The credits fit rides along on the deferred passes: its early
+        // passes can hit the pre-footer allocation window and need a
+        // settled second chance after the layout wave.
+        if (typeof Mainloop !== "undefined") {
+            this._queueActionEdgeSync();
+            Mainloop.timeout_add(120, () => {
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+            Mainloop.timeout_add(400, () => {
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+            Mainloop.timeout_add(900, () => {
+                if (!this._destroyed) {
+                    this._queueActionEdgeSync();
+                    if (this._creditsFit) this._creditsFit.refit();
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+        this._carriedRingTranslations = null;
+        this._carriedHeaderTx = null;
+        // Align before the next frame paints: a rebuild while the popup is
+        // open must not show even one frame of unaligned rings. The
+        // deferred idle/timeout passes stay as backup for late allocators.
+        if (typeof Meta !== "undefined" && Meta.later_add) {
+            Meta.later_add(Meta.LaterType.BEFORE_REDRAW, () => {
+                if (!this._destroyed && !this._closing && this.menu && this.menu.isOpen) {
+                    this._syncActionColumnCentering();
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    _captureCarriedRingTranslations() {
+        return (this._countdownWidgets || []).map(entry =>
+            entry.actor && !entry.actor.is_finalized() &&
+            Math.abs(entry.actor.translation_x) <= POPUP_WIDTH
+                ? entry.actor.translation_x : null);
+    }
+
+    _captureCarriedHeaderTranslation() {
+        return this._headerRings && !this._headerRings.is_finalized() &&
+            Math.abs(this._headerRings.translation_x) <= POPUP_WIDTH
+            ? this._headerRings.translation_x : null;
+    }
+
+    _menuSignature(snapshot) {
+        // A refresh returns a fresh snapshot every time even when nothing
+        // visible changed; rebuilding the open menu for it blanks the
+        // content for a few frames (the flicker on rapid refresh clicks).
+        // Compare exactly what the menu renders.
+        if (!snapshot) return "none";
+        return JSON.stringify({
+            limits: (snapshot.limits || []).map(limit => ({
+                id: limit.id,
+                windows: (limit.windows || []).map(window => [
+                    window.remainingPercent,
+                    window.usedPercent,
+                    window.resetsAt
+                ])
+            })),
+            credits: snapshot.credits || null,
+            consumption: snapshot.history ? snapshot.history.creditPeriods || null : null,
+            activity: snapshot.history ? snapshot.history.creditActivity24h || null : null
+        });
     }
 
     _scheduleMenuRebuild() {
@@ -1011,9 +1333,91 @@ class ChatGptUsageApplet extends Applet.Applet {
                 return GLib.SOURCE_CONTINUE;
             }
             this._menuRebuildTimeoutId = 0;
+            // A rebuild landing mid-fade has the same problem as a
+            // rebuild-before-close: fresh rows allocate at their inflated
+            // natural width and the close-gated syncs never correct them.
+            // The next open rebuilds anyway.
+            if (this.menu && !this.menu.isOpen && this.menu.animating) {
+                return GLib.SOURCE_REMOVE;
+            }
+            // Identical data renders an identical menu - skip the rebuild
+            // and the content flicker that comes with it.
+            const signature = this._menuSignature(this._snapshot);
+            if (signature === this._builtMenuSignature) {
+                return GLib.SOURCE_REMOVE;
+            }
             this._rebuildMenu();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    // St applies the label's own foreground over the markup's first span:
+    // Pango itself paints every span color correctly (verified headless),
+    // but Cinnamon's Clutter layer lets the label color win at glyph 0 -
+    // the "P" stayed white while every later letter took its gradient
+    // (Claudiu's pill report). A leading space inside the first span
+    // absorbs that override, so every visible letter keeps its gradient.
+    _planPillGradientMarkup(planText, fromColor, toColor) {
+        const chars = Array.from(planText);
+        const channel = (a, b, t) =>
+            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
+        const hex = t =>
+            `#${channel(fromColor.red, toColor.red, t)}` +
+            `${channel(fromColor.green, toColor.green, t)}` +
+            `${channel(fromColor.blue, toColor.blue, t)}`;
+        const spans = chars.map((ch, index) => {
+            const t = chars.length > 1 ? index / (chars.length - 1) : 0;
+            const escaped = ch === "&"
+                ? "&amp;"
+                : ch === "<"
+                    ? "&lt;"
+                    : ch === ">"
+                        ? "&gt;"
+                        : ch;
+            return `<span foreground="${hex(t)}">${escaped}</span>`;
+        });
+        return `<span foreground="${hex(0)}"> </span>${spans.join("")}`;
+    }
+
+    // Shared brand treatment: the first brandLength characters carry the
+    // blue-to-green gradient. The label's own color must be the gradient's
+    // start color: the Clutter layer paints glyph 0 with the label color
+    // no matter what the markup's first span says (the pill's white-"P"
+    // finding), so the first character stays unspanned and the remaining
+    // brand letters interpolate in explicit spans. The tail keeps the
+    // label's regular foreground.
+    _brandPrefixGradientMarkup(text, brandLength, fromColor, toColor, baseColor, tailGap = "") {
+        const chars = Array.from(text);
+        const channel = (a, b, t) =>
+            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
+        const mix = t =>
+            `#${channel(fromColor.red, toColor.red, t)}` +
+            `${channel(fromColor.green, toColor.green, t)}` +
+            `${channel(fromColor.blue, toColor.blue, t)}`;
+        const escape = ch => ch === "&"
+            ? "&amp;"
+            : ch === "<"
+                ? "&lt;"
+                : ch === ">"
+                    ? "&gt;"
+                    : ch;
+        const span = (color, ch) => `<span foreground="${color}">${escape(ch)}</span>`;
+        const head = Math.min(brandLength, chars.length);
+        const parts = [escape(chars[0])];
+        let tail = "";
+        for (let index = 1; index < chars.length; index++) {
+            if (index < head) {
+                if (tail) {
+                    parts.push(span(baseColor, tail));
+                    tail = "";
+                }
+                parts.push(span(mix(index / (head - 1)), chars[index]));
+            } else {
+                tail += chars[index];
+            }
+        }
+        if (tail) parts.push(tailGap + span(baseColor, tail));
+        return parts.join("");
     }
 
     _addHeaderItem() {
@@ -1048,9 +1452,87 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._screenshotButton.y_align = Clutter.ActorAlign.START;
         this._screenshotButtonLabel = this._screenshotButton._usageLabel;
         this._buildScreenshotContextMenu();
-        const title = new St.Label({ text: _("ChatGPT Work & Codex usage") });
-        title.style = POPUP_HEADING_STYLE;
-        text.add_child(title);
+        const titleLine = new St.BoxLayout({ vertical: false });
+        const title = new St.Label({ text: _("Z.ai Coding Usage") });
+        // The "Z.ai" brand rides the same blue-to-green gradient as the
+        // plan pill: the label's own color IS the gradient start (the
+        // Clutter layer paints glyph 0 with it regardless of the markup's
+        // first span), the remaining brand letters interpolate, and the
+        // description keeps the menu foreground.
+        const brandStart = Clutter.Color.from_string(
+            this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)
+        );
+        if (title.clutter_text && brandStart[0]) {
+            const [, fromColor] = brandStart;
+            const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
+            const menuNode = this.menu.actor.get_theme_node();
+            const fg = menuNode.get_foreground_color();
+            const bg = menuNode.get_background_color();
+            // The tail returns to the heading's old rendered gray (Claudiu's
+            // final tuning after the +⅓-white test): the theme gray sits a
+            // third of the way toward the popup background from the
+            // foreground, which reads rounder than pure white next to the
+            // gradient brand.
+            const soften = (channel, background) =>
+                Math.round(channel + (background - channel) * 0.33)
+                    .toString(16)
+                    .padStart(2, "0");
+            const baseColor = `#${soften(fg.red, bg.red)}${soften(fg.green, bg.green)}${soften(fg.blue, bg.blue)}`;
+            if (toValid) {
+                title.style = `${POPUP_HEADING_STYLE} color: ${this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)};`;
+                title.clutter_text.set_markup(
+                    this._brandPrefixGradientMarkup(
+                        _("Z.ai Coding Usage"),
+                        4,
+                        fromColor,
+                        toColor,
+                        baseColor,
+                        "\u2009"
+                    )
+                );
+            }
+        }
+        if (!title.style) title.style = POPUP_HEADING_STYLE;
+        titleLine.add_child(title);
+        const plan = this._snapshot && this._snapshot.credits
+            ? this._snapshot.credits.plan
+            : null;
+        if (plan) {
+            // The plan rides the title line (Claudiu): saves the "Plan:"
+            // row below the credits section and shrinks the popup. The
+            // text paints as a bold per-letter blue-to-green gradient -
+            // St labels cannot gradient their text, Pango spans can.
+            const planText = _f("Plan: %s", String(plan));
+            const planLabel = new St.Label({ text: planText });
+            planLabel.y_align = Clutter.ActorAlign.CENTER;
+            title.y_align = Clutter.ActorAlign.CENTER;
+            planLabel.style = [
+                "margin-left: 24px",
+                "padding: 3px 8px 1px 8px",
+                "border-radius: 10px",
+                "background-color: rgba(255, 255, 255, 0.08)",
+                "font-size: 80%",
+                "font-weight: 700",
+                `color: ${this._menuColor(0.75)}`
+            ].join("; ") + ";";
+            if (planLabel.clutter_text) {
+                // Brighten the gradient's start: at this tiny size the
+                // subpixel antialiasing shaves ~40% off the stroke color,
+                // and the first letters of a plain normalColor start read
+                // as muddy dark (Claudiu's invisible "P").
+                const [fromValid, fromColor] = Clutter.Color.from_string(
+                    this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)
+                );
+                const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
+                if (fromValid && toValid) {
+                    planLabel.clutter_text.set_markup(
+                        this._planPillGradientMarkup(planText, fromColor, toColor)
+                    );
+                }
+            }
+            titleLine.add_child(planLabel);
+        }
+        text.add_child(titleLine);
         if (this._snapshot) {
             this._updatedLabel = new St.Label({
                 text: _f("Updated %s", UsageFormat.formatRelativeTime(this._snapshot.updatedAt))
@@ -1082,7 +1564,11 @@ class ChatGptUsageApplet extends Applet.Applet {
         if (this.menu._boxWrapper) this.menu._boxWrapper.add_actor(this._screenshotButton);
 
         if (this._snapshot) {
-            const summaries = UsageFormat.listQuotaWindows(this._filterModelLimits(this._snapshot.limits));
+            // The header rings stay the account's 5h/7d overview; plan sections
+            // carry their own rings next to their rows.
+            const accountLimits = this._filterModelLimits(this._snapshot.limits)
+                .filter(limit => limit.id === ACCOUNT_LIMIT_ID);
+            const summaries = UsageFormat.listQuotaWindows(accountLimits);
             const compact = summaries.length >= 4;
             const rings = new St.BoxLayout({
                 vertical: false,
@@ -1091,9 +1577,12 @@ class ChatGptUsageApplet extends Applet.Applet {
             });
             rings.style = `spacing: ${compact ? 2 : 8}px;`;
             this._headerRings = rings;
-            rings.translation_x = compact
+            rings.connect("notify::allocation", () => this._queueActionEdgeSync());
+            rings._usageHomeTx = compact
                 ? -(POPUP_HEADER_RING_LEFT_SHIFT - 6)
                 : -POPUP_HEADER_RING_LEFT_SHIFT;
+            rings.translation_x = rings._usageHomeTx;
+            if (typeof this._carriedHeaderTx === "number") rings.translation_x = this._carriedHeaderTx;
             for (const summary of summaries) {
                 rings.add_child(
                     this._createQuotaRing(
@@ -1106,11 +1595,16 @@ class ChatGptUsageApplet extends Applet.Applet {
             row.add_child(rings);
         }
         item.addActor(row, { expand: true, span: -1 });
-        this.menu.addMenuItem(item);
+        if (this.menu._header) {
+            this.menu._header.add_child(item.actor);
+        } else {
+            this.menu.addMenuItem(item);
+        }
     }
 
     _quotaRingOpacity(window) {
-        if (this._modelBadge(window) !== "S") return 255;
+        const badge = this._modelBadge(window);
+        if (badge !== "S" && badge !== "G") return 255;
         const limit = (this._snapshot.limits || []).find(
             candidate => candidate.id === window.limitId
         );
@@ -1176,8 +1670,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             const tooltipText = UsageFormat.formatLastResetTooltip(
                 window,
                 details.timestamp,
-                this._use24HourClock,
-                details.estimated
+                this._use24HourClock
             );
             actor.accessible_name = UsageFormat.formatAccessibleTooltip(tooltipText);
             tooltip = this._createPositionedTooltip(actor, tooltipText);
@@ -1212,6 +1705,12 @@ class ChatGptUsageApplet extends Applet.Applet {
             text: _f("  %s usage", duration)
         });
         durationLabel.style = "font-weight: bold;";
+        // Ellipsize the row labels: their inflated minimum widths used to
+        // overflow the clamped item on the first allocation after a rebuild
+        // (rows measured 23..458 instead of 23..396), shoving the rings and
+        // charts outward and letting the credits font fit converge on the
+        // wrong geometry.
+        durationLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         const remainingLabel = new St.Label({
             text: _f("%s remaining", remaining)
         });
@@ -1219,6 +1718,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             this._remainingColor(window.remainingPercent),
             12
         );
+        remainingLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         remainingLabel.opacity = this.showColors &&
             Number.isFinite(window.remainingPercent) &&
             window.remainingPercent <= this.criticalRemaining ? 255 : 195;
@@ -1227,6 +1727,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         const resetLabel = new St.Label({
             text: _f("  Resets %s", reset)
         });
+        resetLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.END);
         resetLabel.style = `padding-top: 3px; font-size: 90%; color: ${this._menuColor(0.68)};`;
         text.add_child(headline);
         text.add_child(resetLabel);
@@ -1274,13 +1775,11 @@ class ChatGptUsageApplet extends Applet.Applet {
         if (collapsible) {
             label.opacity = 128;
             item.actor.style = `padding-right: ${POPUP_RIGHT_INSET}px;`;
-            const arrowBin = new St.Bin({ x_align: St.Align.END });
-            item.addActor(arrowBin, { expand: true, span: -1, align: St.Align.END });
-            item.arrow = PopupMenu.arrowIcon(St.Side.RIGHT);
-            item.arrow.set_pivot_point(0.5, 0.5);
-            arrowBin.child = item.arrow;
             item.actor.label_actor = label;
         }
+        // Marks the fold rule: a heading alone at the viewport fold reads
+        // as a broken chart end - the snap tucks the fold above it.
+        item.actor._usageSectionHeading = true;
         menu.addMenuItem(item);
         return item;
     }
@@ -1301,22 +1800,35 @@ class ChatGptUsageApplet extends Applet.Applet {
             heading,
             rows,
             expanded: false,
+            _usageUserToggled: false,
             setExpanded: open => {
                 section.expanded = open;
                 for (const row of rows) row.actor.visible = open;
-                heading.arrow.rotation_angle_z = open ? 90 : 0;
                 if (open) heading.actor.add_accessible_state(Atk.StateType.EXPANDED);
                 else heading.actor.remove_accessible_state(Atk.StateType.EXPANDED);
+                this._clampPopupHeight();
+                this._queueActionEdgeSync();
+                if (open && rows.length > 0 && typeof Mainloop !== "undefined" &&
+                    !this._suppressSectionAutoScroll && this.menu && this.menu.isOpen) {
+                    Mainloop.idle_add(() => {
+                        if (!this._destroyed) this._ensureActorVisible(rows[rows.length - 1].actor);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
             }
         };
         heading.actor.add_accessible_state(Atk.StateType.EXPANDABLE);
         // The native base activation emits the menu-closing signal. A
         // disclosure must instead keep the popup open for mouse and keyboard.
-        heading.activate = () => section.setExpanded(!section.expanded);
+        heading.activate = () => {
+            section._usageUserToggled = true;
+            section.setExpanded(!section.expanded);
+        };
         heading.actor.connect("key-press-event", (actor, event) => {
             const key = event.get_key_symbol();
             const rtl = actor.get_direction() === St.TextDirection.RTL;
             if (key !== Clutter.KEY_Left && key !== Clutter.KEY_Right) return false;
+            section._usageUserToggled = true;
             section.setExpanded((key === Clutter.KEY_Right) !== rtl);
             return true;
         });
@@ -1360,6 +1872,12 @@ class ChatGptUsageApplet extends Applet.Applet {
             window,
             tooltip: this._createPositionedTooltip(actor, tooltipText)
         };
+        const carried = (this._carriedRingTranslations || [])[this._countdownWidgets.length];
+        actor._usageHomeTx = 0;
+        if (typeof carried === "number") actor.translation_x = carried;
+        // Countdown label text changes width every tick, shifting the ring's
+        // layout position. Re-align on allocation or the ring drifts.
+        actor.connect("notify::allocation", () => this._queueActionEdgeSync());
         this._countdownWidgets.push(entry);
         this._updateResetCountdown(entry);
         return actor;
@@ -1406,6 +1924,9 @@ class ChatGptUsageApplet extends Applet.Applet {
         const progressFraction = Math.max(0, Math.min(1, Number(fraction) || 0));
         const context = area.get_context();
         const foreground = this._menuForeground();
+        // The close fade must be a pure opacity multiplier on the open-state
+        // colors (upstream behavior): boosting the translucent alphas for the
+        // farewell turned the grey track almost white in the first frames.
         const track = new Clutter.Color({
             red: foreground.red,
             green: foreground.green,
@@ -1477,7 +1998,7 @@ class ChatGptUsageApplet extends Applet.Applet {
 
     _weeklyResetHistoryFile() {
         return Gio.File.new_for_path(GLib.build_filenamev([
-            GLib.get_user_state_dir(), "cinnamon-chatgpt-usage", "weekly-reset-history.json"
+            GLib.get_user_state_dir(), "cinnamon-z-usage", "weekly-reset-history.json"
         ]));
     }
 
@@ -1534,7 +2055,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             return { timestamp: Math.floor(explicit), estimated: false };
         }
 
-        const limitId = String(window && window.limitId || "codex");
+        const limitId = String(window && window.limitId || ACCOUNT_LIMIT_ID);
         const duration = Number(window && window.durationMinutes);
         const key = `${limitId}:${duration}`;
         const saved = this._weeklyResetHistory[key];
@@ -1556,7 +2077,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         if (Number(duration) !== WEEKLY_WINDOW_MINUTES) return;
         const timestamp = Number(resetAt);
         if (!Number.isFinite(timestamp) || timestamp <= 0) return;
-        const key = `${String(limitId || "codex")}:${WEEKLY_WINDOW_MINUTES}`;
+        const key = `${String(limitId || ACCOUNT_LIMIT_ID)}:${WEEKLY_WINDOW_MINUTES}`;
         const existing = this._weeklyResetHistory[key];
         const existingTimestamp = Number(
             existing && typeof existing === "object" ? existing.lastResetAt : existing
@@ -1773,7 +2294,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             const scale = Number(global.ui_scale) > 0 ? Number(global.ui_scale) : 1;
             const area = [x, y, width, captureHeight].map(value => Math.max(1, Math.round(value * scale)));
             const cornerRadius = this._popupCornerRadiusForScreenshot(scale);
-            const [file, stream] = Gio.file_new_tmp("chatgpt-usage-screenshot-XXXXXX.png");
+            const [file, stream] = Gio.file_new_tmp("z-usage-screenshot-XXXXXX.png");
             if (stream) stream.close(null);
             temporary = file;
             this._screenshotTempFile = file;
@@ -1853,11 +2374,11 @@ class ChatGptUsageApplet extends Applet.Applet {
         }
     }
 
+    on_open_api_keys_page_pressed() {
+        Util.spawn(["xdg-open", ZAI_API_KEYS_URL]);
+    }
+
     _addLaunchButtons() {
-        const chatGptApp = this._chatGptAppInfo();
-        const codexPath = this._resolveCodexPath();
-        const codexCommand = this._codexTerminalCommand(codexPath);
-        const codexVersion = this._commandVersion(codexPath);
         const item = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
             activate: false
@@ -1882,7 +2403,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._actionColumn = column;
         actionFrame.connect(
             "notify::allocation",
-            () => this._syncActionColumnCentering()
+            () => this._queueActionEdgeSync()
         );
         if (this._actionColumnWidth > 0) {
             this._setActionColumnWidth(Math.round(this._actionColumnWidth * this._popupWidth() / POPUP_WIDTH));
@@ -1895,55 +2416,28 @@ class ChatGptUsageApplet extends Applet.Applet {
             layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 8 }),
             x_expand: true
         });
-        const webRow = new St.Widget({
-            layout_manager: new Clutter.BoxLayout({ homogeneous: true, spacing: 8 }),
-            x_expand: true
-        });
-
-        this._chatGptButton = this._createLaunchButton(
-            _("ChatGPT App"),
-            { fileName: "chat-bubble.svg" },
+        this._chatButton = this._createLaunchButton(
+            _("Z.ai Chat"),
+            { fileName: "zai-chat.svg" },
             true,
-            () => {
-                if (chatGptApp || this._configuredChatGptAppPath()) {
-                    this._launchChatGptApp(chatGptApp);
-                    return;
-                }
-                this._showInstallHelp(
-                    _("Install ChatGPT App"),
-                    _("The ChatGPT desktop app was not found. OpenAI provides it for supported Linux distributions."),
-                    CHATGPT_LINUX_INSTALL_URL
-                );
-            },
-            this._configuredChatGptAppPath() ? (this._resolveChatGptAppPath()
-                ? _("Open the configured ChatGPT app")
-                : _("ChatGPT app path is unavailable. Choose an executable file in settings.")) : this._chatGptAppTooltip(chatGptApp)
+            () => Util.spawn(["xdg-open", ZAI_URL]),
+            _("Open the Z.ai chat web app")
         );
-        this._codexButton = this._createLaunchButton(
-            _("Codex CLI"),
-            { fileName: "terminal-bot.png" },
+        this._zcodeButton = this._createLaunchButton(
+            _("ZCode"),
+            { fileName: "zcode.svg" },
             true,
-            () => {
-                if (codexCommand) {
-                    this._launchCodexTerminal(codexCommand);
-                    return;
-                }
-                this._showInstallHelp(
-                    _("Install Codex CLI"),
-                    _("No Codex CLI or ChatGPT App backend was found. Follow OpenAI's official getting-started guide to install one, sign in, and then refresh this applet."),
-                    CODEX_CLI_INSTALL_URL
-                );
-            },
-            UsageFormat.formatAppTooltip(
-                Boolean(codexPath),
-                codexVersion,
-                "",
-                this._knownReleaseDate(
-                    codexVersion,
-                    CODEX_RELEASE_VERSION,
-                    CODEX_RELEASE_DATE
-                )
-            )
+            () => this._launchZCode(),
+            GLib.find_program_in_path("zcode")
+                ? _("Open the ZCode coding agent")
+                : _("Set up the ZCode coding agent")
+        );
+        this._usageButton = this._createLaunchButton(
+            _("Usage"),
+            { fileName: "utilities-system-monitor-symbolic.svg", symbolic: true, compact: true },
+            true,
+            () => Util.spawn(["xdg-open", ZAI_USAGE_URL]),
+            _("Open the Z.ai coding plan usage statistics")
         );
         const refreshConfirmed = this._refreshConfirmed;
         this._refreshButton = this._createLaunchButton(
@@ -1958,7 +2452,8 @@ class ChatGptUsageApplet extends Applet.Applet {
                 success: refreshConfirmed
             },
             true,
-            () => this._refreshUsage(true)
+            () => this._refreshUsage(),
+            _("Refresh the usage data now")
         );
         this._refreshButtonIcon = this._refreshButton._usageIcon;
         this._refreshButtonLabel = this._refreshButton._usageLabel;
@@ -1979,49 +2474,18 @@ class ChatGptUsageApplet extends Applet.Applet {
             0
         );
         this._syncRefreshButtonState();
-        const analyticsButton = this._createLaunchButton(
-            _("Analytics"),
-            {
-                fileName: "utilities-system-monitor-symbolic.svg",
-                symbolic: true,
-                compact: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", ANALYTICS_URL])
-        );
-        const chatGptWebButton = this._createLaunchButton(
-            "ChatGPT",
-            {
-                fileName: "web-browser-symbolic.svg",
-                symbolic: true,
-                compact: true,
-                transparent: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", CHATGPT_URL])
-        );
-        const codexCloudButton = this._createLaunchButton(
-            _("Codex Cloud"),
-            {
-                fileName: "web-browser-symbolic.svg",
-                symbolic: true,
-                compact: true,
-                transparent: true
-            },
-            true,
-            () => Util.spawn(["xdg-open", CODEX_CLOUD_URL])
-        );
-        launchRow.add_child(this._chatGptButton);
-        launchRow.add_child(this._codexButton);
+        launchRow.add_child(this._chatButton);
+        launchRow.add_child(this._zcodeButton);
         utilityRow.add_child(this._refreshButton);
-        utilityRow.add_child(analyticsButton);
-        webRow.add_child(chatGptWebButton);
-        webRow.add_child(codexCloudButton);
+        utilityRow.add_child(this._usageButton);
         column.add_child(launchRow);
         column.add_child(utilityRow);
-        column.add_child(webRow);
         item.addActor(actionFrame, { span: -1, expand: true });
-        this.menu.addMenuItem(item);
+        if (this.menu._footer) {
+            this.menu._footer.add_child(item.actor);
+        } else {
+            this.menu.addMenuItem(item);
+        }
     }
 
     _createLaunchButton(label, iconSpec, available, action, tooltipText = null) {
@@ -2392,60 +2856,24 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._refreshSpinnerTimeoutId = 0;
     }
 
+    _launchZCode() {
+        if (GLib.find_program_in_path("zcode")) {
+            Util.spawn(["zcode"]);
+            return;
+        }
+        this._showInstallHelp(
+            _("Install ZCode"),
+            _f("The ZCode coding agent was not found. Z.ai's page installs it and signs you into your GLM Coding Plan; this applet then reads the plan usage from its stored credentials. An API key is only needed when that keyless login is unavailable - it stays optional."),
+            ZCODE_INSTALL_URL
+        );
+    }
+
     _showInstallHelp(title, description, url) {
         if (this._installHelpDialog) this._installHelpDialog.destroy();
 
         const dialog = new ModalDialog.ModalDialog();
         const content = new Dialog.MessageDialogContent({ title, description });
         dialog.contentLayout.add_child(content);
-        const fields = new St.BoxLayout({ vertical: true, x_expand: true });
-        fields.style = "spacing: 8px;";
-        const addPathEntry = (label, value) => {
-            fields.add_child(new St.Label({ text: label }));
-            const entry = new St.Entry({ style_class: "run-dialog-entry", text: value || "", hint_text: _("Automatic detection"), can_focus: true, x_expand: true });
-            entry.accessible_name = label;
-            entry._automaticPath = _("Checking automatic paths…");
-            entry.hint_text = entry._automaticPath;
-            entry.clutter_text.connect("key-focus-in", () => {
-                entry._pathFocused = true;
-                entry.hint_text = "";
-            });
-            entry.clutter_text.connect("key-focus-out", () => {
-                entry._pathFocused = false;
-                entry.hint_text = entry._automaticPath;
-            });
-            fields.add_child(entry);
-            return entry;
-        };
-        const codexEntry = addPathEntry(_("codex-cli path (optional)"), this.codexPath);
-        const chatGptEntry = addPathEntry(_("ChatGPT app path (optional)"), this.chatGptAppPath);
-        const status = new St.Label({ text: _("Leave empty for automatic detection. Codex CLI is preferred."), x_expand: true });
-        status.clutter_text.set_line_wrap(true);
-        status.clutter_text.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR);
-        fields.add_child(status);
-        const recheck = new St.Button({ label: _("Recheck"), style_class: "notification-button", can_focus: true });
-        fields.add(recheck, { x_fill: false, x_align: St.Align.END });
-        dialog.contentLayout.add_child(fields);
-        let cancelDetection = null;
-        let destroyed = false;
-        const detect = () => {
-            if (cancelDetection) cancelDetection();
-            recheck.reactive = false;
-            cancelDetection = this._detectAutomaticPaths(paths => {
-                if (destroyed) return;
-                for (const [entry, key] of [[codexEntry, "codex"], [chatGptEntry, "chatgpt"]]) {
-                    entry._automaticPath = paths && paths[key] ? paths[key] : _("No automatic path found");
-                    if (!entry._pathFocused) entry.hint_text = entry._automaticPath;
-                }
-                status.set_text(paths ? _("Leave empty for automatic detection. Codex CLI is preferred.") : _("Could not check automatic paths. Try Recheck."));
-                recheck.reactive = true;
-            });
-        };
-        recheck.connect("clicked", detect);
-        dialog.connect("destroy", () => {
-            destroyed = true;
-            if (cancelDetection) cancelDetection();
-        });
         const close = () => {
             dialog.destroy();
             if (this._installHelpDialog === dialog) this._installHelpDialog = null;
@@ -2457,82 +2885,16 @@ class ChatGptUsageApplet extends Applet.Applet {
                 key: Clutter.KEY_Escape
             },
             {
-                label: _("Installation guide"),
+                label: _("Open installation guide"),
                 action: () => {
                     close();
                     Util.spawn(["xdg-open", url]);
-                }
-            },
-            {
-                label: _("Save and check"),
-                action: () => {
-                    try {
-                        this._saveInstallationPaths(codexEntry.get_text(), chatGptEntry.get_text());
-                        close();
-                    } catch (error) {
-                        status.set_text(String(error.message || error));
-                    }
                 },
                 default: true
             }
         ]);
         this._installHelpDialog = dialog;
         dialog.open();
-        detect();
-    }
-
-    _detectAutomaticPaths(callback) {
-        let process = null;
-        let timeout = 0;
-        let finished = false;
-        const finish = paths => {
-            if (finished) return;
-            finished = true;
-            if (timeout) Mainloop.source_remove(timeout);
-            timeout = 0;
-            if (!this._destroyed) callback(paths);
-        };
-        try {
-            const python = GLib.find_program_in_path("python3");
-            if (!python) throw new Error(_("python3 was not found"));
-            process = Gio.Subprocess.new([python, `${this.metadata.path}/chatgpt_usage.py`, "--detect-paths"],
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-            timeout = Mainloop.timeout_add_seconds(5, () => {
-                timeout = 0;
-                process.force_exit();
-                finish(null);
-                return GLib.SOURCE_REMOVE;
-            });
-            process.communicate_utf8_async(null, null, (source, result) => {
-                try {
-                    const [ok, stdout] = source.communicate_utf8_finish(result);
-                    finish(ok && source.get_exit_status() === 0 ? JSON.parse(stdout) : null);
-                } catch {
-                    finish(null);
-                }
-            });
-        } catch {
-            finish(null);
-        }
-        return () => {
-            if (finished) return;
-            finished = true;
-            if (timeout) Mainloop.source_remove(timeout);
-            if (process) process.force_exit();
-        };
-    }
-
-    _saveInstallationPaths(codex, chatgpt) {
-        const paths = [["codex-path", _("Codex CLI"), String(codex || "").trim()],
-            ["chatgpt-app-path", _("ChatGPT app"), String(chatgpt || "").trim()]];
-        for (const [, label, value] of paths) {
-            if (value && !this._resolveExecutableFile(value)) {
-                throw new Error(_f("%s: choose an executable file, or leave empty for automatic detection.", label));
-            }
-        }
-        for (const [key, , value] of paths) this.settings.setValue(key, value);
-        this._backendCacheKey = null;
-        this._onChatGptAppPathChanged();
     }
 
     _launchButtonStyle(state, compact = false, transparent = false, corner = false) {
@@ -2570,170 +2932,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         ].join("; ") + ";";
     }
 
-    _backendPathArguments() {
-        const codex = String(this.codexPath || "").trim();
-        const chatgpt = this._configuredChatGptAppPath();
-        return [...(codex ? ["--codex", codex] : []), ...(chatgpt ? ["--chatgpt-app", chatgpt] : [])];
-    }
-
-    _refreshBackendInfo() {
-        const pathArguments = this._backendPathArguments();
-        const configured = JSON.stringify(pathArguments);
-        if (this._destroyed || this._backendDiscovery) return;
-        const now = GLib.get_monotonic_time();
-        if (this._backendCacheKey === configured && now - this._backendCachedAt < 300000000) return;
-        this._backendCacheKey = configured;
-        this._backendCachedAt = now;
-        this._backendInfo = null;
-        const python = GLib.find_program_in_path("python3");
-        if (!python) return;
-        const argv = [python, `${this.metadata.path}/chatgpt_usage.py`, "--describe-backend"];
-        argv.push(...pathArguments);
-        try {
-            const process = Gio.Subprocess.new(argv,
-                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-            this._backendDiscovery = process;
-            process.communicate_utf8_async(null, null, (source, result) => {
-                this._backendDiscovery = null;
-                try {
-                    const [ok, stdout] = source.communicate_utf8_finish(result);
-                    if (!this._destroyed && configured === JSON.stringify(this._backendPathArguments()) &&
-                        ok && source.get_exit_status() === 0) {
-                        this._backendInfo = JSON.parse(stdout);
-                        this._scheduleMenuRebuild();
-                    }
-                } catch (error) {
-                    global.logWarning(`${UUID}: backend discovery failed: ${error}`);
-                }
-                if (!this._destroyed && configured !== JSON.stringify(this._backendPathArguments())) {
-                    this._refreshBackendInfo();
-                }
-            });
-        } catch (error) {
-            global.logWarning(`${UUID}: could not start backend discovery: ${error}`);
-        }
-    }
-
-    _commandVersion(executable) {
-        this._refreshBackendInfo();
-        if (!executable || !this._backendInfo) return null;
-        return this._backendInfo.codexVersion;
-    }
-
-    _knownReleaseDate(version, knownVersion, releaseDate) {
-        return version === knownVersion ? releaseDate : null;
-    }
-
-    _chatGptAppTooltip(appInfo) {
-        // Version numbering and filesystem timestamps are not release dates.
-        return UsageFormat.formatAppTooltip(Boolean(appInfo), this._chatGptAppVersion(appInfo), "chatgpt");
-    }
-
-    _chatGptAppVersion(appInfo) {
-        if (this._configuredChatGptAppPath()) return null;
-        this._refreshBackendInfo();
-        if (this._backendInfo && this._backendInfo.chatgptVersion) {
-            return this._backendInfo.chatgptVersion;
-        }
-        if (appInfo) {
-            for (const key of ["Version", "X-AppImage-Version", "X-Version"]) {
-                const value = appInfo.get_string(key);
-                if (value && value.trim()) return value.trim();
-            }
-        }
-        return null;
-    }
-
-    _configuredChatGptAppPath() {
-        const configured = String(this.chatGptAppPath || "").trim();
-        return configured.startsWith("~/")
-            ? GLib.build_filenamev([GLib.get_home_dir(), configured.slice(2)]) : configured;
-    }
-
-    _resolveExecutableFile(value) {
-        const path = value.startsWith("~/")
-            ? GLib.build_filenamev([GLib.get_home_dir(), value.slice(2)]) : value;
-        return path && GLib.path_is_absolute(path) &&
-            GLib.file_test(path, GLib.FileTest.IS_REGULAR) &&
-            GLib.file_test(path, GLib.FileTest.IS_EXECUTABLE) ? path : null;
-    }
-
-    _resolveChatGptAppPath() {
-        return this._resolveExecutableFile(this._configuredChatGptAppPath());
-    }
-
-    _chatGptAppInfo() {
-        if (this._configuredChatGptAppPath()) return null;
-        try {
-            return Gio.DesktopAppInfo.new("chatgpt.desktop");
-        } catch (error) {
-            global.logWarning(`${UUID}: could not inspect ChatGPT desktop app: ${error}`);
-            return null;
-        }
-    }
-
-    _resolveBundledCodexPath() {
-        // Python is the single discovery implementation for CLI and app layouts.
-        return this._backendInfo && this._backendCacheKey === JSON.stringify(this._backendPathArguments())
-            ? this._backendInfo.codex : null;
-    }
-
-    _codexTerminalCommand(codex = this._resolveCodexPath()) {
-        if (!codex) return null;
-        try {
-            const terminalSettings = new Gio.Settings({
-                schema_id: "org.cinnamon.desktop.default-applications.terminal"
-            });
-            const terminal = terminalSettings.get_string("exec").trim();
-            const terminalArgument = terminalSettings.get_string("exec-arg").trim();
-            const [terminalOk, terminalArgv] = GLib.shell_parse_argv(terminal);
-            if (!terminalOk || terminalArgv.length === 0) return null;
-            const executable = GLib.find_program_in_path(terminalArgv[0]);
-            if (!executable) return null;
-            terminalArgv[0] = executable;
-            if (terminalArgument) {
-                const [argumentOk, argumentArgv] = GLib.shell_parse_argv(terminalArgument);
-                if (!argumentOk) return null;
-                terminalArgv.push(...argumentArgv);
-            }
-            terminalArgv.push(codex);
-            return terminalArgv;
-        } catch (error) {
-            global.logWarning(`${UUID}: could not inspect the default terminal: ${error}`);
-            return null;
-        }
-    }
-
-    _launchChatGptApp(appInfo) {
-        try {
-            if (this._configuredChatGptAppPath()) {
-                const path = this._resolveChatGptAppPath();
-                if (!path) throw new Error(_("Choose an executable ChatGPT app file in settings"));
-                // Pass the path as one argv element; it is never a shell command.
-                Gio.Subprocess.new([path], Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
-            } else {
-                appInfo.launch([], null);
-            }
-        } catch (error) {
-            this._reportLaunchError(_("ChatGPT App"), error,
-                this._configuredChatGptAppPath() ? _("Check the ChatGPT app path in settings.") : "");
-        }
-    }
-
-    _launchCodexTerminal(command) {
-        try {
-            Util.spawn(command);
-        } catch (error) {
-            this._reportLaunchError(_("Codex CLI"), error);
-        }
-    }
-
-    _reportLaunchError(target, error, hint = "") {
-        this._lastError = hint ? _f("Could not open %s. %s", target, hint) : _f("Could not open %s", target);
-        global.logError(`${UUID}: ${this._lastError}: ${error}`);
-        this._rebuildMenu();
-    }
-
     _addInfoItem(text, style = null, menu = this.menu) {
         const item = new PopupMenu.PopupMenuItem(text, { reactive: false });
         if (style) item.label.style = style;
@@ -2752,6 +2950,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
         label.style = POPUP_HEADING_STYLE;
         item.addActor(label, { expand: true, span: -1 });
+        item.actor._usageSectionHeading = true;
         menu.addMenuItem(item);
         return item;
     }
@@ -2811,8 +3010,23 @@ class ChatGptUsageApplet extends Applet.Applet {
         suffixEmphasized
     ) {
         let fitting = false;
-        let plotActor = null;
-        let plotAllocationId = 0;
+        // The fit tracks its own convergence: once two consecutive passes
+        // agree on the font size it stops reacting to allocation noise
+        // (hover tooltips, scroll churn would otherwise re-apply the base
+        // font and visibly pulse the line).
+        let armed = true;
+        let converged = false;
+        let lastFont = null;
+        // A rebuild destroys this row while fit callbacks may still be
+        // queued (allocation notifications, the creation idle). Touching
+        // disposed actors floods Cinnamon with Gjs-CRITICALs and was seen
+        // to end in a libmozjs GC segfault during rapid open/refresh
+        // cycles. The destroy hook flips a plain JS flag so every later
+        // pass returns before any native call.
+        let alive = true;
+        const markDead = () => { alive = false; };
+        row.connect("destroy", markDead);
+        item.actor.connect("destroy", markDead);
 
         const applyFontSize = fontSize => {
             expiresLabel.style = this._emphasizedValueStyle(
@@ -2829,62 +3043,168 @@ class ChatGptUsageApplet extends Applet.Applet {
             );
         };
         const preferredWidth = actor => actor.get_preferred_width(-1)[1];
-        const findPlot = () => {
-            const entry = (this._activityCharts || []).find(candidate => {
-                if (candidate.nested || !candidate.chart) return false;
-                return candidate.chart.get_children().length > 0;
-            });
-            const candidate = entry ? entry.chart.get_children()[0] : null;
-            if (candidate === plotActor) return;
-            if (plotActor && plotAllocationId) plotActor.disconnect(plotAllocationId);
-            plotActor = candidate;
-            plotAllocationId = plotActor
-                ? plotActor.connect("notify::allocation", fit)
-                : 0;
+        // The markup label paints wider than its preferred width reports
+        // (nbsp entities + bold spans): measure the real Pango layout so
+        // the fit targets the true paint, not an undershooting estimate.
+        // A constant slop can never serve both - too small and the tail
+        // ellipsizes, too large and the line ends short of the row edge.
+        const paintWidth = actor => {
+            if (actor.clutter_text && actor.clutter_text.get_layout) {
+                try {
+                    const layout = actor.clutter_text.get_layout();
+                    if (layout) {
+                        const extents = layout.get_pixel_extents();
+                        const logical = extents && extents[1];
+                        if (logical && Number.isFinite(logical.width) && logical.width > 0) {
+                            return Math.ceil(logical.width);
+                        }
+                    }
+                } catch { /* fall back to the preferred width */ }
+            }
+            return actor.get_preferred_width(-1)[1];
         };
+        const rowNeedWidth = () => preferredWidth(labelActor) +
+            preferredWidth(valueLabel) + preferredWidth(separatorLabel) +
+            preferredWidth(expiresLabel) + paintWidth(expiryDateLabel);
+        // The fit target is the button grid's right edge, measured from the
+        // stable action frame - never from the activity plots: fresh plots
+        // allocate at their natural geometry and only the edge sync pulls
+        // them onto the grid edge afterwards, so a plot-based target made
+        // the fit converge on whatever the transient offered (the font
+        // bottomed out at the minimum and the line ended short).
         const availableWidth = () => {
-            findPlot();
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return 0;
-            if (!plotActor || !(plotActor.get_width() > 0)) {
-                const rowSize = row.get_transformed_size();
-                const scale = rowSize[0] > 0 ? rowSize[0] / rowWidth : 1;
-                return Math.max(0, rowWidth - POPUP_CHART_RIGHT_INSET / scale);
+            const frame = this._actionWidthFrame;
+            // The fit must only run against the SETTLED footer geometry.
+            // During a rebuild's allocation wave the credits row allocates
+            // before the footer does (the scroll view is laid out first),
+            // and an unallocated action frame reports its width PROPERTY
+            // (352) at its unallocated position - a mixed read that shrank
+            // the target by ~44px and latched the font too small until the
+            // next refresh (the first-hour-bar video). Skip instead of
+            // guessing: the deferred refits own the correction.
+            if (
+                !frame ||
+                frame.is_finalized() ||
+                !frame.allocation ||
+                !(frame.allocation.x2 > frame.allocation.x1) ||
+                !this.menu ||
+                !this.menu.actor ||
+                this.menu.actor.is_finalized()
+            ) {
+                return 0;
             }
-            const [rowX] = row.get_transformed_position();
-            const [plotX] = plotActor.get_transformed_position();
-            const [plotWidth] = plotActor.get_transformed_size();
-            const [rowWidthTransformed] = row.get_transformed_size();
-            const scale = rowWidthTransformed > 0
-                ? rowWidthTransformed / rowWidth
-                : 1;
-            const width = (plotX + plotWidth - rowX) / scale;
-            return Number.isFinite(width) ? Math.max(0, Math.min(rowWidth, width)) : rowWidth;
+            // The line ends at the row's own right edge - the same
+            // inset from the popup edge as the left side (the symmetric
+            // look Claudiu chose). The old grid-edge cap ended the line
+            // short of that agreement.
+            return rowWidth;
+        };
+        // Baseline alignment: the fit scales only the suffix labels, so
+        // the scaled group rode visibly lower than "Credits:" (Claudiu's
+        // "Used:" report - the whole suffix block sits a pixel or more
+        // below the prefix baseline). St has no baseline alignment:
+        // measure each label's Pango layout baseline inside the row and
+        // translation-correct the followers onto the prefix baseline.
+        // Translations never touch layout, so this cannot feed back into
+        // the width fit.
+        const baselineInRow = label => {
+            if (!alive) return null;
+            try {
+                const alloc = label.allocation;
+                const rowAlloc = row.allocation;
+                if (
+                    !alloc || !rowAlloc ||
+                    !(alloc.y2 > alloc.y1) || !(rowAlloc.y2 > rowAlloc.y1)
+                ) {
+                    return null;
+                }
+                const text = label.clutter_text;
+                if (!text || typeof text.get_layout !== "function") return null;
+                const layout = text.get_layout();
+                if (!layout || typeof layout.get_baseline !== "function") {
+                    return null;
+                }
+                const baseline = layout.get_baseline();
+                if (!Number.isFinite(baseline) || baseline <= 0) return null;
+                return (alloc.y1 - rowAlloc.y1) + baseline / Pango.SCALE;
+            } catch {
+                return null;
+            }
+        };
+        const syncBaseline = () => {
+            const target = baselineInRow(labelActor);
+            if (target === null) return;
+            for (const label of [
+                valueLabel,
+                separatorLabel,
+                expiresLabel,
+                expiryDateLabel
+            ]) {
+                const own = baselineInRow(label);
+                if (own === null) continue;
+                const delta = target - own;
+                // A mid-relayout read must not latch a garbage offset.
+                if (Math.abs(delta) > 40) continue;
+                label.translation_y = Math.round(delta * 10) / 10;
+            }
         };
         const fit = () => {
-            if (fitting) return;
+            // The carried start font makes every pass idempotent (the ratio
+            // recomputes to the same size), so the fit can run on every
+            // allocation without pulsing - and it self-corrects whenever a
+            // transient target settles, which the old converged latch
+            // froze out forever.
+            if (!alive || !armed || fitting) return;
             const rowWidth = row.get_width();
             if (!(rowWidth > 0)) return;
             fitting = true;
             try {
-                applyFontSize(CREDIT_CONSUMPTION_BASE_FONT_SIZE);
+                // Start from the size the previous build converged to:
+                // restarting at the base size made the red text visibly
+                // jump on every update.
+                const startFont = this._lastCreditFontSize ||
+                    CREDIT_CONSUMPTION_BASE_FONT_SIZE;
+                applyFontSize(startFont);
                 const fixedWidth = preferredWidth(labelActor) +
                     preferredWidth(valueLabel) + preferredWidth(separatorLabel);
+                // The suffix width pairs the plain label's preferred width
+                // with the markup label's TRUE paint width - the ratio then
+                // lands the line end at the row edge, and the walk loops
+                // below finish the job against the same measurement.
                 const suffixWidth = preferredWidth(expiresLabel) +
-                    preferredWidth(expiryDateLabel);
+                    paintWidth(expiryDateLabel);
                 const targetWidth = availableWidth();
+                // An unpositioned or mid-teardown menu reports no usable
+                // target; fitting against it would clamp to the minimum.
+                if (!(targetWidth > 0)) return;
                 const availableSuffixWidth = Math.max(0, targetWidth - fixedWidth);
+                // Widths scale linearly with the font size, so the ratio
+                // applies to the font the widths were measured at (the
+                // carried size), bounded by the base size - the line may
+                // grow back toward the base font when the new text is
+                // shorter.
                 const ratio = suffixWidth > 0
-                    ? Math.min(1, availableSuffixWidth / suffixWidth)
+                    ? availableSuffixWidth / suffixWidth
                     : 1;
-                let fontSize = Math.max(
-                    CREDIT_CONSUMPTION_MIN_FONT_SIZE,
-                    Math.floor(CREDIT_CONSUMPTION_BASE_FONT_SIZE * ratio * 10) / 10
+                let fontSize = Math.min(
+                    CREDIT_CONSUMPTION_BASE_FONT_SIZE,
+                    Math.max(
+                        CREDIT_CONSUMPTION_MIN_FONT_SIZE,
+                        Math.floor(startFont * ratio * 10) / 10
+                    )
                 );
                 applyFontSize(fontSize);
+                // Trim both ways against the TRUE paint width: the ratio
+                // estimate carries the fixed paddings only approximately,
+                // so walk the last pixels until the line ends exactly at
+                // the row's right edge. The small slop only covers layout
+                // lag between a font step and the Pango measurement.
+                const paintSlop = 4;
                 while (
                     fontSize > CREDIT_CONSUMPTION_MIN_FONT_SIZE &&
-                    preferredWidth(row) > targetWidth + 1
+                    rowNeedWidth() > targetWidth - paintSlop
                 ) {
                     fontSize = Math.max(
                         CREDIT_CONSUMPTION_MIN_FONT_SIZE,
@@ -2892,24 +3212,58 @@ class ChatGptUsageApplet extends Applet.Applet {
                     );
                     applyFontSize(fontSize);
                 }
+                while (
+                    fontSize < CREDIT_CONSUMPTION_BASE_FONT_SIZE &&
+                    rowNeedWidth() < targetWidth - paintSlop - 1
+                ) {
+                    fontSize = Math.min(
+                        CREDIT_CONSUMPTION_BASE_FONT_SIZE,
+                        fontSize + 1
+                    );
+                    applyFontSize(fontSize);
+                }
+                // Two passes agreeing on the font size means the fit has
+                // settled and stops reacting to allocation noise.
+                if (lastFont !== null && Math.abs(lastFont - fontSize) < 0.05) {
+                    converged = true;
+                }
+                lastFont = fontSize;
+                this._lastCreditFontSize = fontSize;
             } finally {
                 fitting = false;
             }
         };
 
-        row.connect("notify::allocation", fit);
-        item.actor.connect("notify::allocation", fit);
+        const onRowAllocation = () => {
+            fit();
+            syncBaseline();
+        };
+        row.connect("notify::allocation", onRowAllocation);
+        item.actor.connect("notify::allocation", onRowAllocation);
         Mainloop.idle_add(() => {
             fit();
+            syncBaseline();
             return GLib.SOURCE_REMOVE;
         });
+        return {
+            setArmed: value => {
+                armed = value;
+                if (value) {
+                    converged = false;
+                    lastFont = null;
+                }
+            },
+            isConverged: () => converged,
+            getFontSize: () => lastFont,
+            refit: () => fit()
+        };
     }
 
     _addCreditItems() {
         const credits = this._snapshot ? this._snapshot.credits : null;
         const history = this._snapshot ? this._snapshot.history : null;
         let balance = credits
-            ? UsageFormat.formatCreditNumber(credits.balance)
+            ? UsageFormat.formatCompactNumber(credits.balance, 1)
             : _("unavailable");
         if (credits && credits.unlimited) balance = "unlimited";
         const creditConsumption = credits && !credits.unlimited && history
@@ -2923,7 +3277,9 @@ class ChatGptUsageApplet extends Applet.Applet {
             : null;
         const creditConsumptionEmphasized = Boolean(creditConsumption) &&
             CREDIT_CONSUMPTION_MARKUP_MODE !== "numbers";
-        const creditConsumptionColor = creditConsumption ? this.criticalColor : null;
+        // The AIC consumption IS the plan quota at Z.ai (not an "extra"
+        // like OpenAI credits) - render it in the normal plan color.
+        const creditConsumptionColor = creditConsumption ? this.normalColor : null;
         this._addCreditItem(
             _("Credits"),
             balance,
@@ -2931,34 +3287,12 @@ class ChatGptUsageApplet extends Applet.Applet {
             creditConsumption,
             creditConsumptionColor,
             null,
-            creditConsumption ? _("Consumed:  ") : null,
+            creditConsumption ? _("Used:  ") : null,
             creditConsumptionColor,
             creditConsumptionEmphasized,
             false,
             Boolean(creditConsumption),
             creditConsumptionMarkup
-        );
-        const resetDisplay = UsageFormat.buildResetCreditDisplay(
-            credits,
-            this._use24HourClock
-        );
-        const resetConfirmation = UsageFormat.buildResetCreditConfirmation(
-            credits,
-            this._use24HourClock
-        );
-        const resetExpiryColor = resetDisplay.suffix
-            ? this._resetExpiryColor(resetDisplay.expiresAt)
-            : null;
-        this._addCreditItem(
-            _("Limit resets"),
-            resetDisplay.count,
-            true,
-            resetDisplay.suffix,
-            resetExpiryColor,
-            (resetConfirmation.available || this._pendingReset) && this._resetJournalReady &&
-                !this._resetConsumeBusy && !this._resetJournalError
-                ? () => this._showResetConfirmation()
-                : null
         );
     }
 
@@ -2983,15 +3317,26 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
         if (interactive) {
             item.connect("activate", () => {
-                if (!this._resetConsumeBusy) action();
+                action();
             });
         }
         const row = new St.BoxLayout({ vertical: false });
         let fitTargets = null;
-        const labelActor = new St.Label({ text: `${label}:` });
+        // Every child of the row is CENTER-aligned so its allocation hugs
+        // its text box - the baseline sync below then measures exact
+        // baselines (a default-aligned label is stretched to the row
+        // height and its text paints from the top, which shifts the
+        // painted baseline away from the allocation math).
+        const labelActor = new St.Label({
+            text: `${label}:`,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         labelActor.style = `color: ${this._menuColor(0.68)};`;
         row.add_child(labelActor);
-        const valueLabel = new St.Label({ text: value });
+        const valueLabel = new St.Label({
+            text: value,
+            y_align: Clutter.ActorAlign.CENTER
+        });
         if (emphasized) {
             const zeroValue = String(value) === "0";
             valueLabel.style = this._emphasizedValueStyle(
@@ -3027,22 +3372,34 @@ class ChatGptUsageApplet extends Applet.Applet {
             const suffixTranslationY = suffixFitToChart ? 1 : 0;
             expiresLabel.translation_y = suffixTranslationY;
             expiryDateLabel.translation_y = suffixTranslationY;
+            // The suffix labels are created at the converged size so the
+            // very first paint after an open already sits at the final
+            // geometry - starting at the base size made the red text
+            // visibly rescale a few frames into the fade.
+            const suffixFontSize = this._lastCreditFontSize ||
+                CREDIT_CONSUMPTION_BASE_FONT_SIZE;
             if (suffixEmphasized) {
                 expiresLabel.style = this._emphasizedValueStyle(
-                    suffixLabelColor || this._menuColor(1)
+                    suffixLabelColor || this._menuColor(1),
+                    0,
+                    suffixFontSize
                 );
                 expiryDateLabel.style = this._emphasizedValueStyle(
-                    suffixColor || this._menuColor(1)
+                    suffixColor || this._menuColor(1),
+                    0,
+                    suffixFontSize
                 );
                 expiresLabel.opacity = 255;
                 expiryDateLabel.opacity = 255;
             } else {
                 expiresLabel.style = [
                     "font-weight: normal",
+                    `font-size: ${suffixFontSize}%`,
                     `color: ${suffixLabelColor || this._menuColor(0.68)}`
                 ].join("; ") + ";";
                 expiryDateLabel.style = [
                     "font-weight: normal",
+                    `font-size: ${suffixFontSize}%`,
                     `color: ${suffixColor || this._menuColor(0.68)}`
                 ].join("; ") + ";";
             }
@@ -3055,6 +3412,10 @@ class ChatGptUsageApplet extends Applet.Applet {
                         .replace(/>/g, "&gt;")
                         .replace(/\x20{2}·\x20{2}/g, "&#160;&#160;·&#160;&#160;");
                 expiryDateLabel.clutter_text.set_markup(markup);
+                // The credit fit bounds the true paint to the row edge;
+                // never let a preferred-width allocation (or theme CSS)
+                // ellipsize the value tail ("1h ..." on live data).
+                expiryDateLabel.clutter_text.set_ellipsize(Pango.EllipsizeMode.NONE);
             }
             if (suffixBreathing && suffixColor === RESET_EXPIRY_CRITICAL_COLOR) {
                 this._resetExpiryBreathingLabels.push(expiryDateLabel);
@@ -3077,7 +3438,7 @@ class ChatGptUsageApplet extends Applet.Applet {
         item.addActor(row, { expand: true, span: -1 });
         this.menu.addMenuItem(item);
         if (fitTargets) {
-            this._fitCreditConsumptionRow(
+            this._creditsFit = this._fitCreditConsumptionRow(
                 item,
                 row,
                 labelActor,
@@ -3089,36 +3450,6 @@ class ChatGptUsageApplet extends Applet.Applet {
                 suffixLabelColor,
                 suffixEmphasized
             );
-        }
-    }
-
-    _resetAttemptFile() {
-        return Gio.File.new_for_path(GLib.build_filenamev([
-            GLib.get_user_state_dir(), "cinnamon-chatgpt-usage", "reset-attempt.json"
-        ]));
-    }
-
-    async _loadResetAttempt() {
-        try {
-            const [ok, bytes] = await new Promise((resolve, reject) => {
-                this._resetAttemptFile().load_contents_async(null, (source, result) => {
-                    try { resolve(source.load_contents_finish(result)); } catch (error) { reject(error); }
-                });
-            });
-            const attempt = ok ? JSON.parse(ByteArray.toString(bytes)) : null;
-            if (!attempt || typeof attempt.key !== "string" || !attempt.key ||
-                typeof attempt.backend !== "string" || !attempt.backend ||
-                !(attempt.creditId === null || typeof attempt.creditId === "string")) {
-                throw new Error(_("Invalid saved reset attempt; reset actions are disabled"));
-            }
-            this._pendingReset = attempt;
-        } catch (error) {
-            if (!error.matches || !error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND)) {
-                this._resetJournalError = String(error.message || error);
-            }
-        } finally {
-            this._resetJournalReady = true;
-            if (!this._destroyed && this.menu) this._scheduleMenuRebuild();
         }
     }
 
@@ -3146,264 +3477,38 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
     }
 
-    async _saveResetAttempt(backend, creditId) {
-        if (!this._resetJournalReady) throw new Error(_("Reset recovery is still loading"));
-        if (this._resetJournalError) throw new Error(this._resetJournalError);
-        if (this._pendingReset) {
-            if (this._pendingReset.backend !== backend) {
-                throw new Error(_("Retry the unresolved reset using its original backend and account"));
-            }
-            return this._pendingReset;
-        }
-        const attempt = { key: GLib.uuid_string_random(), backend, creditId: creditId || null };
-        const file = this._resetAttemptFile();
-        await this._ensureResetDirectory(file.get_parent());
-        // Exclusive creation prevents a reloaded instance from overwriting an
-        // unresolved attempt while the old instance is still finishing I/O.
-        const stream = await new Promise((resolve, reject) => {
-            file.create_async(Gio.FileCreateFlags.PRIVATE, GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                try { resolve(source.create_finish(result)); } catch (error) { reject(error); }
-            });
-        });
-        try {
-            await new Promise((resolve, reject) => {
-                stream.write_bytes_async(new GLib.Bytes(ByteArray.fromString(JSON.stringify(attempt))),
-                    GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                        try {
-                            const count = source.write_bytes_finish(result);
-                            if (count !== ByteArray.fromString(JSON.stringify(attempt)).length) {
-                                throw new Error(_("Incomplete reset journal write; no request was sent"));
-                            }
-                            resolve();
-                        } catch (error) { reject(error); }
-                    });
-            });
-        } finally {
-            await new Promise((resolve, reject) => {
-                stream.close_async(GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                    try { resolve(source.close_finish(result)); } catch (error) { reject(error); }
-                });
-            });
-        }
-        this._pendingReset = attempt;
-        return attempt;
-    }
-
-    async _clearResetAttempt() {
-        await new Promise((resolve, reject) => {
-            this._resetAttemptFile().delete_async(GLib.PRIORITY_DEFAULT, null, (source, result) => {
-                try { resolve(source.delete_finish(result)); } catch (error) { reject(error); }
-            });
-        });
-        this._pendingReset = null;
-    }
-
-    _showResetConfirmation() {
-        if (this._destroyed || this._resetConsumeBusy || !this._snapshot) return;
-
-        const details = UsageFormat.buildResetCreditConfirmation(
-            this._snapshot.credits,
-            this._use24HourClock
-        );
-        if ((!details.available && !this._pendingReset) || !this._resetJournalReady || this._resetJournalError) return;
-        if (this.menu && this.menu.isOpen) this.menu.close(false);
-        if (this._resetConfirmationDialog) this._resetConfirmationDialog.destroy();
-
-        const content = new Dialog.MessageDialogContent({
-            title: this._pendingReset ? _("Retry the unresolved reset?") : _("Use one limit reset now?"),
-            description: this._pendingReset
-                ? _("The previous outcome is unknown. Retry the same request using the same account. Its saved key prevents a second redemption for this attempt.")
-                : [
-                _f("Available reset credits: %s", details.count),
-                _f("Next expiry: %s", details.expiryText || _("unavailable")),
-                "",
-                _("One reset credit will be consumed.")
-            ].join("\n")
-        });
-        const dialog = new ModalDialog.ModalDialog();
-        dialog.contentLayout.add_child(content);
-        const acknowledgment = new CheckBox.CheckBox(
-            this._pendingReset ? _("I confirm retrying this reset.") : _("I confirm using one reset credit."),
-            undefined,
-            false
-        );
-        dialog.contentLayout.add_child(acknowledgment.actor);
-        let submitted = false;
-        dialog.connect("destroy", () => {
-            if (this._resetConfirmationDialog === dialog) {
-                this._resetConfirmationDialog = null;
-            }
-        });
-        const cancelButton = dialog.addButton({
-            label: _("Cancel"),
-            action: () => dialog.destroy(),
-            key: Clutter.KEY_Escape,
-            default: true
-        });
-        const useButton = dialog.addButton({
-            label: this._pendingReset ? _("Retry same reset") : _("Use reset now"),
-            action: () => {
-                if (!acknowledgment.actor.checked || submitted || this._destroyed ||
-                    this._resetConsumeBusy || this._resetConfirmationDialog !== dialog) return;
-                submitted = true;
-                this._consumeResetCredit(details, dialog, content, [cancelButton, useButton, acknowledgment.actor]);
-            },
-            default: false,
-            destructive_action: true
-        });
-        const syncAcknowledgment = () => {
-            const enabled = acknowledgment.actor.checked && !submitted && !this._resetConsumeBusy;
-            useButton.reactive = enabled;
-            useButton.can_focus = enabled;
-            useButton.change_style_pseudo_class("insensitive", !enabled);
-        };
-        acknowledgment.actor.connect("notify::checked", syncAcknowledgment);
-        syncAcknowledgment();
-        this._resetConfirmationDialog = dialog;
-        dialog.open();
-    }
-
-    _setResetConfirmationBusy(dialog, content, buttons) {
-        for (const button of buttons) {
-            button.reactive = false;
-            button.can_focus = false;
-            button.add_style_pseudo_class("insensitive");
-        }
-        content.description = _f("%s\n\nUsing reset…", content.description);
-        dialog.buttonLayout.get_children().forEach(button => {
-            button.reactive = false;
-            button.can_focus = false;
-        });
-    }
-
-    _resetOutcomeFeedback(outcome) {
-        const feedback = UsageFormat.buildResetConsumeFeedback(outcome);
-        if (!feedback) {
-            throw new Error(_f("Unexpected reset outcome: %s", outcome || _("missing")));
-        }
-        return feedback;
-    }
-
-    _resetErrorFeedback(message) {
-        const detail = String(message || _("The reset request failed.")).slice(0, 180);
-        return {
-            title: _("Reset outcome unknown"),
-            description: _f("%s Retry the same request from the reset dialog; do not switch accounts until it is resolved.", detail)
-        };
-    }
-
-    _finishResetConsume(dialog, feedback, refresh) {
-        this._resetConsumeBusy = false;
-        this._resetCancellable = null;
-        if (dialog && !dialog.is_finalized()) dialog.destroy();
-        if (!feedback || this._destroyed) return;
-
-        this._resetFeedback = feedback;
-        this._rebuildPanel();
-        this._scheduleMenuRebuild();
-        if (refresh) this._refreshUsage();
-    }
-
-    async _consumeResetCredit(details, dialog, content, buttons) {
-        if (this._destroyed || this._resetConsumeBusy) return;
-
-        this._resetConsumeBusy = true;
-        this._resetFeedback = null;
-        this._setResetConfirmationBusy(dialog, content, buttons);
-        const python = GLib.find_program_in_path("python3");
-        const helper = `${this.metadata.path}/chatgpt_usage.py`;
-        const codex = this._resolveCodexPath();
-        if (!python || !codex) {
-            this._finishResetConsume(
-                dialog,
-                this._resetErrorFeedback(
-                    !python
-                        ? _("python3 was not found")
-                        : _("No Codex CLI or ChatGPT App backend was found; install one or configure its path in the applet settings")
-                ),
-                false
-            );
-            return;
-        }
-
-        let attempt;
-        try {
-            attempt = await this._saveResetAttempt(codex, details.creditId);
-            if (this._destroyed) return;
-        } catch (error) {
-            this._finishResetConsume(dialog, this._resetErrorFeedback(error.message), false);
-            return;
-        }
-        const argv = [
-            python,
-            helper,
-            "--codex",
-            codex,
-            "--timeout",
-            "25",
-            "--consume-reset",
-            "--idempotency-key",
-            attempt.key
-        ];
-        if (attempt.creditId) argv.push("--credit-id", attempt.creditId);
-
-        this._resetCancellable = new Gio.Cancellable();
-        try {
-            const process = new Gio.Subprocess({
-                argv,
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            });
-            process.init(null);
-            this._resetProcess = process;
-            process.communicate_utf8_async(
-                null,
-                this._resetCancellable,
-                async (source, result) => {
-                    this._resetProcess = null;
-                    let feedback = null;
-                    let cancelled = false;
-                    try {
-                        const [ok, stdout, stderr] = source.communicate_utf8_finish(result);
-                        if (!ok || source.get_exit_status() !== 0) {
-                            const helperError = UsageFormat.parseUsageHelperError(stderr);
-                            const error = new Error(helperError.message);
-                            error.authenticationRequired = helperError.authenticationRequired;
-                            throw error;
-                        }
-                        const payload = JSON.parse(String(stdout || "").trim());
-                        feedback = this._resetOutcomeFeedback(payload && payload.outcome);
-                        await this._clearResetAttempt();
-                    } catch (error) {
-                        cancelled = typeof error.matches === "function" &&
-                            error.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
-                        if (!cancelled) {
-                            global.logError(`${UUID}: reset consume failed: ${error}`);
-                            feedback = this._resetErrorFeedback(error.message || error);
-                        }
-                    }
-
-                    this._finishResetConsume(
-                        cancelled ? null : dialog,
-                        feedback,
-                        !cancelled
-                    );
-                }
-            );
-        } catch (error) {
-            global.logError(`${UUID}: could not start reset consume: ${error}`);
-            this._finishResetConsume(dialog, this._resetErrorFeedback(error), false);
-        }
-    }
-
     _selectCreditHistoryWindow(windows) {
         const source = Array.from(windows || []);
         return source.find(window =>
-            window.id === "codex" && Number(window.durationMinutes) === 10080
+            window.id === ACCOUNT_LIMIT_ID && Number(window.durationMinutes) === 10080
         ) || source.find(window =>
-            window.id === "codex" && Number(window.durationMinutes) === 300
+            window.id === ACCOUNT_LIMIT_ID && Number(window.durationMinutes) === 300
         ) || source.find(window =>
             Number(window.durationMinutes) === 10080
         ) || source[0] || null;
+    }
+
+    _forwardContentWheel(event) {
+        if (!this.menu || !this.menu.isOpen || !this.menu._scroll) {
+            return Clutter.EVENT_PROPAGATE;
+        }
+        const adjustment = this.menu._scroll.get_vscroll_bar().get_adjustment();
+        const direction = event.get_scroll_direction();
+        const step = 48;
+        if (direction === Clutter.ScrollDirection.SMOOTH) {
+            const [, deltaY] = event.get_scroll_delta();
+            if (!deltaY) return Clutter.EVENT_PROPAGATE;
+            adjustment.set_value(adjustment.get_value() + deltaY * step);
+            return Clutter.EVENT_STOP;
+        }
+        if (direction === Clutter.ScrollDirection.UP) {
+            adjustment.set_value(adjustment.get_value() - step);
+        } else if (direction === Clutter.ScrollDirection.DOWN) {
+            adjustment.set_value(adjustment.get_value() + step);
+        } else {
+            return Clutter.EVENT_PROPAGATE;
+        }
+        return Clutter.EVENT_STOP;
     }
 
     _addHistoryItems() {
@@ -3429,19 +3534,31 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._addSectionHeading(_("Recent consumption"));
         const windowsByLimit = new Map();
         for (const window of visibleWindows) {
-            const limitId = window.id || "codex";
+            const limitId = window.id || ACCOUNT_LIMIT_ID;
             if (!windowsByLimit.has(limitId)) windowsByLimit.set(limitId, []);
             windowsByLimit.get(limitId).push(window);
         }
         const showLimitLabels = windowsByLimit.size > 1;
         for (const [limitId, windows] of windowsByLimit) {
-            if (showLimitLabels && limitId !== "codex") {
+            if (showLimitLabels && limitId !== ACCOUNT_LIMIT_ID) {
                 const first = windows[0];
                 const submenu = new PopupMenu.PopupSubMenuMenuItem(
                     ""
                 );
                 submenu.actor.style = `padding-right: ${POPUP_RIGHT_INSET}px;`;
-                this._submenuTriangles.push(submenu._triangle);
+                // The native disclosure arrow flashed on collapse and its
+                // alignment kept fighting the grid (same call as the section
+                // arrows): expand/collapse is communicated by the leaf rows.
+                // Hide the whole bin; Cinnamon's submenu animation still
+                // rotates the hidden icon harmlessly.
+                submenu._triangleBin.hide();
+                // The leaf never needs its own scrollbar - the main scroll
+                // view scrolls the whole content. An AUTOMATIC policy here
+                // only creates an inert adjustment whose wheel handler
+                // dead-zones scrolling while the pointer is over the leaf.
+                if ("vscrollbar_policy" in submenu.menu.actor) {
+                    submenu.menu.actor.vscrollbar_policy = St.PolicyType.NEVER;
+                }
                 if ("overlay_scrollbars" in submenu.menu.actor) {
                     submenu.menu.actor.overlay_scrollbars = true;
                 }
@@ -3467,7 +3584,42 @@ class ChatGptUsageApplet extends Applet.Applet {
                 submenu.actor.label_actor = submenuLabel;
                 this.menu.addMenuItem(submenu);
                 this._historySubmenus.push({ id: limitId, submenu });
-                submenu.menu.connect("open-state-changed", () => {
+                submenu.menu.connect("open-state-changed", (_menu, open) => {
+                    if (open) {
+                        // Several leaves may stay open at once - the leaves
+                        // stack in the normal content flow and the popup
+                        // scrolls (Claudiu: multiple comparisons at a glance
+                        // beat the one-leaf accordion).
+                        // A previous scroll-viewport pass can leave a stale
+                        // height on the reopened leaf; clear it and settle.
+                        submenu.menu.actor.set_height(-1);
+                        submenu.menu.box.set_height(-1);
+                        // A freshly opened leaf's charts lost their forced
+                        // width in the rebuild allocation waves: re-pin them
+                        // to the carried width before the first visible
+                        // frame. The sync skips unmapped charts, so the
+                        // carried widths stay genuine and the queued sync
+                        // confirms the pinned width without needing the
+                        // two-pass vote (whose extra passes latched ring
+                        // garbage during the open storm, Claudiu's
+                        // leaf-width report).
+                        (this._activityCharts || []).forEach(({ chart }, index) => {
+                            if (chart.is_finalized()) return;
+                            if (chart._usageOwnerMenu !== submenu.menu) return;
+                            const carried = (this._lastChartWidths || [])[index];
+                            if (carried > 0 && (!chart.min_width_set || chart.min_width !== carried)) {
+                                this._forceActorWidth(chart, carried);
+                            }
+                        });
+                        this._clampPopupHeight();
+                        this._queueActionEdgeSync();
+                        if (typeof Mainloop !== "undefined" && this.menu && this.menu.isOpen) {
+                            Mainloop.idle_add(() => {
+                                if (!this._destroyed) this._ensureActorVisible(submenu.menu.actor);
+                                return GLib.SOURCE_REMOVE;
+                            });
+                        }
+                    }
                     this._syncPopupRightInsets();
                 });
                 const shareSparkActivityChart = this._modelBadge({
@@ -3538,12 +3690,10 @@ class ChatGptUsageApplet extends Applet.Applet {
     ) {
         const duration = UsageFormat.formatDuration(window.durationMinutes);
         const periods = window.periods || {};
-        const activityTotal = periods["24h"];
         const oneHour = UsageFormat.formatConsumedPercent(periods["1h"]);
         const fourHours = UsageFormat.formatConsumedPercent(periods["4h"]);
         const twelveHours = UsageFormat.formatConsumedPercent(periods["12h"]);
         const today = UsageFormat.formatConsumedPercent(periods.today);
-        const rollingDay = UsageFormat.formatConsumedPercent(activityTotal);
         const periodKeys = UsageFormat.historyPeriodKeys(window.durationMinutes);
         if (showLimitLabel) {
             this._addIconHeading(
@@ -3554,16 +3704,17 @@ class ChatGptUsageApplet extends Applet.Applet {
         } else {
             this._addInfoItem(_f("  %s usage", duration), "font-weight: bold;", menu);
         }
-        const rollingDayText = periodKeys.includes("24h")
-            ? _f("  ·  24h %s", rollingDay)
-            : "";
-        this._addInfoItem(
-            _f("    1h %s  ·  4h %s%s", oneHour, fourHours, rollingDayText),
-            null,
-            menu
-        );
-        if (periodKeys.includes("12h")) {
-            this._addInfoItem(_f("    12h %s  ·  Today %s", twelveHours, today), null, menu);
+        // One compact line: the chart caption already carries the window
+        // total, so a 24h row repeated the same number (Claudiu) - the
+        // 12h/today values join 1h/4h on the same line instead of
+        // spending an extra row.
+        const periodParts = [];
+        if (periodKeys.includes("1h")) periodParts.push(_f("1h %s", oneHour));
+        if (periodKeys.includes("4h")) periodParts.push(_f("4h %s", fourHours));
+        if (periodKeys.includes("12h")) periodParts.push(_f("12h %s", twelveHours));
+        if (periodKeys.includes("today")) periodParts.push(_f("Today %s", today));
+        if (periodParts.length > 0) {
+            this._addInfoItem(`    ${periodParts.join("  ·  ")}`, null, menu);
         }
         if (activityValues) {
             this._addActivityChart(
@@ -3628,8 +3779,14 @@ class ChatGptUsageApplet extends Applet.Applet {
             ? UsageFormat.formatPeakCredits(creditValues)
             : null;
         const peakCreditsLabel = peakCredits ? _f(" / %s AIC", peakCredits) : "";
+        // The window total may exceed 100% at Z.ai (overage) - render it
+        // like the leaf rows instead of formatPercent, which clamps to
+        // 100 and made a 138% day read as "100%".
         const totalLabel = model.knownCount > 0
-            ? UsageFormat.formatPercent(model.totalPercent)
+            ? UsageFormat.formatConsumedPercent({
+                consumedPercent: model.totalPercent,
+                complete: model.totalComplete
+            })
             : "—";
         const item = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
@@ -3659,10 +3816,22 @@ class ChatGptUsageApplet extends Applet.Applet {
         const chart = new St.BoxLayout({ vertical: true, x_align: Clutter.ActorAlign.START });
         const nested = menu !== this.menu;
         chart.style = this._activityChartStyle(nested, false);
+        // Marks the owning menu: the leaf-open handler re-pins the leaf's
+        // charts to their carried width before the first visible frame.
+        chart._usageOwnerMenu = menu;
+        // Carry the previous menu's aligned width across rebuilds: a fresh
+        // chart starts at its natural width and the graph would visibly
+        // jump on every data refresh until the sync re-forces it.
+        const widthHint = (this._lastChartWidths || [])[this._activityCharts.length];
+        if (widthHint > 0) this._forceActorWidth(chart, widthHint);
         this._activityCharts.push({
             chart,
             nested
         });
+        // The width hint above plus the deferred rebuild re-queues keep
+        // fresh charts converged; per-chart allocation watchers were
+        // deliberately avoided - they storm the JS engine with callbacks
+        // during rapid toggling and destabilize the shell.
 
         const plot = new St.Widget({
             layout_manager: new Clutter.BoxLayout({ homogeneous: true }),
@@ -3670,10 +3839,53 @@ class ChatGptUsageApplet extends Applet.Applet {
             x_expand: true
         });
         plot.style = `border-bottom: 1px solid ${this._menuColor(0.28)}; padding-top: 2px;`;
-        const creditHighlightColor = this._brightenColor(this.criticalColor);
+        const creditHighlightColor = this._brightenColor(this.normalColor);
+        // One GLOBAL stack scale for the whole chart: the old per-slot
+        // clamp pressed every slot whose quota+credit stack exceeded the
+        // chart height onto EXACTLY the maximum, so a 1% bucket and the
+        // 5% peak rendered at the same height (Claudiu's 7d chart). A
+        // single factor preserves every slot's relative share.
+        const slotHeights = [];
         for (let index = 0; index < barCount; index++) {
             const bar = model.bars[index] || null;
             const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
+            // Known zero buckets keep their smallest-height stub (the gray
+            // rounded-zero bar below): an all-zero window otherwise renders
+            // an empty plot - caption and axis labels with no bars between
+            // them read as a broken chart (Claudiu's first-open report).
+            // Unknown buckets (beyond the data range) stay invisible.
+            const quotaVisible = Boolean(
+                bar && bar.known && Number.isFinite(bar.consumedPercent)
+            );
+            const creditVisible = Boolean(
+                creditBar && creditBar.known &&
+                Number.isFinite(creditBar.consumedPercent)
+            );
+            slotHeights.push([
+                quotaVisible
+                    ? UsageFormat.activityBarHeight(bar, model.peakPercent)
+                    : 0,
+                creditVisible
+                    ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
+                    : 0
+            ]);
+        }
+        const maxStacked = slotHeights.reduce(
+            (max, heights) => Math.max(max, heights[0] + heights[1]),
+            0
+        );
+        const globalStackScale = maxStacked > ACTIVITY_CHART_BAR_MAX_HEIGHT
+            ? ACTIVITY_CHART_BAR_MAX_HEIGHT / maxStacked
+            : 1;
+        for (let index = 0; index < barCount; index++) {
+            const bar = model.bars[index] || null;
+            const creditBar = hasCreditModel ? creditModel.bars[index] || null : null;
+            const [quotaHeightBase, creditHeightBase] = slotHeights[index];
+            const quotaHeight = quotaHeightBase;
+            const creditHeight = creditHeightBase;
+            const quotaHasVisibleBar = quotaHeight > 0;
+            const creditHasVisibleBar = creditHeight > 0;
+            const stackScale = globalStackScale;
             const slot = new St.Bin({
                 height: 28,
                 reactive: true,
@@ -3686,20 +3898,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             }
 
             const barWidth = barCount >= 24 ? 8 : 14;
-            const quotaHasVisibleBar = bar && bar.known &&
-                Number.isFinite(bar.consumedPercent) && bar.consumedPercent > 0;
-            const creditHasVisibleBar = creditBar && creditBar.known &&
-                Number.isFinite(creditBar.consumedPercent) && creditBar.consumedPercent > 0;
-            const quotaHeight = quotaHasVisibleBar
-                ? UsageFormat.activityBarHeight(bar, model.peakPercent)
-                : 0;
-            const creditHeight = creditHasVisibleBar
-                ? UsageFormat.activityBarHeight(creditBar, creditModel.peakPercent)
-                : 0;
-            const stackedHeight = quotaHeight + creditHeight;
-            const stackScale = stackedHeight > ACTIVITY_CHART_BAR_MAX_HEIGHT
-                ? ACTIVITY_CHART_BAR_MAX_HEIGHT / stackedHeight
-                : 1;
             const bars = new St.BoxLayout({
                 vertical: true,
                 y_align: Clutter.ActorAlign.END
@@ -3708,7 +3906,7 @@ class ChatGptUsageApplet extends Applet.Applet {
                 if (!entry) return;
                 if (isCredit && !creditHasVisibleBar) return;
                 if (!isCredit && creditHasVisibleBar && !quotaHasVisibleBar) return;
-                const naturalHeight = UsageFormat.activityBarHeight(entry, peak);
+                const naturalHeight = isCredit ? creditHeight : quotaHeight;
                 const height = hasCreditModel && creditHasVisibleBar
                     ? Math.max(2, Math.round(naturalHeight * stackScale))
                     : naturalHeight;
@@ -3720,7 +3918,7 @@ class ChatGptUsageApplet extends Applet.Applet {
                     style = `background-color: ${this._menuColor(0.38)}; border-radius: ${radius};`;
                 } else if (entry.known && isCredit) {
                     const radius = quotaHasVisibleBar ? "2px 2px 0 0" : "2px";
-                    style = `background-gradient-direction: vertical; background-gradient-start: ${creditHighlightColor}; background-gradient-end: ${this.criticalColor}; border-radius: ${radius};`;
+                    style = `background-gradient-direction: vertical; background-gradient-start: ${creditHighlightColor}; background-gradient-end: ${this.normalColor}; border-radius: ${radius};`;
                 } else if (entry.known) {
                     const radius = creditHasVisibleBar && quotaHasVisibleBar && !isCredit
                         ? "0 0 2px 2px"
@@ -3833,6 +4031,10 @@ class ChatGptUsageApplet extends Applet.Applet {
     }
 
     _syncPopupRightInsets() {
+        // While the popup is closing, open leaves collapse and flip the
+        // inset styles - a row re-layout that shifts the aligned rings
+        // mid-fade. Freeze the current insets through the close.
+        if (this.menu && !this.menu.isOpen && this.menu.animating) return;
         const expandedWithScrollbar = this._historySubmenus.some(
             entry => entry.submenu.menu.isOpen &&
                 entry.submenu.menu.actor.vscrollbar_policy === St.PolicyType.AUTOMATIC
@@ -3847,9 +4049,10 @@ class ChatGptUsageApplet extends Applet.Applet {
                 expandedWithScrollbar
             );
         }
-        this._syncContentRightEdges();
+        this._queueActionEdgeSync();
         if (this.menu.isOpen) {
             this._lockPopupLayoutWidth();
+            this._clampPopupHeight();
         }
     }
 
@@ -3931,11 +4134,6 @@ class ChatGptUsageApplet extends Applet.Applet {
         this._rebuildPanel();
     }
 
-    _onChatGptAppPathChanged() {
-        this._rebuildMenu();
-        this._refreshUsage();
-    }
-
     _onModelVisibilityChanged() {
         this._rebuildPanel();
         this._rebuildMenu();
@@ -3954,7 +4152,17 @@ class ChatGptUsageApplet extends Applet.Applet {
             Mainloop.source_remove(this._timeoutId);
             this._timeoutId = 0;
         }
-        const minutes = Math.max(1, Number(this.refreshInterval) || 3);
+        const minutes = Math.max(1, Number(this.refreshInterval) || 1);
+        // Shrinking the interval (3 -> 1 min) while the data is already
+        // older than the new value must not wait another full interval:
+        // the overdue refresh runs immediately, then the regular cadence
+        // takes over.
+        if (
+            this._lastRefreshAt > 0 &&
+            Date.now() - this._lastRefreshAt >= minutes * 60000
+        ) {
+            this._refreshUsage();
+        }
         this._timeoutId = Mainloop.timeout_add_seconds(minutes * 60, () => {
             this._refreshUsage();
             return GLib.SOURCE_CONTINUE;
@@ -3975,22 +4183,24 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
     }
 
-    _refreshUsage(showConfirmation = false) {
+    _usageHelperPath() {
+        return `${this.metadata.path}/z_usage.py`;
+    }
+
+    _refreshUsage() {
         if (this._destroyed) return;
         if (this._busy) {
             this._refreshQueued = true;
             return;
         }
+        this._lastRefreshAt = Date.now();
 
         const python = GLib.find_program_in_path("python3");
-        const helper = `${this.metadata.path}/chatgpt_usage.py`;
-        this._refreshBackendInfo();
-        const pathArguments = this._backendPathArguments();
+        const helper = this._usageHelperPath();
+        const apiKey = String(this.apiKey || "").trim();
         if (!python) {
             this._authenticationRequired = false;
-            this._lastError = !python
-                ? _("python3 was not found")
-                : _("No Codex CLI or ChatGPT App backend was found; install one or configure its path in the applet settings");
+            this._lastError = _("python3 was not found");
             this._rebuildPanel();
             this._scheduleMenuRebuild();
             return;
@@ -4007,7 +4217,7 @@ class ChatGptUsageApplet extends Applet.Applet {
                 argv: [
                     python,
                     helper,
-                    ...pathArguments,
+                    ...(apiKey ? ["--api-key", apiKey] : []),
                     "--timeout",
                     "25",
                     "--activity-bucket-minutes",
@@ -4059,7 +4269,10 @@ class ChatGptUsageApplet extends Applet.Applet {
                 }
 
                 if (!this._destroyed) {
-                    if (showConfirmation && succeeded) this._showRefreshConfirmation();
+                    // Every successful refresh confirms - the auto-update's
+                    // "Updating…" must resolve to the green "Updated" state
+                    // while the popup is open, not only the button click.
+                    if (succeeded) this._showRefreshConfirmation();
                     this._rebuildPanel();
                     this._scheduleMenuRebuild();
                     if (this._refreshQueued) {
@@ -4095,12 +4308,17 @@ class ChatGptUsageApplet extends Applet.Applet {
         });
     }
 
-    _resolveCodexPath() {
-        this._refreshBackendInfo();
-        return this._resolveBundledCodexPath();
-    }
-
     on_applet_clicked() {
+        if (this.menu && this.menu.isOpen) {
+            // A click that closes must not rebuild: the fresh rows take
+            // their first allocation at their inflated natural width (the
+            // ring rows overflow to ~458px), and the close gates every sync
+            // that would correct them - the rings would ride the whole
+            // farewell fade ~60px off, flush against the popup edge. The
+            // fade shows the settled actors; the next open rebuilds anyway.
+            this.menu.toggle();
+            return;
+        }
         this._rebuildMenu();
         this.menu.toggle();
     }
@@ -4161,18 +4379,50 @@ class ChatGptUsageApplet extends Applet.Applet {
 
     _lockPopupLayoutWidth() {
         if (!this.menu) return;
-        const width = this._rightPanelPopupLockedWidth > 0
+        const outer = this._rightPanelPopupLockedWidth > 0
             ? this._rightPanelPopupLockedWidth
             : this._popupWidth();
-        this.menu.actor.set_width(width);
-        this.menu.box.set_width(width);
+        // The lock must reproduce the SETTLED layout on the very first
+        // allocation pass: the settled scroll/content/items measure exactly
+        // the popup's outer width (St re-allocates them at the box width no
+        // matter what smaller fixed width is forced). Forcing the old inner
+        // width (outer - 24) made every rebuild-while-open allocate its
+        // first frames in a 24px narrower world - rows collapsed to their
+        // minimum, right-aligned content shifted, and the edge syncs read
+        // that transient geometry. Locking to the settled width keeps the
+        // first pass and the settled pass in the same world; the item clamp
+        // still caps the inflated natural widths (458px rows) at the popup
+        // edge.
+        this.menu.actor.set_width(outer);
+        this.menu.box.set_width(outer);
         this.menu.box.clip_to_allocation = true;
-        this._forceActorWidth(this.menu._scroll, width);
-        this._forceActorWidth(this.menu._content.actor, width);
-        for (const entry of this._historySubmenus) {
-            this._forceActorWidth(entry.submenu.menu.actor, width);
-            this._forceActorWidth(entry.submenu.menu.box, width);
+        this._forceActorWidth(this.menu._scroll, outer);
+        this._forceActorWidth(this.menu._content.actor, outer);
+        this.menu._content.actor.clip_to_allocation = false;
+        if (this.menu._header) {
+            this._forceActorWidth(this.menu._header, outer);
         }
+        if (this.menu._footer) {
+            this._forceActorWidth(this.menu._footer, outer);
+        }
+        // Menu items report inflated minimum widths in the scroll regime and
+        // would overflow the popup; clamp every item to the settled width.
+        const items = this.menu._content.actor.get_children ?
+            this.menu._content.actor.get_children() : [];
+        for (const child of items) {
+            this._forceActorWidth(child, outer);
+        }
+        for (const entry of this._historySubmenus) {
+            this._forceActorWidth(entry.submenu.menu.actor, this._menuInnerWidth(outer));
+            this._forceActorWidth(entry.submenu.menu.box, this._menuInnerWidth(outer));
+        }
+    }
+
+    _menuInnerWidth(width) {
+        // The popup theme pads the actor even when the theme node reports no
+        // padding, so children must never be forced to the full outer width
+        // or they overflow past the right edge under the panel.
+        return Math.max(200, width - 24);
     }
 
     _forceActorWidth(actor, width) {
@@ -4184,6 +4434,323 @@ class ChatGptUsageApplet extends Applet.Applet {
         actor.clip_to_allocation = true;
     }
 
+    _clampPopupHeight(forActor) {
+        if (!this.menu || !this.menu._scroll || !this.menu._content) return;
+        if (!this._popupWidth || !this._menuInnerWidth) return;
+        if (!Main.layoutManager || !Main.layoutManager.findMonitorForActor) return;
+        const monitor = Main.layoutManager.findMonitorForActor(forActor || this.menu.actor);
+        if (!monitor || !Number.isFinite(monitor.height) || monitor.height <= 0) return;
+
+        const outer = this._popupWidth();
+        const inner = this._menuInnerWidth(outer);
+        // Pinned chrome naturals: header on top, footer at the bottom, both
+        // outside the scroll view.
+        // The chrome naturals from the preferred heights miss the theme
+        // padding of the PopupBaseMenuItems (~16px per item). Without the
+        // padding the reserved chrome is too small and the pinned footer
+        // overflows the popup bottom, pushing the button rows below the
+        // screen edge.
+        const headerNat = this.menu._header ?
+            this.menu._header.get_preferred_height(inner)[1] + 16 : 0;
+        const footerNat = this.menu._footer ?
+            this.menu._footer.get_preferred_height(inner)[1] + 16 : 0;
+
+        // The content's natural height at the real inner width (children are
+        // freshly built by the rebuild, so this is the true laid-out size).
+        const [, contentNat] = this.menu._content.actor.get_preferred_height(inner);
+
+        // The popup gets at most the monitor height minus a small reserve:
+        // header and footer keep their space, the scroll view absorbs the
+        // rest. The frame height is locked once per open - later section
+        // toggles only change the scrollbar range, never the popup frame, so
+        // nothing drifts, jumps or gets cut while the popup is open.
+        // Reserve the REAL panel edges: Cinnamon positions the popup inside
+        // the monitor with visible panels excluded (PanelLoc.top = 0,
+        // PanelLoc.bottom = 1), so a too-tall popup bottom-clamps to the
+        // monitor and its header hides under the top panel.
+        let topReserve = 16;
+        // Without a bottom panel nothing reserved the monitor's bottom
+        // edge: the popup was allowed to end flush at the screen bottom
+        // (or below it, depending on the icon anchor), pushing the pinned
+        // button rows out of view. Always keep a small bottom safety.
+        let bottomReserve = 16;
+        try {
+            const panels = typeof Main.panelManager.getPanelsInMonitor === "function"
+                ? Main.panelManager.getPanelsInMonitor(monitor.index)
+                : (Main.panelManager.panels || []);
+            for (const panel of panels) {
+                if (!panel || !panel.actor) continue;
+                if (panel.getIsVisible && !panel.getIsVisible()) continue;
+                const [, panelY] = panel.actor.get_transformed_position();
+                const [, panelH] = panel.actor.get_transformed_size();
+                if (!Number.isFinite(panelY) || !Number.isFinite(panelH) || panelH <= 0) continue;
+                if (panel.panelPosition === 0) {
+                    topReserve = Math.max(topReserve, Math.ceil(panelY + panelH - monitor.y) + 16);
+                } else if (panel.panelPosition === 1) {
+                    bottomReserve = Math.max(bottomReserve, Math.ceil(monitor.y + monitor.height - panelY) + 8);
+                }
+            }
+        } catch { /* best effort */ }
+        const maxMenu = Math.max(240, monitor.height - topReserve - bottomReserve);
+        if (!this._popupFrameHeight) {
+            // Only 2px of frame chrome plus a small headroom pad: a larger
+            // reserve would show the scrollbar in the default view whenever
+            // the natural content exceeds the viewport by a few pixels, and
+            // the pad absorbs post-lock content growth. The 16px top-panel
+            // slack absorbs the difference instead.
+            let viewport = Math.max(200, Math.min(
+                contentNat + POPUP_VIEWPORT_PAD,
+                maxMenu - headerNat - footerNat - 2
+            ));
+            // Trim to the last fully visible row: when the content
+            // overflows, whatever row straddles the viewport bottom pokes
+            // out above the footer and reads as a glitch. ANY straddler
+            // hides fully (Claudiu's explicit call - the collapsible
+            // areas appear only once you scroll); the earlier size cap
+            // kept tall straddlers (an open leaf) peeking their header
+            // corner. Measure at the width the width lock actually
+            // enforces (the popup's outer width), and shave a constant
+            // strip below the last full row: preferred heights drift a
+            // little per item against the real allocations (theme
+            // paddings), and the drift scales with the row count -
+            // measured 1px in the harness, ~16px on live data.
+            if (viewport < contentNat + POPUP_VIEWPORT_PAD) {
+                let acc = 0;
+                const children = this.menu._content.actor.get_children ?
+                    this.menu._content.actor.get_children() : [];
+                for (const child of children) {
+                    const [, childNat] = child.get_preferred_height(outer);
+                    if (acc + childNat > viewport) {
+                        // 32px below the last full row: the live preferred-
+                        // vs-allocation drift (theme paddings) measured
+                        // ~24px on Claudiu's row counts - 20 still left a
+                        // few-pixel corner peeking (his red-arrow shot).
+                        // The strip sits in the row's own bottom padding.
+                        viewport = Math.max(200, acc - 32);
+                        break;
+                    }
+                    acc += childNat;
+                }
+            }
+            this._popupViewport = viewport;
+            this._popupFrameHeight = headerNat + viewport + footerNat + 2;
+            this._popupChromeHeights = [headerNat, footerNat];
+            // The monitor-budget viewport without the preferred-based trim:
+            // the post-open fold snap replays this limit against the REAL
+            // row geometry (preferred sums drift per row against the real
+            // allocations, in both directions).
+            this._popupMonitorViewport = Math.max(
+                200,
+                maxMenu - headerNat - footerNat - 2
+            );
+            this._popupFoldSnapped = false;
+        }
+        this.menu._scroll.set_height(this._popupViewport);
+        // A fixed popup height up front: Cinnamon positions the popup once
+        // with the final size, so nothing jumps or gets cut at the top.
+        this.menu.actor.set_height(this._popupFrameHeight);
+    }
+
+    _snapViewportFoldToRows(attempts = 1) {
+        // The pre-open trim guesses the fold from preferred-height sums,
+        // which drift a few px per row against the real allocations (theme
+        // paddings) - in BOTH directions: a drifted fold either cut into
+        // the next row (the peeking corner) or sat above a row that still
+        // fit the monitor budget (the 7d graph vanishing below the fold).
+        // With the popup now allocated, replay the budget against the REAL
+        // geometry: every row that fits the monitor budget stays visible,
+        // the first row that does not hides fully, and the fold lands
+        // exactly on that boundary. Runs once per open before the first
+        // visible paint, so growing and shrinking are both invisible.
+        // Returns false while the geometry is not measurable yet so the
+        // caller can retry on the next frame.
+        if (this._popupFoldSnapped) return true;
+        if (!this._popupFrameHeight || !this._popupViewport) return true;
+        if (!Number.isFinite(this._popupMonitorViewport) ||
+            !(this._popupMonitorViewport > 0)) return true;
+        if (!this.menu || !this.menu.isOpen) return true;
+        if (!this._popupChromeHeights) return true;
+        const scroll = this.menu._scroll;
+        const content = this.menu._content ? this.menu._content.actor : null;
+        if (!scroll || !content) return true;
+        const [, scrollY] = scroll.get_transformed_position();
+        const [, scrollH] = scroll.get_transformed_size();
+        if (!Number.isFinite(scrollY) || !Number.isFinite(scrollH) || scrollH <= 0) {
+            return false;
+        }
+        const monitorLimit = this._popupMonitorViewport;
+        let crossingTop = null;
+        let lastBottom = null;
+        // Skipped children read as height 0 while their allocation is
+        // still pending: treating that pass as final mistook a partial
+        // walk for the whole content (a probe run collapsed the fold to
+        // the minimum that way). Only skips ABOVE the measured frontier
+        // matter - below it, a zero height cannot move the fold.
+        const zeroTops = [];
+        const orderedRows = [];
+        if (content.get_children) {
+            for (const child of content.get_children()) {
+                if (!child || (child.is_finalized && child.is_finalized())) continue;
+                // Unmapped children report stale transforms at the scroll
+                // origin (a closed leaf's inner box sits at the top with
+                // its last open height): they must not shape the fold.
+                if (child.mapped === false) continue;
+                const [, y] = child.get_transformed_position();
+                const [, h] = child.get_transformed_size();
+                if (!Number.isFinite(y) || !Number.isFinite(h) || h <= 0) {
+                    zeroTops.push(Number.isFinite(y) ? y - scrollY : null);
+                    continue;
+                }
+                const relTop = y - scrollY;
+                const relBottom = relTop + h;
+                if (relBottom > monitorLimit + 0.5) {
+                    crossingTop = relTop;
+                    break;
+                }
+                orderedRows.push({ actor: child, relTop });
+                // Transforms are not guaranteed monotonic (stale actors);
+                // the content end is the deepest bottom, not the last one.
+                if (lastBottom === null || relBottom > lastBottom) {
+                    lastBottom = relBottom;
+                }
+            }
+        }
+        let target = null;
+        let pending = false;
+        if (Number.isFinite(crossingTop)) {
+            // A section heading alone at the fold reads as a broken chart
+            // end: the heading stays visible while its whole section body
+            // hides below the fold (Claudiu's first-open report). Tuck the
+            // fold above the heading run instead, so the section hides
+            // completely and the fold lands under the previous section.
+            let index = orderedRows.length;
+            while (
+                index > 0 &&
+                orderedRows[index - 1].actor._usageSectionHeading
+            ) {
+                index -= 1;
+            }
+            if (index < orderedRows.length) crossingTop = orderedRows[index].relTop;
+            target = crossingTop;
+        } else if (Number.isFinite(lastBottom)) {
+            // The content box's natural height is stable from the start
+            // (preferred stack) while the children lag a frame or two:
+            // lastBottom well below it means rows are still settling. The
+            // box's ALLOCATED height is useless here - a short content
+            // expands to the locked viewport.
+            const contentNat = content.get_preferred_height(-1)[1];
+            if (!Number.isFinite(contentNat) || lastBottom < contentNat - 4) {
+                pending = true;
+            } else {
+                // Everything fits the monitor budget: the fold is the real
+                // content end (the preferred sums over- or under-reported
+                // it).
+                target = lastBottom;
+            }
+        } else {
+            pending = true;
+        }
+        // In the overflow case there is no content-height bound above the
+        // crossing: a not-yet allocated row there would seat the crossing
+        // too high. Only the first frames count - a permanently collapsed
+        // child must not block the snap forever.
+        if (Number.isFinite(crossingTop) && attempts <= 4) {
+            for (const zeroTop of zeroTops) {
+                if (zeroTop === null || zeroTop <= crossingTop + 0.5) {
+                    pending = true;
+                    break;
+                }
+            }
+        }
+        if (pending) return false;
+        this._popupFoldSnapped = true;
+        // Collapsible areas appear only when you scroll (Claudiu's rule):
+        // the default fold hides CLOSED leaf headers even when the monitor
+        // budget would still fit them. Open leaves count as normal
+        // content - their header and chart stay visible.
+        let leafLimit = null;
+        for (const entry of this._historySubmenus || []) {
+            const leaf = entry && entry.submenu;
+            if (!leaf || !leaf.actor) continue;
+            if (leaf.actor.is_finalized && leaf.actor.is_finalized()) continue;
+            if (!leaf.actor.mapped) continue;
+            if (leaf.menu && leaf.menu.isOpen) continue;
+            const [, leafY] = leaf.actor.get_transformed_position();
+            if (!Number.isFinite(leafY)) continue;
+            const relTop = leafY - scrollY;
+            if (leafLimit === null || relTop < leafLimit) leafLimit = relTop;
+        }
+        if (
+            target !== null &&
+            leafLimit !== null &&
+            leafLimit >= 200 &&
+            leafLimit < target
+        ) {
+            target = leafLimit;
+        }
+        if (target === null) return true;
+        target = Math.max(200, Math.round(target));
+        if (Math.abs(target - this._popupViewport) < 1) return true;
+        this._popupViewport = target;
+        this._popupFrameHeight = this._popupChromeHeights[0]
+            + target + this._popupChromeHeights[1] + 2;
+        scroll.set_height(target);
+        this.menu.actor.set_height(this._popupFrameHeight);
+        return true;
+    }
+
+    _healRingRepaints() {
+        if (typeof Mainloop === "undefined") return;
+        // GJS blocks a JS callback that fires during the GC sweeping
+        // phase ("call back into JSAPI during the sweeping phase ... the
+        // JS callback not invoked"). When that hits a freshly rebuilt
+        // ring's first `repaint` emission, the drawing area stays blank -
+        // the all-rings-vanished popup after one auto-update. Re-queue
+        // every drawing area on two deferred passes; a repaint past the
+        // sweep window heals the blank rings, and a repaint of an intact
+        // ring paints the same pixels again (invisible either way).
+        const heal = () => {
+            if (this._destroyed || !this.menu || !this.menu.actor) return;
+            if (this.menu.actor.is_finalized && this.menu.actor.is_finalized()) return;
+            const areas = [];
+            const walk = actor => {
+                if (!actor || (actor.is_finalized && actor.is_finalized())) return;
+                if (actor instanceof St.DrawingArea) areas.push(actor);
+                const children = actor.get_children ? actor.get_children() : [];
+                for (const child of children) walk(child);
+            };
+            walk(this.menu.actor);
+            for (const area of areas) area.queue_repaint();
+        };
+        Mainloop.timeout_add(350, () => {
+            heal();
+            return GLib.SOURCE_REMOVE;
+        });
+        Mainloop.timeout_add(1000, () => {
+            heal();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _ensureActorVisible(actor) {
+        if (!this.menu || !this.menu.isOpen || !this.menu._scroll) return;
+        const scroll = this.menu._scroll;
+        if (!actor || actor.is_finalized() || !actor.mapped) return;
+        const [, scrollY] = scroll.get_transformed_position();
+        const [, scrollH] = scroll.get_transformed_size();
+        const [, actorY] = actor.get_transformed_position();
+        const [, actorH] = actor.get_transformed_size();
+        if (!Number.isFinite(actorY) || !Number.isFinite(actorH) || actorH <= 0) return;
+        const adjustment = scroll.get_vscroll_bar().get_adjustment();
+        const value = adjustment.get_value();
+        const relativeTop = actorY - scrollY + value;
+        const relativeBottom = relativeTop + actorH;
+        const viewTop = value;
+        const viewBottom = value + scrollH;
+        if (relativeBottom > viewBottom) adjustment.set_value(relativeBottom - scrollH);
+        else if (relativeTop < viewTop) adjustment.set_value(relativeTop);
+    }
+
     _clearForcedActorWidth(actor) {
         actor.set_width(-1);
         actor.min_width_set = false;
@@ -4191,21 +4758,41 @@ class ChatGptUsageApplet extends Applet.Applet {
         actor.clip_to_allocation = false;
     }
 
-    _normalizeRightPanelPopupCloseWidth(trimPx = 0) {
+    _normalizeRightPanelPopupCloseWidth() {
         if (!this._isRightPanel || !this.menu) return;
         const lockedWidth = this._rightPanelPopupLockedWidth;
-        this.menu.actor.style = this._rightPanelMenuStyleBase;
-        this.menu.actor.translation_x = 0;
-        this.menu.actor.set_width(-1);
-
-        const naturalWidth = this.menu.actor.get_preferred_width(-1)[1];
-        const baseWidth = lockedWidth > 0 ? lockedWidth : naturalWidth;
-        const normalizedWidth = Math.max(0, Math.floor(baseWidth - trimPx));
-        if (normalizedWidth > 0) {
-            this.menu.actor.set_width(normalizedWidth);
-            return;
-        }
-        this.menu.actor.set_width(-1);
+        if (lockedWidth > 0) this.menu.actor.set_width(lockedWidth);
+        // Freeze the popup position across the close: Cinnamon's close()
+        // repositions the actor from its preferred size, and theme margins
+        // can make that land a few pixels off the open position - the whole
+        // content incl. the rings then reads as squeezed sideways before the
+        // slide starts. The slide ease keeps running from the frozen spot.
+        const menu = this.menu;
+        menu._closePositionFrozen = [Math.round(menu.actor.x), Math.round(menu.actor.y)];
+        menu._calculatePosition = () => menu._closePositionFrozen;
+        // Cinnamon eases the close by MENU_ANIMATION_OFFSET plus the actor
+        // margins. The right-panel margins add ~110px, sliding the whole
+        // popup under the panel: the green rings (right edge) vanish
+        // abruptly and the blue rings get clipped from the right. Zero the
+        // margins for the close so the slide is the subtle 12px nudge; the
+        // animated-closed handler restores them.
+        // Strip x/y from the close ease: Cinnamon animates the actor
+        // MENU_ANIMATION_OFFSET (+ theme margins) toward the panel, which
+        // visibly shoved the rings under it. With the position frozen and
+        // the ease reduced to opacity, the close is a pure fade with zero
+        // movement for every element.
+        // The close fade is a pure opacity multiplier on the open-state
+        // colors - no farewell repaint, no per-area opacity flips. Dimmed
+        // S/G rings keep their designed 128 dim through the fade, exactly
+        // like upstream.
+        const actor = menu.actor;
+        menu._closeEaseRestore = true;
+        actor.ease = function (params) {
+            const fadeParams = Object.assign({}, params);
+            delete fadeParams.x;
+            delete fadeParams.y;
+            Clutter.Actor.prototype.ease.call(this, fadeParams);
+        };
     }
 
     _orientationIsVertical(orientation) {
@@ -4219,6 +4806,14 @@ class ChatGptUsageApplet extends Applet.Applet {
     on_applet_removed_from_panel() {
         this._destroyed = true;
         if (this.menu && this.menu.isOpen) this.menu.close(false);
+        if (this._installHelpDialog) {
+            this._installHelpDialog.destroy();
+            this._installHelpDialog = null;
+        }
+        if (this._actionEdgeSyncQueuedId) {
+            Mainloop.source_remove(this._actionEdgeSyncQueuedId);
+            this._actionEdgeSyncQueuedId = 0;
+        }
         if (this._timeoutId) {
             Mainloop.source_remove(this._timeoutId);
             this._timeoutId = 0;
@@ -4261,7 +4856,7 @@ class ChatGptUsageApplet extends Applet.Applet {
             this._screenshotTempFile = null;
         }
         this._stopRefreshSpinner();
-        for (const process of [this._usageProcess, this._resetProcess, this._backendDiscovery]) {
+        for (const process of [this._usageProcess]) {
             if (process) {
                 // SIGTERM lets the Python helper terminate and reap its backend.
                 process.send_signal(15);
@@ -4277,15 +4872,6 @@ class ChatGptUsageApplet extends Applet.Applet {
             this._cancellable = null;
         }
         this._refreshQueued = false;
-        if (this._resetCancellable) {
-            this._resetCancellable.cancel();
-            this._resetCancellable = null;
-        }
-        this._resetConsumeBusy = false;
-        if (this._resetConfirmationDialog) {
-            this._resetConfirmationDialog.destroy();
-            this._resetConfirmationDialog = null;
-        }
         if (this._installHelpDialog) {
             this._installHelpDialog.destroy();
             this._installHelpDialog = null;
@@ -4321,5 +4907,5 @@ function main(metadata, orientation, panelHeight, instanceId) {
         UUID,
         GLib.build_filenamev([GLib.get_user_data_dir(), "locale"])
     );
-    return new ChatGptUsageApplet(metadata, orientation, panelHeight, instanceId);
+    return new ZUsageApplet(metadata, orientation, panelHeight, instanceId);
 }

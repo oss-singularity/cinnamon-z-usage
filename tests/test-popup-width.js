@@ -13,10 +13,20 @@ class Actor {
     add_child() {}
 }
 
+class Scroll extends Actor {
+    constructor() {
+        super();
+        this.vscrollbar = new Actor();
+    }
+    connect() { return 1; }
+    get_vscroll_bar() { return this.vscrollbar; }
+}
+
 class Menu {
     constructor() {
         this.actor = new Actor();
         this.box = new Actor();
+        this._scroll = new Scroll();
         this.isOpen = false;
     }
     connect() { return 1; }
@@ -29,7 +39,7 @@ class Menu {
 }
 
 const AppletClass = new Function("imports", "require", "global",
-    `${ByteArray.toString(contents)}\nreturn ChatGptUsageApplet;`
+    `${ByteArray.toString(contents)}\nreturn ZUsageApplet;`
 )(
     {
         gettext: imports.gettext, format: imports.format, ui: {
@@ -43,7 +53,8 @@ const AppletClass = new Function("imports", "require", "global",
         misc: {},
         gi: { St: {
             PolicyType: { AUTOMATIC: 1, NEVER: 0 },
-            ScrollView: class extends Actor { set_policy() {} add_actor() {} }
+            ScrollView: class extends Actor { set_policy() {} add_actor() {} connect() { return 1; } },
+            BoxLayout: class extends Actor { add_child() {} remove_all_children() {} get_children() { return []; } }
         } }
     },
     () => ({}),
@@ -64,7 +75,6 @@ for (const orientation of ["top", "bottom", "left", "right"]) {
         _limitSections: [],
         _popupRightInsetRows: [],
         _activityCharts: [],
-        _submenuTriangles: [],
         _rebuildMenu() {},
         _openActiveSparkHistory() {}
     });
