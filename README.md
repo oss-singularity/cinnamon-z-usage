@@ -21,17 +21,9 @@
   <img src=".github/social-preview.png" alt="Z Usage Monitor — quota rings, plan buckets and activity chart" width="720">
 </p>
 
-| Full usage overview with the gradient plan pill                                                 | Every window at once, including Global Build's own 5h quota                                                    |
-| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| ![Usage menu with plan buckets, credits and 24-hour histories](docs/screenshots/usage-menu.png) | ![Usage menu with all four quota rings and expanded plan sections](docs/screenshots/usage-menu-four-rings.png) |
-
-| Horizontal top bar with all plan windows                                  | 40 px vertical panel with all plan windows                                          |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| ![Z.ai plan windows in a horizontal top bar](docs/screenshots/topbar.png) | ![Z.ai plan windows in a 40 px vertical panel](docs/screenshots/vertical-panel.png) |
-
-| Top bar with the credits block                                                     | Vertical panel with the credits block                                                  |
-| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| ![Z.ai credits block in a horizontal top bar](docs/screenshots/topbar-credits.png) | ![Z.ai credits block in a vertical panel](docs/screenshots/vertical-panel-credits.png) |
+| Full usage overview with the gradient plan pill                                                 | Every window with its recent consumption                                                                                |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ![Usage menu with plan buckets, credits and 24-hour histories](docs/screenshots/usage-menu.png) | ![Scrolled usage menu with the recent-consumption charts of every plan window](docs/screenshots/usage-menu-history.png) |
 
 <p align="center"><strong>Every active quota at a glance</strong></p>
 <p align="center">

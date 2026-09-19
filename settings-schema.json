@@ -37,7 +37,6 @@
         "show-zcode-plan-quotas",
         "expand-zcode-plan-sections",
         "show-model-limits-in-panel",
-        "show-credits-in-panel",
         "show-weekly-with-five-hour",
         "font-size",
         "separator"
@@ -146,12 +145,6 @@
     "dependency": "show-zcode-plan-quotas",
     "description": "Keep ZCode plan sections expanded",
     "tooltip": "Open the ZCode plan sections by default whenever the popup is rebuilt. Manual collapsing still works per popup."
-  },
-  "show-credits-in-panel": {
-    "type": "switch",
-    "default": false,
-    "description": "Show credits in the panel",
-    "tooltip": "Show the available AIC credit balance as an additional compact panel value."
   },
   "show-weekly-with-five-hour": {
     "type": "switch",

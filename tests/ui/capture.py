@@ -12,36 +12,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / "tests/ui"
+# Variants whose driver runs extra lifecycle passes need more settle time.
+SETTLE_OVERRIDES = {
+    "usage-menu-history": 22000,
+}
 SPECS = [
     ("usage-menu", "overview", "vertical", {}, "native"),
     ("usage-menu-horizontal", "basic", "horizontal", {}, "native"),
     ("usage-menu-history", "history", "vertical", {}, "native"),
-    ("usage-menu-four-rings", "four", "vertical", {}, "native"),
-    (
-        "usage-menu-credits",
-        "credits",
-        "vertical",
-        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
-        "native",
-    ),
     ("bucket-tooltip", "bucket", "vertical", {}, "native"),
     ("topbar", "panel", "horizontal", {}, "native"),
     ("vertical-panel", "panel", "vertical", {}, "native"),
-    (
-        "topbar-credits",
-        "credits-panel",
-        "horizontal",
-        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
-        "native",
-    ),
-    (
-        "vertical-panel-credits",
-        "credits-panel",
-        "vertical",
-        {"QA_SHOW_CREDITS_IN_PANEL": "1"},
-        "native",
-    ),
-    ("reset-confirmation", "reset", "vertical", {}, "native"),
     ("panel-tooltip", "panel-tooltip", "horizontal", {}, "native"),
     ("settings-general", "settings-general", "vertical", {}, "native"),
     ("settings-colors", "settings-colors", "vertical", {}, "native"),
@@ -120,7 +101,7 @@ def main():
             "--geometry",
             size,
             "--settle-ms",
-            "13000",
+            str(SETTLE_OVERRIDES.get(name, 13000)),
         ]
         if args.extension:
             command += ["--stage-extension", str(args.extension)]

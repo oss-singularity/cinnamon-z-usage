@@ -73,7 +73,7 @@ assert usage.ACCOUNT_LIMIT_LABEL == "Z.AI PLAN TRANSLATED", usage.ACCOUNT_LIMIT_
         for message in module.settings_messages(settings):
             self.assertIn("msgid " + json.dumps(message, ensure_ascii=False), template)
         for message in [
-            "Z.ai GLM Coding usage",
+            "Z.ai Coding Usage",
             "Z.ai Coding Plan",
             "No Z.ai API key found",
             "Reset applied",

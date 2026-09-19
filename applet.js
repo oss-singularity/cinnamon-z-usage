@@ -444,7 +444,6 @@ class ZUsageApplet extends Applet.Applet {
         this.showZcodePlanQuotas = true;
         this.expandZcodePlanSections = true;
         this.showModelLimitsInPanel = false;
-        this.showCreditsInPanel = false;
         this.showWeeklyWithFiveHour = true;
         this.fontSize = 100;
         this.separator = "·";
@@ -491,11 +490,6 @@ class ZUsageApplet extends Applet.Applet {
         this.settings.bind(
             "show-model-limits-in-panel",
             "showModelLimitsInPanel",
-            layoutChanged
-        );
-        this.settings.bind(
-            "show-credits-in-panel",
-            "showCreditsInPanel",
             layoutChanged
         );
         this.settings.bind(
@@ -808,6 +802,10 @@ class ZUsageApplet extends Applet.Applet {
         const chartLimit = this._popupWidth() + 96;
         (this._activityCharts || []).forEach(({ chart }, index) => {
             if (chart.is_finalized()) return;
+            // A closed leaf's chart reports stale transforms (its inner box
+            // sits at the scroll origin with its last-open height): reading
+            // it would write garbage widths into the carried hints.
+            if (chart.mapped === false) return;
             const [x] = chart.get_transformed_position();
             const padding = chart.get_theme_node().get_padding(St.Side.RIGHT);
             const width = Math.max(1, Math.round(right - x + padding));
@@ -879,18 +877,6 @@ class ZUsageApplet extends Applet.Applet {
                     this._createWindowActor(summary, this.showPanelIcon)
                 );
             });
-        }
-
-        const panelCredits = this._panelCreditsValue();
-        if (panelCredits !== null) {
-            if (this.separator && !this._isVertical) {
-                this._root.add_child(new St.Label({
-                    text: this.separator,
-                    y_align: Clutter.ActorAlign.CENTER,
-                    style: `padding-left: 4px; padding-right: 4px; color: ${this.panelTextColor};`
-                }));
-            }
-            this._root.add_child(this._createPanelCreditsActor(panelCredits));
         }
 
         this._updateTooltip(summaries);
@@ -1013,56 +999,6 @@ class ZUsageApplet extends Applet.Applet {
         return actor;
     }
 
-    _panelCreditsValue() {
-        const credits = this._snapshot ? this._snapshot.credits : null;
-        if (!this.showCreditsInPanel || !credits) return null;
-        if (credits.unlimited) return "∞";
-        return UsageFormat.formatCreditNumber(credits.balance);
-    }
-
-    _createPanelCreditsActor(value) {
-        const fontSize = this._panelFontSize();
-        const labelFontSize = Math.max(60, Math.round(fontSize * PANEL_LABEL_SCALE));
-        const actor = new St.BoxLayout({
-            reactive: false,
-            vertical: true
-        });
-        actor.x_align = Clutter.ActorAlign.CENTER;
-        actor.y_align = Clutter.ActorAlign.CENTER;
-        actor.style = this._isVertical ? "padding: 1px 0px;" : "";
-
-        const labelRow = new St.BoxLayout({
-            reactive: false,
-            vertical: false,
-            x_align: Clutter.ActorAlign.CENTER
-        });
-        if (this.showPanelIcon) {
-            labelRow.add_child(this._createPanelIcon());
-            if (this._isVertical) labelRow.style = `min-width: ${PANEL_VERTICAL_LABEL_WIDTH}px;`;
-        }
-        const label = new St.Label({
-            text: _("AIC"),
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            style: `font-size: ${labelFontSize}%; color: ${this.panelTextColor};`
-        });
-        label.clutter_text.set_line_alignment(Pango.Alignment.CENTER);
-        labelRow.add_child(label);
-        actor.add_child(labelRow);
-
-        const balance = new St.Label({
-            text: value,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-            style: `font-size: ${fontSize}%; color: ${this.panelTextColor};`
-        });
-        balance.clutter_text.set_line_alignment(Pango.Alignment.CENTER);
-        if (!this._isVertical) balance.translation_y = 1;
-        actor.add_child(balance);
-        actor.accessible_name = _f("Credits: %s", value);
-        return actor;
-    }
-
     _panelFontSize() {
         return Math.round(this.fontSize * PANEL_FONT_SCALE);
     }
@@ -1098,8 +1034,6 @@ class ZUsageApplet extends Applet.Applet {
                 );
             }).join(" • ");
         }
-        const panelCredits = this._panelCreditsValue();
-        if (panelCredits !== null) text += `\n${_f("Credits: %s", panelCredits)}`;
         if (this._lastError) text += `\n${this._lastError}`;
         this.set_applet_tooltip(text);
     }
@@ -1445,6 +1379,47 @@ class ZUsageApplet extends Applet.Applet {
         return `<span foreground="${hex(0)}"> </span>${spans.join("")}`;
     }
 
+    // Shared brand treatment: the first brandLength characters carry the
+    // blue-to-green gradient. The label's own color must be the gradient's
+    // start color: the Clutter layer paints glyph 0 with the label color
+    // no matter what the markup's first span says (the pill's white-"P"
+    // finding), so the first character stays unspanned and the remaining
+    // brand letters interpolate in explicit spans. The tail keeps the
+    // label's regular foreground.
+    _brandPrefixGradientMarkup(text, brandLength, fromColor, toColor, baseColor, tailGap = "") {
+        const chars = Array.from(text);
+        const channel = (a, b, t) =>
+            Math.round(a + (b - a) * t).toString(16).padStart(2, "0");
+        const mix = t =>
+            `#${channel(fromColor.red, toColor.red, t)}` +
+            `${channel(fromColor.green, toColor.green, t)}` +
+            `${channel(fromColor.blue, toColor.blue, t)}`;
+        const escape = ch => ch === "&"
+            ? "&amp;"
+            : ch === "<"
+                ? "&lt;"
+                : ch === ">"
+                    ? "&gt;"
+                    : ch;
+        const span = (color, ch) => `<span foreground="${color}">${escape(ch)}</span>`;
+        const head = Math.min(brandLength, chars.length);
+        const parts = [escape(chars[0])];
+        let tail = "";
+        for (let index = 1; index < chars.length; index++) {
+            if (index < head) {
+                if (tail) {
+                    parts.push(span(baseColor, tail));
+                    tail = "";
+                }
+                parts.push(span(mix(index / (head - 1)), chars[index]));
+            } else {
+                tail += chars[index];
+            }
+        }
+        if (tail) parts.push(tailGap + span(baseColor, tail));
+        return parts.join("");
+    }
+
     _addHeaderItem() {
         this._headerRings = null;
         const item = new PopupMenu.PopupBaseMenuItem({
@@ -1478,8 +1453,46 @@ class ZUsageApplet extends Applet.Applet {
         this._screenshotButtonLabel = this._screenshotButton._usageLabel;
         this._buildScreenshotContextMenu();
         const titleLine = new St.BoxLayout({ vertical: false });
-        const title = new St.Label({ text: _("Z.ai GLM Coding usage") });
-        title.style = POPUP_HEADING_STYLE;
+        const title = new St.Label({ text: _("Z.ai Coding Usage") });
+        // The "Z.ai" brand rides the same blue-to-green gradient as the
+        // plan pill: the label's own color IS the gradient start (the
+        // Clutter layer paints glyph 0 with it regardless of the markup's
+        // first span), the remaining brand letters interpolate, and the
+        // description keeps the menu foreground.
+        const brandStart = Clutter.Color.from_string(
+            this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)
+        );
+        if (title.clutter_text && brandStart[0]) {
+            const [fromValid, fromColor] = brandStart;
+            const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
+            const menuNode = this.menu.actor.get_theme_node();
+            const fg = menuNode.get_foreground_color();
+            const bg = menuNode.get_background_color();
+            // The tail returns to the heading's old rendered gray (Claudiu's
+            // final tuning after the +⅓-white test): the theme gray sits a
+            // third of the way toward the popup background from the
+            // foreground, which reads rounder than pure white next to the
+            // gradient brand.
+            const soften = (channel, background) =>
+                Math.round(channel + (background - channel) * 0.33)
+                    .toString(16)
+                    .padStart(2, "0");
+            const baseColor = `#${soften(fg.red, bg.red)}${soften(fg.green, bg.green)}${soften(fg.blue, bg.blue)}`;
+            if (toValid) {
+                title.style = `${POPUP_HEADING_STYLE} color: ${this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)};`;
+                title.clutter_text.set_markup(
+                    this._brandPrefixGradientMarkup(
+                        _("Z.ai Coding Usage"),
+                        4,
+                        fromColor,
+                        toColor,
+                        baseColor,
+                        "\u2009"
+                    )
+                );
+            }
+        }
+        if (!title.style) title.style = POPUP_HEADING_STYLE;
         titleLine.add_child(title);
         const plan = this._snapshot && this._snapshot.credits
             ? this._snapshot.credits.plan
@@ -1494,7 +1507,7 @@ class ZUsageApplet extends Applet.Applet {
             planLabel.y_align = Clutter.ActorAlign.CENTER;
             title.y_align = Clutter.ActorAlign.CENTER;
             planLabel.style = [
-                "margin-left: 8px",
+                "margin-left: 24px",
                 "padding: 3px 8px 1px 8px",
                 "border-radius: 10px",
                 "background-color: rgba(255, 255, 255, 0.08)",
@@ -2405,7 +2418,7 @@ class ZUsageApplet extends Applet.Applet {
         });
         this._chatButton = this._createLaunchButton(
             _("Z.ai Chat"),
-            { fileName: "chat-bubble.svg" },
+            { fileName: "zai-chat.svg" },
             true,
             () => Util.spawn(["xdg-open", ZAI_URL]),
             _("Open the Z.ai chat web app")
@@ -3581,7 +3594,25 @@ class ZUsageApplet extends Applet.Applet {
                         // height on the reopened leaf; clear it and settle.
                         submenu.menu.actor.set_height(-1);
                         submenu.menu.box.set_height(-1);
+                        // A freshly opened leaf's charts lost their forced
+                        // width in the rebuild allocation waves: re-pin them
+                        // to the carried width before the first visible
+                        // frame. The sync skips unmapped charts, so the
+                        // carried widths stay genuine and the queued sync
+                        // confirms the pinned width without needing the
+                        // two-pass vote (whose extra passes latched ring
+                        // garbage during the open storm, Claudiu's
+                        // leaf-width report).
+                        (this._activityCharts || []).forEach(({ chart }, index) => {
+                            if (chart.is_finalized()) return;
+                            if (chart._usageOwnerMenu !== submenu.menu) return;
+                            const carried = (this._lastChartWidths || [])[index];
+                            if (carried > 0 && (!chart.min_width_set || chart.min_width !== carried)) {
+                                this._forceActorWidth(chart, carried);
+                            }
+                        });
                         this._clampPopupHeight();
+                        this._queueActionEdgeSync();
                         if (typeof Mainloop !== "undefined" && this.menu && this.menu.isOpen) {
                             Mainloop.idle_add(() => {
                                 if (!this._destroyed) this._ensureActorVisible(submenu.menu.actor);
@@ -3785,6 +3816,9 @@ class ZUsageApplet extends Applet.Applet {
         const chart = new St.BoxLayout({ vertical: true, x_align: Clutter.ActorAlign.START });
         const nested = menu !== this.menu;
         chart.style = this._activityChartStyle(nested, false);
+        // Marks the owning menu: the leaf-open handler re-pins the leaf's
+        // charts to their carried width before the first visible frame.
+        chart._usageOwnerMenu = menu;
         // Carry the previous menu's aligned width across rebuilds: a fresh
         // chart starts at its natural width and the graph would visibly
         // jump on every data refresh until the sync re-forces it.

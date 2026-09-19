@@ -15,10 +15,9 @@ if (schema["show-model-specific-limits"].default !== true ||
     schema["show-model-limits-in-panel"].dependency !== "show-model-specific-limits") {
     throw new Error("Model visibility must default on and control the panel-only option");
 }
-if (!schema.layout["display-section"].keys.includes("show-credits-in-panel") ||
-    schema["show-credits-in-panel"].type !== "switch" ||
-    schema["show-credits-in-panel"].default !== false) {
-    throw new Error("Credits-in-panel switch must be an opt-in display setting");
+if (schema.layout["display-section"].keys.includes("show-credits-in-panel") ||
+    schema["show-credits-in-panel"]) {
+    throw new Error("The AIC credits-in-panel switch is retired and must stay removed");
 }
 
 if (!schema.layout["panel-color-section"].keys.includes("show-panel-threshold-colors")) {

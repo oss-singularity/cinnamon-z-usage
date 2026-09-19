@@ -6,9 +6,10 @@ geometry_file=${2:?geometry output path is required}
 panel_mode=${3:-vertical}
 panel_geometry_file=${4:-}
 uuid='z-usage@oss-singularity'
+fixture_path="$(cd "$(dirname "$0")" && pwd)/fixtures/live-snapshot.json"
 
 case "$variant" in
-    basic|overview|history|bucket|four|credits|credits-panel|panel|panel-tooltip|settings-general|settings-colors) ;;
+    basic|overview|history|bucket|four|panel|panel-tooltip|settings-general|settings-colors|settings-notifications) ;;
     *)
         printf 'Unsupported variant: %s\n' "$variant" >&2
         exit 2
@@ -54,6 +55,20 @@ if [[ -n "$panel_geometry_file" && "$panel_geometry_file" != /* ]]; then
     exit 2
 fi
 
+eval_cinnamon_retry() {
+    # A transient Gjs eval failure right after a relayout storm (leaf open,
+    # scroll) must not kill the driver via pipefail - retry, then degrade.
+    local output="" attempt
+    for attempt in 1 2 3; do
+        output=$(eval_cinnamon "$1" 2>/dev/null || true)
+        if [[ "$output" == *"(true,"* ]]; then
+            printf '%s\n' "$output"
+            return 0
+        fi
+        sleep 1
+    done
+    printf '%s\n' "$output"
+}
 eval_cinnamon() {
     gdbus call \
         --session \
@@ -73,7 +88,7 @@ cleanup() {
     # that controlled driver shutdown as a successful capture.
     if (( status == 143 )); then status=0; fi
     if [[ -n "$cinnamon_pid" ]] && kill -0 "$cinnamon_pid" 2>/dev/null; then
-    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];if(!a)return {restored:false};if(a.menu&&a.menu.isOpen)a.menu.close(false);if(a.__captureOriginalSnapshot!==undefined){a._snapshot=a.__captureOriginalSnapshot;a._lastError=a.__captureOriginalLastError;a._authenticationRequired=a.__captureOriginalAuthRequired;a.showModelLimitsInPanel=a.__captureOriginalShowModelLimitsInPanel;a.showCreditsInPanel=a.__captureOriginalShowCreditsInPanel;a._rebuildPanel();a._rebuildMenu();}if(a.__captureBackgroundActor){a.__captureBackgroundActor.destroy();a.__captureBackgroundActor=null;}if(global.background_actor){if(a.__captureOriginalBackgroundVisible)global.background_actor.show();else global.background_actor.hide();}var desk=imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor;if(desk&&a.__captureOriginalDeskletsVisible)desk.show();if(desk&&!a.__captureOriginalDeskletsVisible)desk.hide();var pointer=a.__captureOriginalPointer;if(pointer)global.set_pointer(pointer[0],pointer[1]);return {restored:true};})())' >/dev/null 2>&1 || true
+    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];if(!a)return {restored:false};if(a.menu&&a.menu.isOpen)a.menu.close(false);if(a.__captureOriginalSnapshot!==undefined){a._snapshot=a.__captureOriginalSnapshot;a._lastError=a.__captureOriginalLastError;a._authenticationRequired=a.__captureOriginalAuthRequired;a.showModelLimitsInPanel=a.__captureOriginalShowModelLimitsInPanel;a._rebuildPanel();a._rebuildMenu();}if(a.__captureBackgroundActor){a.__captureBackgroundActor.destroy();a.__captureBackgroundActor=null;}if(global.background_actor){if(a.__captureOriginalBackgroundVisible)global.background_actor.show();else global.background_actor.hide();}var desk=imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor;if(desk&&a.__captureOriginalDeskletsVisible)desk.show();if(desk&&!a.__captureOriginalDeskletsVisible)desk.hide();var pointer=a.__captureOriginalPointer;if(pointer)global.set_pointer(pointer[0],pointer[1]);return {restored:true};})())' >/dev/null 2>&1 || true
         kill -TERM "$cinnamon_pid" 2>/dev/null || true
         for _ in {1..40}; do
             kill -0 "$cinnamon_pid" 2>/dev/null || break
@@ -152,7 +167,6 @@ JSON.stringify((function(){
     a.__captureOriginalLastError=a._lastError;
     a.__captureOriginalAuthRequired=a._authenticationRequired;
     a.__captureOriginalShowModelLimitsInPanel=a.showModelLimitsInPanel;
-    a.__captureOriginalShowCreditsInPanel=a.showCreditsInPanel;
     a.__captureOriginalDeskletsVisible=!!(imports.ui.main.deskletContainer&&imports.ui.main.deskletContainer.actor&&imports.ui.main.deskletContainer.actor.visible);
     a.__captureOriginalPointer=global.get_pointer();
     a.__captureOriginalBackgroundVisible=!!(global.background_actor&&global.background_actor.visible);
@@ -212,25 +226,53 @@ JSON.stringify((function(){
         a._snapshot.history.creditActivity24h=[];
     }
     if(GLib.getenv("QA_MODEL_SPECIFIC_LIMITS")==="off")a.showModelSpecificLimits=false;
-    a._lastError=null;a._authenticationRequired=false;a.showModelLimitsInPanel=true;
-    var creditsMode=GLib.getenv("QA_SHOW_CREDITS_IN_PANEL");
-    if(creditsMode==="1"||creditsMode==="0")a.showCreditsInPanel=creditsMode==="1";
+    var liveFixture=null;
+    try{
+        var fixRead=GLib.file_get_contents("FIXTUREPATH");
+        if(fixRead[0]){
+            var fixRaw="";
+            try{fixRaw=imports.byteArray.toString(fixRead[1]);}catch(e){fixRaw="";}
+            if(!fixRaw){for(var ci=0;ci<fixRead[1].length;ci++)fixRaw+=String.fromCharCode(fixRead[1][ci]);}
+            var parsed=JSON.parse(fixRaw);
+            var now2=Math.floor(Date.now()/1000);
+            var liveSnap=parsed.snapshot;
+            liveSnap.updatedAt=now2-120;
+            if(liveSnap.history){liveSnap.history.activityEndAt=Math.ceil(now2/3600)*3600;liveSnap.history.trackedSince=now2-8*86400;}
+            for(var li=0;li<(liveSnap.limits||[]).length;li++){
+                var lim=liveSnap.limits[li];
+                for(var wi=0;wi<(lim.windows||[]).length;wi++){
+                    var w=lim.windows[wi];
+                    var dur=Math.max(60,(w.durationMinutes||300)*60);
+                    if(!w.resetsAt){w.resetsAt=now2+dur;continue;}
+                    while(w.resetsAt<now2+1800)w.resetsAt+=dur;
+                }
+            }
+            if(liveSnap.credits&&liveSnap.credits.nextResetExpiresAt){while(liveSnap.credits.nextResetExpiresAt<now2+86400)liveSnap.credits.nextResetExpiresAt+=10*86400;}
+            liveFixture=liveSnap;
+        }
+    }catch(e){liveFixture=null;}
+    a._lastError=null;a._authenticationRequired=false;
+    if(liveFixture){
+        // The checked-in live fixture wins over the generated demo data:
+        // the README shots show realistic Z.ai values (Claudiu's request),
+        // time fields re-based so every capture reads fresh, and the panel
+        // rides its default two-icon layout.
+        a._snapshot=liveFixture;
+        a.showModelLimitsInPanel=false;
+    }else{
+        a.showModelLimitsInPanel=true;
+    }
+    if(typeof Mainloop!=="undefined"&&a._timeoutId){Mainloop.source_remove(a._timeoutId);a._timeoutId=0;}
+    if(a._cancellable){a._cancellable.cancel();a._cancellable=null;}
+    a._refreshQueued=false;
     a._rebuildPanel();a._rebuildMenu();
     imports.ui.main.deskletContainer.actor.hide();
     return {staged:true,variant:"VARIANT",menuOpen:!!a.menu.isOpen};
 })())
 JSEOF
 setup_code=${setup_code//VARIANT/$variant}
+setup_code=${setup_code//FIXTUREPATH/$fixture_path}
 eval_cinnamon "$setup_code" >/dev/null
-
-if [[ "${QA_SHOW_CREDITS_IN_PANEL:-}" == 1 ]]; then
-    credits_panel=$(eval_cinnamon 'String((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];return a._root.get_children().some(function(child){return child.get_children&&child.get_children().some(function(grandchild){return grandchild.text==="AIC";});});})())')
-    if [[ "$credits_panel" != *true* ]]; then
-        printf 'Credits panel setting did not render an AIC block\n' >&2
-        exit 1
-    fi
-    printf 'credits-panel=true\n'
-fi
 
 if [[ "$variant" == settings-* ]]; then
     if [[ "$variant" == settings-notifications ]]; then
@@ -251,6 +293,19 @@ elif [[ "$variant" == "panel" || "$variant" == "credits-panel" || "$variant" == 
     :
 else
     eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];if(a.menu.isOpen)a.menu.close(false);a.on_applet_clicked();return {menuOpen:!!a.menu.isOpen};})())' >/dev/null
+    if [[ "$variant" == "history" ]]; then
+        # The scrolled companion shot: Recent consumption with every open
+        # leaf and its live chart, pinned header and footer in place. All
+        # history leaves open first - their charts grow the scroll range -
+        # and the scroll repeats across the settle window: the fold snap
+        # and the post-open relayout waves re-clamp the adjustment while
+        # they settle, and an early pass alone left the shot at the top.
+        eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];var opened=0;for(var i=0;i<(a._historySubmenus||[]).length;i++){var sm=a._historySubmenus[i].submenu;if(sm&&sm.menu&&!sm.menu.isOpen){sm.menu.open(false);opened++;}}return {opened:opened};})())' | tee "${geometry_file}.leaves"
+        for settle in 1 2; do
+            sleep 1
+            eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];if(!a||!a.menu||!a.menu._scroll)return {err:"no scroll"};var v=a.menu._scroll.get_vscroll_bar().get_adjustment();var before=Math.round(v.get_value());var upper=Math.round(v.upper);var page=Math.round(v.page_size);v.set_value(upper-page);return {before:before,upper:upper,page:page,after:Math.round(v.get_value()),open:a.menu.isOpen};})())' | tee "${geometry_file}.scroll"
+        done
+    fi
 fi
 sleep 1
 
@@ -299,6 +354,18 @@ case "$variant" in
         ;;
 esac
 
+if [[ "$variant" == "history" ]]; then
+    # The lifecycle checks close and reopen the popup, which resets the
+    # scroll to the header: land the scrolled companion shot by re-opening
+    # the leaves (the restore keeps them open) and scrolling after the
+    # checks, so the capture frames the bottom of the popup.
+    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];var opened=0;for(var i=0;i<(a._historySubmenus||[]).length;i++){var sm=a._historySubmenus[i].submenu;if(sm&&sm.menu&&!sm.menu.isOpen){sm.menu.open(false);opened++;}}return {opened:opened};})())' | tee "${geometry_file}.leaves2"
+    sleep 1
+    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];var v=a.menu._scroll.get_vscroll_bar().get_adjustment();v.set_value(v.upper-v.page_size);return {scrolled:true,value:Math.round(v.get_value()),upper:Math.round(v.upper)};})())' | tee "${geometry_file}.scroll2"
+    sleep 1
+    eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];var v=a.menu._scroll.get_vscroll_bar().get_adjustment();v.set_value(v.upper-v.page_size);return {value:Math.round(v.get_value())};})())' | tee "${geometry_file}.scroll3"
+fi
+
 if [[ "$variant" == "panel-tooltip" ]]; then
     point=$(eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0],p=a.actor.get_transformed_position(),s=a.actor.get_transformed_size();return [Math.round(p[0]+s[0]/2),Math.round(p[1]+s[1]/2)].join(",");})())' | grep -oE '[0-9]+,[0-9]+' | tail -1)
     IFS=, read -r hover_x hover_y <<< "$point"
@@ -321,7 +388,7 @@ elif [[ "$variant" == "panel-tooltip" ]]; then
 elif [[ "$variant" == "panel" || "$variant" == "credits-panel" ]]; then
     menu_geometry='0,0,0,0'
 else
-    menu_geometry=$(eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0],p=a.menu.actor.get_transformed_position(),s=a.menu.actor.get_transformed_size();return [Math.round(p[0]),Math.round(p[1]),Math.round(s[0]),Math.round(s[1])].join(",");})())' | grep -oE '[0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1)
+    menu_geometry=$(eval_cinnamon_retry 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0],p=a.menu.actor.get_transformed_position(),s=a.menu.actor.get_transformed_size();return [Math.round(p[0]),Math.round(p[1]),Math.round(s[0]),Math.round(s[1])].join(",");})())' | grep -oE '[0-9]+,[0-9]+,[0-9]+,[0-9]+' | tail -1 || true)
 fi
 printf '%s\n' "$menu_geometry" >"$geometry_file"
 printf 'private-menu=%s variant=%s\n' "$menu_geometry" "$variant"
@@ -333,7 +400,7 @@ if [[ -n "$panel_geometry_file" ]]; then
 fi
 
 if [[ "${QA_REQUIRE_TRANSPARENT_PANEL:-0}" == 1 ]]; then
-    panel_alpha=$(eval_cinnamon 'String(Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0].panel.actor.get_theme_node().get_background_color().alpha)' | grep -oE '[0-9]+' | tail -1)
+    panel_alpha=$(eval_cinnamon_retry 'String(Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0].panel.actor.get_theme_node().get_background_color().alpha)' | grep -oE '[0-9]+' | tail -1 || true)
     [[ "$panel_alpha" =~ ^[0-9]+$ && "$panel_alpha" -lt 255 ]] || { printf 'Expected transparent native panel, got alpha=%s\n' "$panel_alpha" >&2; exit 1; }
     printf 'private-panel-alpha=%s\n' "$panel_alpha"
 fi

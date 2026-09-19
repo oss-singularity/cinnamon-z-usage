@@ -98,4 +98,22 @@ assert(
     `single-letter plan must render at the start color, got: ${single}`
 );
 
+// The header brand gradient leaves glyph 0 unspanned (the label color
+// carries it - the Clutter override paints glyph 0 with the label color),
+// interpolates the rest of the brand, and wraps the tail in the base color.
+const branded = applet._brandPrefixGradientMarkup(
+    "Z.ai GLM usage",
+    4,
+    from,
+    to,
+    "#e6e6e6"
+);
+assert(
+    branded === 'Z<span foreground="#82e1e2">.</span>' +
+        '<span foreground="#7fe9cc">a</span>' +
+        '<span foreground="#7df2b6">i</span>' +
+        '<span foreground="#e6e6e6"> GLM usage</span>',
+    `header brand markup mismatch: ${branded}`
+);
+
 print("Plan pill: absorber space span leads the markup and every visible letter keeps its gradient.");

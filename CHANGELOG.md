@@ -1,7 +1,26 @@
 # Changelog
 
-## Unreleased — 1.0.0 (planned)
+## 1.0.0 — 2026-09-19
 
+- The header reads "Z.ai Coding Usage", with the "Z.ai" brand riding the
+  plan pill's blue-to-green gradient: the label's own color doubles as the
+  gradient start (the Clutter layer paints glyph 0 with it), the remaining
+  brand letters interpolate, and the description keeps a softened menu
+  gray. Both gradient markups are built by tested helpers.
+- The Z.ai Chat button trades the carried purple bubble for original
+  Z-ai artwork in the ZCode icon's design language: the dark rounded
+  square with the blue edge now hosts a green gradient speech bubble
+  with a "Z." - the two footer launch icons read as one family.
+- The AIC panel block is retired: Z.ai expresses credits as percentages,
+  so the "Show credits in the panel" switch and the compact AIC balance
+  block are removed from the settings and the panel rendering.
+- Freshly opened history leaves paint their charts at the correct width
+  from the first frame: the leaf-open path re-pins its charts to the
+  carried width and runs deferred edge-sync passes, so the two-pass width
+  vote no longer waited for the NEXT leaf's open to correct the previous
+  one (each newly opened chart stayed too wide until then). The sync also
+  skips charts of closed leaves instead of recording their stale
+  transforms.
 - All-zero windows render their chart completely: known zero buckets keep
   their smallest-height gray stub instead of collapsing to nothing, so the
   end of the popup no longer shows a caption and axis labels around an

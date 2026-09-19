@@ -2,7 +2,7 @@
 
 ## Original project artwork
 
-`applet.svg`, `usage.svg`, `chat-bubble.svg` and `terminal-bot.svg` were drawn
+`applet.svg`, `usage.svg`, `zai-chat.svg` and `terminal-bot.svg` were drawn
 for OSS Singularity as original geometric artwork. They are licensed under
 GPL-3.0-or-later, as are the PNGs rendered from them: `../icon.png`,
 `usage-white.png` and `terminal-bot.png`. The robot is a terminal-themed project

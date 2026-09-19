@@ -270,10 +270,6 @@ msgid ""
 msgstr ""
 
 #: applet.js
-msgid "AIC"
-msgstr ""
-
-#: applet.js
 msgid "About..."
 msgstr ""
 
@@ -346,11 +342,6 @@ msgstr ""
 
 #: applet.js
 msgid "Credits"
-msgstr ""
-
-#: applet.js
-#, javascript-format
-msgid "Credits: %s"
 msgstr ""
 
 #: settings-schema.json.js
@@ -608,19 +599,11 @@ msgid "Show additional model limits such as Spark in the menu, history, rings, p
 msgstr ""
 
 #: settings-schema.json.js
-msgid "Show credits in the panel"
-msgstr ""
-
-#: settings-schema.json.js
 msgid "Show model-specific limits in the applet"
 msgstr ""
 
 #: settings-schema.json.js
 msgid "Show model-specific limits in the panel"
-msgstr ""
-
-#: settings-schema.json.js
-msgid "Show the available AIC credit balance as an additional compact panel value."
 msgstr ""
 
 #: settings-schema.json.js
@@ -736,7 +719,7 @@ msgid "Z.ai Coding Plan"
 msgstr ""
 
 #: applet.js
-msgid "Z.ai GLM Coding usage"
+msgid "Z.ai Coding Usage"
 msgstr ""
 
 #: z_usage.py
