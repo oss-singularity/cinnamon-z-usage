@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-09-19
+
+- The Spices submission screenshot shows the current applet: the package
+  export now takes it from the live-fixture capture instead of the
+  historical upstream-era image.
+
 ## 1.0.0 — 2026-09-19
 
 - The header reads "Z.ai Coding Usage", with the "Z.ai" brand riding the
