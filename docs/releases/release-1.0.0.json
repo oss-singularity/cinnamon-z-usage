@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "checkedAt": "2026-09-19",
+  "status": "validated-payload",
+  "sourceBaseCommit": "c4d65496e5e50b8625d19a39fe636b4a3c0ddabe",
+  "sourceState": "Squash-merge of oss-oo/z-usage-poc (branch head 85bc6a1); the packaged bytes are exactly this commit.",
+  "uuid": "z-usage@oss-singularity",
+  "localVerify": "passed",
+  "superLinter": "passed",
+  "pythonTestCount": 49,
+  "cjsSuiteCount": 12,
+  "verifiedScreenshotCount": 5,
+  "screenshotInventory": "screenshots/inventory.json",
+  "installedPayloadFiles": 24,
+  "liveCopyInstall": "24 matching regular files, targeted ReloadXlet only, unchanged Cinnamon process (PID 2246 across reloads), healthy single applet instance with live Z.ai data",
+  "maintainerReview": {
+    "date": "2026-09-19",
+    "by": "ClaudiuSchuster",
+    "status": "accepted"
+  },
+  "cinnamonVersions": ["6.6"],
+  "release": {
+    "tag": "v1.0.0",
+    "targetCommit": "c4d65496e5e50b8625d19a39fe636b4a3c0ddabe",
+    "assets": ["install.zip", "SHA256SUMS"],
+    "installZipSha256": "98a8d80e23ce6debf9063452e75faedbe405b1dd4bf23e58a2fba9d15645af00"
+  },
+  "notes": [
+    "First release of the Z.ai fork, versioned independently from upstream.",
+    "Live-snapshot capture fixture (tests/ui/fixtures/live-snapshot.json) checked in with maintainer approval; usage values only, no credentials.",
+    "AIC credits-in-panel block retired at maintainer request; Z.ai Chat icon family redesigned from the carried purple bubble."
+  ]
+}
