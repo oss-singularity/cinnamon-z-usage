@@ -1463,7 +1463,7 @@ class ZUsageApplet extends Applet.Applet {
             this._brightenColor(String(this.normalColor || "#62c7f5"), 0.35)
         );
         if (title.clutter_text && brandStart[0]) {
-            const [fromValid, fromColor] = brandStart;
+            const [, fromColor] = brandStart;
             const [toValid, toColor] = Clutter.Color.from_string("#7df2b6");
             const menuNode = this.menu.actor.get_theme_node();
             const fg = menuNode.get_foreground_color();

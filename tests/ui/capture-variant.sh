@@ -58,8 +58,8 @@ fi
 eval_cinnamon_retry() {
     # A transient Gjs eval failure right after a relayout storm (leaf open,
     # scroll) must not kill the driver via pipefail - retry, then degrade.
-    local output="" attempt
-    for attempt in 1 2 3; do
+    local output=""
+    for _ in 1 2 3; do
         output=$(eval_cinnamon "$1" 2>/dev/null || true)
         if [[ "$output" == *"(true,"* ]]; then
             printf '%s\n' "$output"
@@ -301,7 +301,7 @@ else
         # and the post-open relayout waves re-clamp the adjustment while
         # they settle, and an early pass alone left the shot at the top.
         eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];var opened=0;for(var i=0;i<(a._historySubmenus||[]).length;i++){var sm=a._historySubmenus[i].submenu;if(sm&&sm.menu&&!sm.menu.isOpen){sm.menu.open(false);opened++;}}return {opened:opened};})())' | tee "${geometry_file}.leaves"
-        for settle in 1 2; do
+        for _ in 1 2; do
             sleep 1
             eval_cinnamon 'JSON.stringify((function(){var a=Main.AppletManager.getRunningInstancesForUuid("z-usage@oss-singularity")[0];if(!a||!a.menu||!a.menu._scroll)return {err:"no scroll"};var v=a.menu._scroll.get_vscroll_bar().get_adjustment();var before=Math.round(v.get_value());var upper=Math.round(v.upper);var page=Math.round(v.page_size);v.set_value(upper-page);return {before:before,upper:upper,page:page,after:Math.round(v.get_value()),open:a.menu.isOpen};})())' | tee "${geometry_file}.scroll"
         done
