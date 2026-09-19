@@ -82,7 +82,7 @@ def export(output):
             for name, source in {
                 "info.json": "packaging/info.json",
                 "README.md": "packaging/README.md",
-                "screenshot.png": "docs/model-limits/usage-menu.png",
+                "screenshot.png": "docs/screenshots/usage-menu.png",
             }.items()
         }
     )
