@@ -51,7 +51,7 @@ The normal order after that approval is:
 - Before editing, inspect the current version, `metadata.json`,
   `CHANGELOG.md`, project PRs/tags/releases and the README divergence map.
 - Backport merges from upstream use `git fetch upstream && git merge
-  upstream/main`. Resolve conflicts only in the Z-specific regions documented
+upstream/main`. Resolve conflicts only in the Z-specific regions documented
   in the README (`z_usage.py`, identity constants, launch buttons, dropped
   reset-credit/path-settings code). Keep the neutral code byte-identical to
   upstream whenever possible so future merges stay small.
@@ -154,10 +154,10 @@ actively testing — announce and coordinate.
 ## Capture pipeline (README screenshots + social preview)
 
 - Full set: `python3 tests/ui/capture.py --output /tmp/z-usage-captures
-  --extension ~/.local/share/cinnamon/extensions/transparent-panels@germanfr
-  --extension-config
-  ~/.config/cinnamon/spices/transparent-panels@germanfr/transparent-panels@germanfr.json
-  [--only <variants>]`.
+--extension ~/.local/share/cinnamon/extensions/transparent-panels@germanfr
+--extension-config
+~/.config/cinnamon/spices/transparent-panels@germanfr/transparent-panels@germanfr.json
+[--only <variants>]`.
 - The pipeline stages a checked-in live-snapshot fixture
   (`tests/ui/fixtures/live-snapshot.json`, maintainer-approved, usage values
   only): capture-variant.sh re-bases timestamps, forces
@@ -189,8 +189,8 @@ actively testing — announce and coordinate.
 2. Fresh clone of the fork, add the linuxmint remote, branch from
    **linuxmint:master** (never from the sibling chatgpt PR branch — the PR
    would carry its files).
-3. Copy the exported `<uuid>/` directory (files/<uuid> payload + info.json
-   + README.md + screenshot.png), verify byte-identical to the export
+3. Copy the exported `<uuid>/` directory (files/<uuid> payload + info.json +
+   README.md + screenshot.png), verify byte-identical to the export
    (`diff -rq`), no symlinks, and run the pinned validator:
    `validate-spice z-usage@oss-singularity` (pinned copy:
    worktree `cinnamon-spices-applets-9024/validate-spice`, sha256

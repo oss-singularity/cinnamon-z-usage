@@ -9,13 +9,8 @@ import json
 from pathlib import Path
 
 
-DEFAULT_PROJECT = Path(
-    "/home/claudiu/git/oss-singularity/cinnamon-chatgpt-usage"
-)
-DEFAULT_INSTALLED = Path(
-    "/home/claudiu/.local/share/cinnamon/applets/"
-    "chatgpt-usage@oss-singularity"
-)
+DEFAULT_PROJECT = Path("/home/claudiu/git/oss-singularity/cinnamon-chatgpt-usage")
+DEFAULT_INSTALLED = Path("/home/claudiu/.local/share/cinnamon/applets/chatgpt-usage@oss-singularity")
 
 
 def load_manifest(project: Path, manifest_path: Path | None) -> tuple[tuple[str, str], ...]:
@@ -82,11 +77,7 @@ def main() -> int:
             problems.append("source missing")
 
         symlink_parent = next(
-            (
-                parent
-                for parent in target.parents
-                if parent != args.installed and parent.is_symlink()
-            ),
+            (parent for parent in target.parents if parent != args.installed and parent.is_symlink()),
             None,
         )
         if symlink_parent is not None:
@@ -108,10 +99,7 @@ def main() -> int:
             valid += 1
             print(f"OK   {destination}")
 
-    print(
-        f"EXPECTED={len(managed_files)} VALID={valid} "
-        f"SYMLINKS={symlinks} MISMATCHES={mismatches}"
-    )
+    print(f"EXPECTED={len(managed_files)} VALID={valid} SYMLINKS={symlinks} MISMATCHES={mismatches}")
     return 0 if valid == len(managed_files) else 1
 
 
